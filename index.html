@@ -919,6 +919,45 @@ tr.selected-row td:nth-child(2){
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <script>
+  // ─── درع الحماية البرمجي الشامل (HAC Security Shield) ───
+(function() {
+  // 1. قفل النطاق (Domain Lock)
+  const allowedDomains = [
+    "magdygaper.github.io",
+    "equipment-list-hac.web.app",
+    "equipment-list-hac.firebaseapp.com"
+  ];
+  if (!allowedDomains.includes(window.location.hostname)) {
+    document.documentElement.innerHTML = `
+      <div style="background:#0d1117;color:#f85149;height:100vh;display:flex;align-items:center;justify-content:center;font-family:sans-serif;flex-direction:column;text-align:center;padding:20px;">
+        <h2 style="font-size:22px;margin-bottom:10px;">⛔ Access Denied</h2>
+        <p style="font-size:14px;color:#7d8590;">غير مصرح بتشغيل هذه المنظومة خارج النطاق الرسمي لشركة حسن علام.</p>
+      </div>`;
+    throw new Error("Access Denied: Unauthorized Domain");
+  }
+
+  // 2. منع كليك يمين
+  document.addEventListener('contextmenu', e => e.preventDefault());
+
+  // 3. منع اختصارات الحفظ والفحص والطباعة
+  document.addEventListener('keydown', e => {
+    // منع F12
+    if (e.key === 'F12' || e.keyCode === 123) { e.preventDefault(); return false; }
+    // منع Ctrl+S (حفظ) و Ctrl+U (عرض الكود) و Ctrl+P (طباعة)
+    if (e.ctrlKey && ['s','S','u','U','p','P'].includes(e.key)) { e.preventDefault(); return false; }
+    // منع Ctrl+Shift+I / J / C (فتح أدوات المطورين)
+    if (e.ctrlKey && e.shiftKey && ['I','i','J','j','C','c'].includes(e.key)) { e.preventDefault(); return false; }
+  });
+
+  // 4. مصيدة المطورين (Debugger Loop)
+  setInterval(() => {
+    const t0 = performance.now();
+    debugger;
+    if (performance.now() - t0 > 100) {
+      document.body.innerHTML = "";
+    }
+  }, 1000);
+})();
 // 1. DUAL CLOUD SERVERS (Main + Workshop)
 const mainConfig = {
   apiKey:"AIzaSyBb9KUiy-0IJFMPqLrGDF3EZxQ1k68UDL4",
