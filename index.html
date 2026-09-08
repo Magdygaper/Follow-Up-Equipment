@@ -36,7 +36,25 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 .topbar-left{display:flex;align-items:center;gap:16px;}
 .logo-mark{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:2px;font-weight:700;}
 .topbar-title{font-size:15px;font-weight:600;}
-.topbar-right{display:flex;align-items:center;gap:12px;}
+.topbar-right{display:flex;align-items:center;gap:10px;}
+
+/* LIVE VIEWER PRESENCE BADGE (FOR ADMIN) */
+.viewer-presence-badge{
+  display:none;align-items:center;gap:6px;background:rgba(63,185,80,.12);
+  border:1px solid rgba(63,185,80,.4);color:var(--green);padding:4px 10px;
+  border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;transition:all .2s;
+}
+.viewer-presence-badge:hover{background:rgba(63,185,80,.2);border-color:var(--green);}
+.viewer-pulse-dot{
+  width:7px;height:7px;border-radius:50%;background:var(--green);
+  box-shadow:0 0 6px var(--green);animation:pulseGreen 1.5s infinite;
+}
+@keyframes pulseGreen{
+  0%{transform:scale(0.9);opacity:0.7;}
+  50%{transform:scale(1.3);opacity:1;}
+  100%{transform:scale(0.9);opacity:0.7;}
+}
+
 .badge-role{background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--text-muted);}
 .badge-role.admin{border-color:var(--accent);color:var(--accent);}
 .btn-sm{background:transparent;border:1px solid var(--border);color:var(--text-muted);padding:5px 12px;border-radius:var(--radius);cursor:pointer;font-size:12px;}
@@ -58,7 +76,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 .section-title{font-size:18px;font-weight:700;margin-bottom:6px;}
 .section-sub{color:var(--text-muted);font-size:13px;margin-bottom:24px;}
 
-/* DASHBOARD CARDS (DESKTOP ORIGINAL) */
+/* DASHBOARD CARDS */
 .dash-section-label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;margin-top:24px;}
 .cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:8px;}
 .dash-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
@@ -123,7 +141,7 @@ tr.selected-row td{
   border-bottom: 1px solid var(--accent) !important;
 }
 
-/* تثبيت أول عمودين */
+/* تثبيت أول عمودين للجدول العام */
 .table-wrap table th:nth-child(1),
 .table-wrap table td:nth-child(1){
   position: sticky;
@@ -210,7 +228,7 @@ tr.selected-row td:nth-child(2){
 #ws-notification-banner{position:fixed;top:20px;right:20px;background:#27ae60;color:#fff;padding:12px 20px;border-radius:6px;box-shadow:0 4px 15px rgba(0,0,0,0.3);z-index:10000;display:none;font-size:12px;font-weight:bold;max-width:350px;}
 
 /* ============================================================ */
-/* تعديل الموبايل: تصغير وتحديد عرض عمود المعدة لمنع فرشه بالعرض */
+/* تعديلات الموبايل: ضبط عمود المعدة فقط بالورشة وترجيع الباقي طبيعي */
 /* ============================================================ */
 @media (max-width: 860px) {
   .main{flex-direction:column !important;}
@@ -242,37 +260,37 @@ tr.selected-row td:nth-child(2){
     font-size: 22px !important;
   }
 
-  /* حل مشكلة عمود المعدة الضخم في الورشة وكل الجداول على الموبايل */
-  .table-wrap table th:nth-child(1),
-  .table-wrap table td:nth-child(1) {
-    width: 32px !important;
-    min-width: 32px !important;
-    padding: 8px 3px !important;
+  /* 1. عمود الرقم (#) بالورشة */
+  #page-workshop .table-wrap table th:nth-child(1),
+  #page-workshop .table-wrap table td:nth-child(1) {
+    width: 36px !important;
+    min-width: 36px !important;
+    padding: 8px 4px !important;
     font-size: 11px !important;
     text-align: center !important;
   }
 
-  .table-wrap table th:nth-child(2),
-  .table-wrap table td:nth-child(2) {
-    left: 32px !important;
-    width: 105px !important;
-    max-width: 110px !important;
-    min-width: 95px !important;
-    white-space: normal !important;      /* يسمح للاسم ينزل سطرين وميفرشش الشاشة */
+  /* 2. عمود المعدة فقط بالورشة ينزل سطرين بأناقة */
+  #page-workshop .table-wrap table th:nth-child(2),
+  #page-workshop .table-wrap table td:nth-child(2) {
+    left: 36px !important;
+    width: 115px !important;
+    max-width: 120px !important;
+    min-width: 100px !important;
+    white-space: normal !important;
     word-break: break-word !important;
-    line-height: 1.25 !important;
+    line-height: 1.3 !important;
     font-size: 11px !important;
     padding: 8px 6px !important;
     font-weight: 600 !important;
   }
 
-  /* تقليص عرض عمود الكود والملاحظات بالورشة على الموبايل لسهولة السحب */
-  #page-workshop .table-wrap table th:nth-child(3),
-  #page-workshop .table-wrap table td:nth-child(3) {
-    max-width: 140px !important;
-    white-space: normal !important;
-    font-size: 11px !important;
-    word-break: break-word !important;
+  /* 3. باقي أعمدة الورشة بالكامل (الكود، الملاحظات، المشروع، المدة، الحالة) ترجع لطبيعتها 100% */
+  #page-workshop .table-wrap table th:nth-child(n+3),
+  #page-workshop .table-wrap table td:nth-child(n+3) {
+    white-space: nowrap !important;
+    max-width: none !important;
+    width: auto !important;
   }
 }
 </style>
@@ -305,6 +323,17 @@ tr.selected-row td:nth-child(2){
       <div class="topbar-title">Equipment Management Portal</div>
     </div>
     <div class="topbar-right">
+      <!-- رادار التتبع الحي للفيور النشط (يظهر فقط للأدمن) -->
+      <div class="viewer-presence-badge" id="viewer-presence-indicator" onclick="openViewersModal('live')" title="Click to view online engineers">
+        <span class="viewer-pulse-dot"></span>
+        <span id="viewer-presence-text">0 Online</span>
+      </div>
+
+      <!-- زر فتح سجل الدخول الدائم (History) للأدمن -->
+      <button class="btn-sm" id="btn-viewers-log" style="display:none;color:var(--accent);border-color:rgba(240,165,0,.4);gap:4px;" onclick="openViewersModal('history')">
+        🕒 Access Log
+      </button>
+
       <span class="badge-role" id="role-badge">Viewer</span>
       <button class="btn-sm" onclick="doLogout()">Logout</button>
     </div>
@@ -670,6 +699,56 @@ tr.selected-row td:nth-child(2){
 
 <!-- ================= MODALS ================= -->
 
+<!-- VIEWER NAME PROMPT MODAL -->
+<div class="modal-overlay" id="viewer-name-modal" style="z-index:9999;">
+  <div class="modal" style="width:380px;text-align:center;">
+    <div class="auth-logo" style="margin-bottom:6px;">HAC · PMV PORTAL</div>
+    <div class="modal-title" style="margin-bottom:6px;">Welcome, Team Member!</div>
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">Please enter your full name to proceed to the portal:</p>
+    <form id="viewer-name-form" onsubmit="submitViewerName(event)">
+      <div class="form-group" style="margin-bottom:16px;">
+        <input type="text" id="viewer-name-input" placeholder="e.g. Eng. Ahmed Mostafa" required style="text-align:center;font-size:14px;font-weight:600;">
+      </div>
+      <button type="submit" class="btn-primary">Continue to Portal ›</button>
+    </form>
+  </div>
+</div>
+
+<!-- ACTIVE VIEWERS & ACCESS HISTORY MODAL (FOR ADMIN) -->
+<div class="modal-overlay" id="active-viewers-modal">
+  <div class="modal" style="width:520px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <div class="modal-title" style="margin:0;color:var(--text);display:flex;align-items:center;gap:8px;">
+        👥 Team Viewers Access Monitor
+      </div>
+      <button class="btn-sm" onclick="closeModal('active-viewers-modal')">✕</button>
+    </div>
+
+    <!-- TABS: LIVE VS HISTORY -->
+    <div style="display:flex;gap:8px;margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:10px;align-items:center;">
+      <button class="btn-sm active" id="tab-live-btn" onclick="switchViewerModalTab('live')">
+        🟢 المتواجدون الآن (<span id="count-live-tab">0</span>)
+      </button>
+      <button class="btn-sm" id="tab-history-btn" onclick="switchViewerModalTab('history')">
+        🕒 سجل الدخول السابق (History)
+      </button>
+      <button class="btn-sm" id="btn-clear-history" style="margin-left:auto;color:var(--red);border-color:rgba(248,81,73,.3);display:none;" onclick="clearAccessHistory()">
+        🗑 مسح السجل
+      </button>
+    </div>
+
+    <!-- TAB 1: LIVE VIEWERS -->
+    <div id="viewers-live-content" style="display:flex;flex-direction:column;gap:8px;max-height:360px;overflow-y:auto;">
+      <!-- Populated live -->
+    </div>
+
+    <!-- TAB 2: ACCESS HISTORY LOG -->
+    <div id="viewers-history-content" style="display:none;flex-direction:column;gap:8px;max-height:360px;overflow-y:auto;">
+      <!-- Populated from persistent logs -->
+    </div>
+  </div>
+</div>
+
 <!-- WORKSHOP REQUEST MODAL -->
 <div class="modal-overlay" id="requestModal">
   <div class="modal" style="width:400px;">
@@ -876,6 +955,13 @@ let allEquipment=[], allTransfers=[];
 let editingId=null;
 let multiFilter={od:null, cat:null, proj:null};
 
+// LIVE PRESENCE & PERSISTENT ACCESS LOGS
+let viewerSessionId = null;
+let viewerPingInterval = null;
+let activeViewersList = [];
+let viewerAccessHistoryList = [];
+let currentViewerModalTab = 'live';
+
 function getOd(p){
   if(!p) return '';
   if(OD_MAP[p]) return OD_MAP[p];
@@ -916,7 +1002,11 @@ function doLogin() {
   });
 }
 
-function doLogout() { auth.signOut(); }
+function doLogout() {
+  cleanupViewerPresence();
+  sessionStorage.removeItem('viewer_name');
+  auth.signOut();
+}
 
 auth.onAuthStateChanged(function(user) {
   const btn = document.getElementById('btn-login-submit');
@@ -937,15 +1027,243 @@ auth.onAuthStateChanged(function(user) {
     document.getElementById('fu-btn-upload').style.display = isAdmin ? 'inline-flex' : 'none';
     document.getElementById('fu-btn-clear').style.display  = isAdmin ? 'inline-flex' : 'none';
     document.getElementById('fu-btn-add').style.display    = isAdmin ? 'inline-flex' : 'none';
+    document.getElementById('btn-viewers-log').style.display = isAdmin ? 'inline-flex' : 'none';
 
     loadData();
     initWorkshopLive();
+
+    if (!isAdmin) {
+      checkAndPromptViewerName();
+    } else {
+      initAdminPresenceListener();
+      initAdminHistoryListener();
+    }
   } else {
     currentUser = null;
+    cleanupViewerPresence();
     document.getElementById('auth-screen').style.display = 'flex';
     document.getElementById('app').style.display = 'none';
   }
 });
+
+// ─── VIEWER NAME PROMPT & PERSISTENT ACCESS LOGGING ───
+function checkAndPromptViewerName() {
+  const storedName = sessionStorage.getItem('viewer_name');
+  if (!storedName) {
+    document.getElementById('viewer-name-modal').classList.add('open');
+    document.getElementById('viewer-name-input').focus();
+  } else {
+    startViewerPresence(storedName);
+  }
+}
+
+window.submitViewerName = function(e) {
+  if (e) e.preventDefault();
+  const nameInput = document.getElementById('viewer-name-input');
+  const name = nameInput.value.trim();
+  if (!name) return;
+  sessionStorage.setItem('viewer_name', name);
+  document.getElementById('viewer-name-modal').classList.remove('open');
+  
+  // 1. بدء الجلسة الحية المتصلة الآن
+  startViewerPresence(name);
+  
+  // 2. تسجيل دائم في الهيستوري (حتى لو الأدمن غير متصل)
+  logViewerAccessHistory(name);
+
+  toast('Welcome, ' + name + ' ✓');
+};
+
+function logViewerAccessHistory(name) {
+  const isMobile = window.innerWidth <= 860;
+  const now = new Date();
+  
+  db.collection('viewer_access_logs').add({
+    name: name,
+    device: isMobile ? 'Mobile' : 'Desktop',
+    date: now.toISOString().split('T')[0],
+    time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    timestamp: Date.now(),
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  }).catch(function(err){
+    console.log('Access log save error:', err);
+  });
+}
+
+function startViewerPresence(name) {
+  if (isAdmin) return;
+  if (!viewerSessionId) {
+    viewerSessionId = 'v_' + Math.random().toString(36).substr(2, 9);
+  }
+  const isMobile = window.innerWidth <= 860;
+  const userAgent = isMobile ? 'Mobile' : 'Desktop';
+
+  const sessionRef = db.collection('active_viewers').doc(viewerSessionId);
+  sessionRef.set({
+    name: name,
+    device: userAgent,
+    startedAt: new Date().toISOString(),
+    lastSeen: Date.now()
+  }).catch(function(err){ console.log('Silent presence error:', err); });
+
+  if (viewerPingInterval) clearInterval(viewerPingInterval);
+  viewerPingInterval = setInterval(function() {
+    sessionRef.update({ lastSeen: Date.now() }).catch(function(e){});
+  }, 25000);
+}
+
+function cleanupViewerPresence() {
+  if (viewerPingInterval) clearInterval(viewerPingInterval);
+  if (viewerSessionId && !isAdmin) {
+    db.collection('active_viewers').doc(viewerSessionId).delete().catch(function(e){});
+    viewerSessionId = null;
+  }
+}
+
+window.addEventListener('beforeunload', function() {
+  cleanupViewerPresence();
+});
+
+// مراقبة المتواجدين الآن للأدمن
+function initAdminPresenceListener() {
+  const badge = document.getElementById('viewer-presence-indicator');
+  const badgeText = document.getElementById('viewer-presence-text');
+
+  db.collection('active_viewers').onSnapshot(function(snapshot) {
+    const now = Date.now();
+    activeViewersList = [];
+
+    snapshot.forEach(function(doc) {
+      const data = doc.data();
+      if (now - (data.lastSeen || 0) < 60000) {
+        activeViewersList.push(data);
+      } else {
+        doc.ref.delete().catch(function(e){});
+      }
+    });
+
+    document.getElementById('count-live-tab').textContent = activeViewersList.length;
+
+    if (activeViewersList.length > 0) {
+      badge.style.display = 'inline-flex';
+      if (activeViewersList.length === 1) {
+        badgeText.textContent = (activeViewersList[0].name || 'Viewer') + ' Online';
+      } else {
+        badgeText.textContent = activeViewersList.length + ' Viewers Online';
+      }
+    } else {
+      badge.style.display = 'none';
+    }
+
+    if(currentViewerModalTab === 'live') {
+      renderLiveViewersList();
+    }
+  }, function(err) {
+    console.log('Presence listener error:', err);
+  });
+}
+
+// تحميل سجل الدخول الدائم (History) للأدمن
+function initAdminHistoryListener() {
+  db.collection('viewer_access_logs')
+    .orderBy('timestamp', 'desc')
+    .limit(100)
+    .onSnapshot(function(snapshot) {
+      viewerAccessHistoryList = snapshot.docs.map(function(doc) {
+        return Object.assign({ id: doc.id }, doc.data());
+      });
+      if(currentViewerModalTab === 'history') {
+        renderHistoryViewersList();
+      }
+    }, function(err){
+      console.log('History load error:', err);
+    });
+}
+
+window.openViewersModal = function(tab) {
+  switchViewerModalTab(tab || 'live');
+  document.getElementById('active-viewers-modal').classList.add('open');
+};
+
+window.switchViewerModalTab = function(tab) {
+  currentViewerModalTab = tab;
+  const liveBtn = document.getElementById('tab-live-btn');
+  const histBtn = document.getElementById('tab-history-btn');
+  const liveContent = document.getElementById('viewers-live-content');
+  const histContent = document.getElementById('viewers-history-content');
+  const clearBtn = document.getElementById('btn-clear-history');
+
+  if(tab === 'live') {
+    liveBtn.classList.add('active');
+    histBtn.classList.remove('active');
+    liveContent.style.display = 'flex';
+    histContent.style.display = 'none';
+    clearBtn.style.display = 'none';
+    renderLiveViewersList();
+  } else {
+    histBtn.classList.add('active');
+    liveBtn.classList.remove('active');
+    liveContent.style.display = 'none';
+    histContent.style.display = 'flex';
+    clearBtn.style.display = 'inline-flex';
+    renderHistoryViewersList();
+  }
+};
+
+function renderLiveViewersList() {
+  const container = document.getElementById('viewers-live-content');
+  if (!activeViewersList.length) {
+    container.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);">No engineers currently online.</div>';
+  } else {
+    container.innerHTML = activeViewersList.map(function(v) {
+      let timeStr = 'Just now';
+      try {
+        timeStr = new Date(v.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      } catch(e){}
+      return '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--surface2);padding:10px 14px;border-radius:var(--radius);border:1px solid var(--border);">'
+        + '<div>'
+          + '<div style="font-weight:700;color:var(--text);font-size:13px;display:flex;align-items:center;gap:6px;">'
+            + '<span class="viewer-pulse-dot"></span> ' + (v.name || 'Viewer') 
+          + '</div>'
+          + '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Online since: ' + timeStr + '</div>'
+        + '</div>'
+        + '<span class="badge" style="background:var(--surface3);color:var(--accent);font-size:11px;">' + (v.device === 'Mobile' ? '📱 Mobile' : '💻 Desktop') + '</span>'
+      + '</div>';
+    }).join('');
+  }
+}
+
+function renderHistoryViewersList() {
+  const container = document.getElementById('viewers-history-content');
+  if (!viewerAccessHistoryList.length) {
+    container.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);">No past access logs found.</div>';
+  } else {
+    container.innerHTML = viewerAccessHistoryList.map(function(h) {
+      return '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--surface2);padding:9px 12px;border-radius:var(--radius);border:1px solid var(--border);">'
+        + '<div>'
+          + '<div style="font-weight:700;color:var(--text);font-size:13px;">' + (h.name || 'Viewer') + '</div>'
+          + '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">📅 ' + (h.date || '—') + ' · ⏰ ' + (h.time || '—') + '</div>'
+        + '</div>'
+        + '<span class="badge" style="background:var(--surface3);color:var(--text-muted);font-size:11px;">' + (h.device === 'Mobile' ? '📱 Mobile' : '💻 Desktop') + '</span>'
+      + '</div>';
+    }).join('');
+  }
+}
+
+window.clearAccessHistory = function() {
+  if(!isAdmin) return;
+  if(!confirm('Clear all access history logs permanently?')) return;
+
+  db.collection('viewer_access_logs').get().then(function(snap){
+    const batch = db.batch();
+    snap.docs.forEach(function(d){ batch.delete(d.ref); });
+    return batch.commit();
+  }).then(function(){
+    toast('Access logs cleared ✓');
+  }).catch(function(err){
+    toast('Error clearing logs: ' + err.message, 'error');
+  });
+};
 
 // LOAD DATA
 function loadData() {
@@ -1331,10 +1649,9 @@ function renderWsTable() {
   document.getElementById('ws-table-body').innerHTML = filtered.map(function(item, i){
     const statusClass = 'status-' + (item.status ? item.status.replace(/\s+/g, '-') : 'Waiting');
     
+    // زرار الطلب متاح للأدمن وللفيور لأي معدة Ready
     let actionBtn = '<span style="font-size:11px;color:var(--text-muted);font-style:italic">Not Ready</span>';
-    if(isAdmin){
-      actionBtn = '<span style="font-size:11px;color:var(--accent)">Admin View</span>';
-    } else if(item.status === 'Ready'){
+    if(item.status === 'Ready'){
       actionBtn = '<button class="btn-request" onclick="openWsRequestModal(\''+(item.code||'')+'\', \''+(item.name||'').replace(/'/g,"\\'")+'\')">Request</button>';
     }
 
@@ -1386,7 +1703,9 @@ function openWsRequestModal(code, name) {
   document.getElementById("req-eq-code").value = code;
   document.getElementById("req-eq-name").value = name;
   document.getElementById("req-eq-info").textContent = "Equipment: " + name + " (" + code + ")";
-  document.getElementById("req-user-name").value = "";
+  
+  const currentName = isAdmin ? "Eng. Mahmoud Osama (Admin)" : (sessionStorage.getItem('viewer_name') || "");
+  document.getElementById("req-user-name").value = currentName;
   document.getElementById("req-dest-project").value = "";
   document.getElementById("requestModal").classList.add("open");
 }
