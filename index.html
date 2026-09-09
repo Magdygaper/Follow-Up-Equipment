@@ -1,1 +1,2591 @@
 
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>HAC · PMV Integrated System</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0d1117;--surface:#161b22;--surface2:#1c2128;--surface3:#21262d;--border:#30363d;
+  --accent:#f0a500;--text:#e6edf3;--text-muted:#7d8590;--text-dim:#484f58;
+  --green:#3fb950;--red:#f85149;--blue:#58a6ff;
+  --status-ready:#2ecc71;--status-delay:#e74c3c;--status-progress:#3498db;
+  --status-external:#9b59b6;--status-waiting:#f39c12;--status-dispatched:#7f8c8d;
+  --rental:#58a6ff;--transfer:#3fb950;--hold:#f0a500;--cancel:#f85149;--pending:#bc8cff;
+  --radius:8px;--radius-lg:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:14px;min-height:100vh;}
+
+/* AUTH */
+#auth-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 60% 20%,#1a1000 0%,var(--bg) 60%);}
+.auth-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:44px 38px;width:360px;text-align:center;}
+.auth-logo{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:3px;margin-bottom:8px;}
+.auth-title{font-size:22px;font-weight:700;margin-bottom:4px;}
+.auth-sub{color:var(--text-muted);font-size:13px;margin-bottom:28px;}
+.auth-card input{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:10px 14px;border-radius:var(--radius);font-size:14px;margin-bottom:12px;outline:none;}
+.auth-card input:focus{border-color:var(--accent);}
+.btn-primary{width:100%;background:var(--accent);color:#000;border:none;padding:11px;border-radius:var(--radius);font-weight:700;font-size:14px;cursor:pointer;}
+.btn-primary:disabled{opacity:0.6;cursor:not-allowed;}
+.auth-err{color:var(--red);font-size:12px;margin-top:8px;min-height:18px;}
+
+/* LAYOUT */
+#app{display:none;}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.topbar-left{display:flex;align-items:center;gap:16px;}
+.logo-mark{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:2px;font-weight:700;}
+.topbar-title{font-size:15px;font-weight:600;}
+.topbar-right{display:flex;align-items:center;gap:10px;}
+
+/* LIVE VIEWER PRESENCE BADGE (FOR ADMIN) */
+.viewer-presence-badge{
+  display:none;align-items:center;gap:6px;background:rgba(63,185,80,.12);
+  border:1px solid rgba(63,185,80,.4);color:var(--green);padding:4px 10px;
+  border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;transition:all .2s;
+}
+.viewer-presence-badge:hover{background:rgba(63,185,80,.2);border-color:var(--green);}
+.viewer-pulse-dot{
+  width:7px;height:7px;border-radius:50%;background:var(--green);
+  box-shadow:0 0 6px var(--green);animation:pulseGreen 1.5s infinite;
+}
+@keyframes pulseGreen{
+  0%{transform:scale(0.9);opacity:0.7;}
+  50%{transform:scale(1.3);opacity:1;}
+  100%{transform:scale(0.9);opacity:0.7;}
+}
+
+.badge-role{background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--text-muted);}
+.badge-role.admin{border-color:var(--accent);color:var(--accent);}
+.btn-sm{background:transparent;border:1px solid var(--border);color:var(--text-muted);padding:5px 12px;border-radius:var(--radius);cursor:pointer;font-size:12px;}
+.btn-sm:hover{border-color:var(--text-muted);color:var(--text);}
+.main{display:flex;}
+.sidebar{width:230px;min-height:calc(100vh - 56px);background:var(--surface);border-right:1px solid var(--border);padding:18px 10px;flex-shrink:0;}
+
+/* SIDEBAR DIVIDERS */
+.nav-divider{margin:16px 0 6px 0;padding:0 8px;display:flex;align-items:center;gap:8px;}
+.nav-divider:first-of-type{margin-top:2px;}
+.nav-divider-line{flex:1;height:1px;background:var(--border);}
+.nav-divider-text{font-size:10px;font-weight:700;color:var(--accent);letter-spacing:1px;text-transform:uppercase;}
+.nav-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--radius);cursor:pointer;color:var(--text-muted);font-size:13px;transition:all .15s;margin-bottom:2px;border:none;background:none;width:100%;text-align:left;}
+.nav-item:hover{background:var(--surface2);color:var(--text);}
+.nav-item.active{background:rgba(240,165,0,.1);color:var(--accent);font-weight:600;}
+
+.content{flex:1;padding:28px 32px;overflow-x:auto;}
+.page{display:none;}.page.active{display:block;}
+.section-title{font-size:18px;font-weight:700;margin-bottom:6px;}
+.section-sub{color:var(--text-muted);font-size:13px;margin-bottom:24px;}
+
+/* DASHBOARD CARDS */
+.dash-section-label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;margin-top:24px;}
+.cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:8px;}
+.dash-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;}
+.dash-card:hover{border-color:var(--accent);transform:translateY(-1px);}
+.dash-card.active{border-color:var(--accent);background:rgba(240,165,0,.08);}
+.dash-card-val{font-size:26px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--accent);}
+.dash-card-label{font-size:11px;color:var(--text-muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dash-card-sub{font-size:10px;color:var(--text-muted);margin-top:2px;opacity:.7;}
+
+/* ACTIVE FILTER BAR */
+.active-filter-bar{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:8px 12px;margin-bottom:14px;display:flex;flex-wrap:wrap;align-items:center;gap:8px;}
+.filter-chip{display:inline-flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:4px 10px;font-size:11px;cursor:pointer;transition:all .2s;}
+.filter-chip:hover{border-color:var(--red);color:var(--red);}
+.filter-chip-close{font-weight:700;font-size:11px;background:rgba(248,81,73,.15);color:var(--red);width:15px;height:15px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;}
+.btn-clear-all{background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.3);color:var(--red);padding:4px 10px;border-radius:20px;font-size:11px;cursor:pointer;font-weight:600;}
+
+/* PROJECT LIST FILTER */
+.proj-filter-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:8px;}
+.proj-search{width:100%;background:var(--surface2);border:none;border-bottom:1px solid var(--border);color:var(--text);padding:10px 16px;font-size:13px;outline:none;}
+.proj-search::placeholder{color:var(--text-muted);}
+.proj-list{max-height:260px;overflow-y:auto;}
+.proj-list::-webkit-scrollbar{width:4px;}
+.proj-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+.proj-row{display:flex;align-items:center;justify-content:space-between;padding:9px 16px;cursor:pointer;border-bottom:1px solid var(--border);transition:all .15s;}
+.proj-row:last-child{border-bottom:none;}
+.proj-row:hover{background:var(--surface2);}
+.proj-row.active{background:rgba(240,165,0,.08);border-left:3px solid var(--accent);}
+.proj-row-left{display:flex;align-items:center;gap:10px;}
+.proj-dot{width:8px;height:8px;border-radius:50%;background:var(--blue);flex-shrink:0;}
+.proj-row.active .proj-dot{background:var(--accent);}
+.proj-name{font-size:13px;color:var(--text);}
+.proj-row.active .proj-name{color:var(--accent);font-weight:600;}
+.proj-od{font-size:11px;color:var(--text-muted);}
+.proj-count{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-muted);background:var(--surface2);padding:2px 8px;border-radius:10px;}
+
+/* OD BUTTONS */
+.od-buttons{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;}
+.od-btn{background:var(--surface);border:1px solid var(--border);color:var(--text-muted);padding:7px 14px;border-radius:20px;cursor:pointer;font-size:12px;transition:all .2s;}
+.od-btn:hover{border-color:var(--accent);color:var(--accent);}
+.od-btn.active{background:rgba(240,165,0,.15);border-color:var(--accent);color:var(--accent);font-weight:600;}
+
+/* TOOLBAR */
+.toolbar{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap;align-items:center;}
+.search-box{flex:1;min-width:200px;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:var(--radius);font-size:13px;outline:none;}
+.search-box:focus{border-color:var(--accent);}
+select{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:var(--radius);font-size:13px;cursor:pointer;outline:none;}
+.btn-add{background:var(--accent);color:#000;border:none;padding:8px 18px;border-radius:var(--radius);font-weight:600;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:6px;}
+
+/* TABLES WITH STICKY COLUMNS & ROW HIGHLIGHT */
+.table-wrap{overflow-x:auto;border-radius:var(--radius);border:1px solid var(--border);-webkit-overflow-scrolling:touch;background:var(--surface);position:relative;}
+table{width:100%;border-collapse:separate;border-spacing:0;}
+thead{background:var(--surface2);}
+th{padding:10px 14px;text-align:left;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;border-bottom:1px solid var(--border);}
+td{padding:11px 14px;border-bottom:1px solid var(--border);vertical-align:middle;white-space:nowrap;font-size:13px;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:var(--surface2);}
+
+tr.selected-row td{
+  background: rgba(240, 165, 0, 0.22) !important;
+  color: #fff !important;
+  border-top: 1px solid var(--accent) !important;
+  border-bottom: 1px solid var(--accent) !important;
+}
+
+/* تثبيت أول عمودين للجدول العام */
+.table-wrap table th:nth-child(1),
+.table-wrap table td:nth-child(1){
+  position: sticky;
+  left: 0;
+  background: var(--surface2);
+  z-index: 3;
+  width: 44px;
+  min-width: 44px;
+  text-align: center;
+}
+.table-wrap table th:nth-child(2),
+.table-wrap table td:nth-child(2){
+  position: sticky;
+  left: 44px;
+  background: var(--surface2);
+  z-index: 3;
+  box-shadow: 2px 0 5px rgba(0,0,0,0.4);
+}
+tr.selected-row td:nth-child(1),
+tr.selected-row td:nth-child(2){
+  background: #2d2616 !important;
+}
+
+.code-cell{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--accent);}
+.cat-badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);}
+.action-btns{display:flex;gap:6px;}
+.btn-edit,.btn-del,.btn-transfer{padding:4px 10px;border-radius:5px;font-size:11px;cursor:pointer;border:1px solid;background:transparent;transition:all .15s;}
+.btn-edit{border-color:var(--blue);color:var(--blue);}.btn-edit:hover{background:var(--blue);color:#000;}
+.btn-del{border-color:var(--red);color:var(--red);}.btn-del:hover{background:var(--red);color:#fff;}
+.btn-transfer{border-color:var(--green);color:var(--green);}.btn-transfer:hover{background:var(--green);color:#000;}
+.btn-request{background:var(--status-ready);color:#fff;border:none;padding:5px 12px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;}
+.btn-request:hover{background:#27ae60;}
+
+/* WORKSHOP TICKER & STYLES */
+.news-ticker-container{background:#001424;color:#fff;display:flex;align-items:center;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;height:38px;font-size:13px;margin-bottom:16px;}
+.ticker-label{background:var(--surface2);color:var(--accent);padding:0 14px;height:100%;display:flex;align-items:center;font-weight:700;font-size:11px;text-transform:uppercase;border-right:1px solid var(--border);white-space:nowrap;}
+.ticker-wrap{overflow:hidden;white-space:nowrap;flex:1;}
+.ticker-move{display:inline-block;animation:tickerAnimation 160s linear infinite;padding-left:100%;}
+.ticker-move:hover{animation-play-state:paused;}
+@keyframes tickerAnimation{0%{transform:translate3d(0,0,0);}100%{transform:translate3d(-100%,0,0);}}
+
+.ws-view-tabs{display:flex;gap:8px;margin-bottom:14px;}
+.ws-tab-btn{padding:8px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);font-weight:600;font-size:12px;color:var(--text-muted);cursor:pointer;}
+.ws-tab-btn.active{background:var(--accent);color:#000;border-color:var(--accent);font-weight:700;}
+
+.status-badge{padding:4px 8px;border-radius:12px;font-size:10px;font-weight:700;text-transform:uppercase;display:inline-block;}
+.status-Ready{background:rgba(46,204,113,.15);color:var(--status-ready);}
+.status-Delay{background:rgba(231,76,60,.15);color:var(--status-delay);}
+.status-In-Progress{background:rgba(52,152,219,.15);color:var(--status-progress);}
+.status-External{background:rgba(155,89,182,.15);color:var(--status-external);}
+.status-Waiting{background:rgba(243,156,18,.15);color:var(--status-waiting);}
+.status-Dispatched{background:rgba(127,140,141,.15);color:var(--status-dispatched);}
+
+/* FOLLOW-UP STATUS DROPDOWN & BADGES */
+.badge{display:inline-block;padding:3px 8px;border-radius:10px;font-size:10px;font-weight:700;}
+.badge-rental{background:rgba(88,166,255,.15);color:var(--rental);}
+.badge-transfer{background:rgba(63,185,80,.15);color:var(--transfer);}
+.badge-hold{background:rgba(240,165,0,.15);color:var(--hold);}
+.badge-cancel{background:rgba(248,81,73,.15);color:var(--cancel);}
+.badge-pending{background:rgba(188,140,255,.15);color:var(--pending);}
+
+/* MODALS */
+.modal-overlay,.breakdown-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;align-items:center;justify-content:center;}
+.modal-overlay.open,.breakdown-overlay.open{display:flex;}
+.modal,.breakdown-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px 32px;width:620px;max-width:95vw;max-height:90vh;overflow-y:auto;}
+.modal-title,.breakdown-title{font-size:16px;font-weight:700;margin-bottom:20px;}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.form-group{display:flex;flex-direction:column;gap:5px;}
+.form-group.full{grid-column:1/-1;}
+.form-group label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;}
+.form-group input,.form-group select,.form-group textarea{background:var(--bg);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:var(--radius);font-size:13px;outline:none;font-family:inherit;}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:24px;}
+.btn-cancel{background:transparent;border:1px solid var(--border);color:var(--text-muted);padding:9px 20px;border-radius:var(--radius);cursor:pointer;font-size:13px;}
+.btn-save{background:var(--accent);color:#000;border:none;padding:9px 24px;border-radius:var(--radius);font-weight:600;cursor:pointer;font-size:13px;}
+.breakdown-close{margin-top:20px;background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);padding:8px 20px;border-radius:var(--radius);cursor:pointer;font-size:13px;float:right;}
+
+/* TOAST */
+#toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 20px;font-size:13px;z-index:999;transform:translateY(80px);opacity:0;transition:all .3s;pointer-events:none;}
+#toast.show{transform:translateY(0);opacity:1;}
+#toast.success{border-color:var(--green);color:var(--green);}
+#toast.error{border-color:var(--red);color:var(--red);}
+
+/* NOTIFICATION BANNER */
+#ws-notification-banner{position:fixed;top:20px;right:20px;background:#27ae60;color:#fff;padding:12px 20px;border-radius:6px;box-shadow:0 4px 15px rgba(0,0,0,0.3);z-index:10000;display:none;font-size:12px;font-weight:bold;max-width:350px;}
+
+/* ============================================================ */
+/* تعديلات الموبايل: ضبط عمود المعدة فقط بالورشة وترجيع الباقي طبيعي */
+/* ============================================================ */
+@media (max-width: 860px) {
+  .main{flex-direction:column !important;}
+  .sidebar{
+    position:fixed !important;bottom:0 !important;left:0 !important;right:0 !important;
+    width:100% !important;min-height:auto !important;height:60px !important;padding:4px 6px !important;
+    flex-direction:row !important;justify-content:space-around !important;align-items:center !important;
+    border-right:none !important;border-top:1px solid var(--border) !important;
+    background:var(--surface) !important;z-index:1000 !important;display:flex !important;
+    overflow-x:auto !important;
+  }
+  .nav-divider{display:none !important;}
+  .nav-item{flex-direction:column !important;align-items:center !important;justify-content:center !important;font-size:10px !important;padding:4px 6px !important;gap:2px !important;width:auto !important;margin:0 !important;}
+  .content{padding:16px 12px 85px 12px !important;}
+
+  #page-workshop .cards-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+  #page-workshop .cards-grid .dash-card-val {
+    font-size: 22px !important;
+  }
+
+  #page-followup .cards-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+  #page-followup .cards-grid .dash-card-val {
+    font-size: 22px !important;
+  }
+
+  /* 1. عمود الرقم (#) بالورشة */
+  #page-workshop .table-wrap table th:nth-child(1),
+  #page-workshop .table-wrap table td:nth-child(1) {
+    width: 36px !important;
+    min-width: 36px !important;
+    padding: 8px 4px !important;
+    font-size: 11px !important;
+    text-align: center !important;
+  }
+
+  /* 2. عمود المعدة فقط بالورشة ينزل سطرين بأناقة */
+  #page-workshop .table-wrap table th:nth-child(2),
+  #page-workshop .table-wrap table td:nth-child(2) {
+    left: 36px !important;
+    width: 115px !important;
+    max-width: 120px !important;
+    min-width: 100px !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+    line-height: 1.3 !important;
+    font-size: 11px !important;
+    padding: 8px 6px !important;
+    font-weight: 600 !important;
+  }
+
+  /* 3. باقي أعمدة الورشة بالكامل (الكود، الملاحظات، المشروع، المدة، الحالة) ترجع لطبيعتها 100% */
+  #page-workshop .table-wrap table th:nth-child(n+3),
+  #page-workshop .table-wrap table td:nth-child(n+3) {
+    white-space: nowrap !important;
+    max-width: none !important;
+    width: auto !important;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- NOTIFICATION BANNER FOR WORKSHOP REQUESTS -->
+<div id="ws-notification-banner">
+  🔔 <span id="ws-notification-text">New Request Logged</span>
+</div>
+
+<!-- AUTH -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">HAC · PMV</div>
+    <div class="auth-title">Equipment List</div>
+    <div class="auth-sub">Hassan Allam Construction</div>
+    <input type="email" id="login-email" placeholder="Email">
+    <input type="password" id="login-pass" placeholder="Password">
+    <button class="btn-primary" id="btn-login-submit" onclick="doLogin()">Sign In</button>
+    <div class="auth-err" id="auth-err"></div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="logo-mark">HAC · PMV</div>
+      <div class="topbar-title">Equipment Management Portal</div>
+    </div>
+    <div class="topbar-right">
+      <!-- رادار التتبع الحي للفيور النشط (يظهر فقط للأدمن) -->
+      <div class="viewer-presence-badge" id="viewer-presence-indicator" onclick="openViewersModal('live')" title="Click to view online engineers">
+        <span class="viewer-pulse-dot"></span>
+        <span id="viewer-presence-text">0 Online</span>
+      </div>
+
+      <!-- زر فتح سجل الدخول الدائم (History) للأدمن -->
+      <button class="btn-sm" id="btn-viewers-log" style="display:none;color:var(--accent);border-color:rgba(240,165,0,.4);gap:4px;" onclick="openViewersModal('history')">
+        🕒 Access Log
+      </button>
+
+      <span class="badge-role" id="role-badge">Viewer</span>
+      <button class="btn-sm" onclick="doLogout()">Logout</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="sidebar">
+      
+      <!-- SECTION 1: ASSETS -->
+      <div class="nav-divider">
+        <span class="nav-divider-text">Equipment Assets</span>
+        <div class="nav-divider-line"></div>
+      </div>
+      <button class="nav-item active" onclick="showPage('dashboard',this)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect></svg>
+        Dashboard
+      </button>
+      <button class="nav-item" onclick="showPage('equipment',this)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"></path></svg>
+        Equipment List
+      </button>
+      <button class="nav-item" onclick="showPage('transfers',this)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 014-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 01-4 4H3"></path></svg>
+        Transfer Log
+      </button>
+
+      <!-- SECTION 2: WORKSHOP PLAN -->
+      <div class="nav-divider">
+        <span class="nav-divider-text">Workshop Plan</span>
+        <div class="nav-divider-line"></div>
+      </div>
+      <button class="nav-item" onclick="showPage('workshop',this)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"></path></svg>
+        Central Workshop
+      </button>
+
+      <!-- SECTION 3: FOLLOW-UP -->
+      <div class="nav-divider">
+        <span class="nav-divider-text">Follow-Up 2026</span>
+        <div class="nav-divider-line"></div>
+      </div>
+      <button class="nav-item" onclick="showPage('followup',this)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path></svg>
+        Follow-Up System
+      </button>
+
+    </div>
+
+    <!-- CONTENT -->
+    <div class="content">
+
+      <!-- ================= 1. DASHBOARD PAGE ================= -->
+      <div class="page active" id="page-dashboard">
+        <div class="section-title">Dashboard</div>
+        <div class="section-sub">Click any card to filter equipment</div>
+
+        <div id="kpi-cards" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
+          <div class="kpi-card" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;">
+            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Total Equipment</div>
+            <div style="font-size:28px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--accent);" id="kpi-total">0</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;" id="kpi-total-sub">across all projects</div>
+          </div>
+          <div class="kpi-card" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;">
+            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Active Projects</div>
+            <div style="font-size:28px;font-weight:700;font-family:'JetBrains Mono',monospace;color:#58a6ff;" id="kpi-projects">0</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;" id="kpi-projects-sub">active projects</div>
+          </div>
+          <div class="kpi-card" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;">
+            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">O.D Engineers</div>
+            <div style="font-size:28px;font-weight:700;font-family:'JetBrains Mono',monospace;color:#3fb950;" id="kpi-ods">0</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;" id="kpi-ods-sub">O.D engineers total</div>
+          </div>
+          <div class="kpi-card" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;">
+            <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Last Updated</div>
+            <div style="font-size:18px;font-weight:700;color:#bc8cff;margin-top:4px;" id="kpi-updated">—</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;" id="kpi-transfers-sub">0 transfers logged</div>
+          </div>
+        </div>
+
+        <div id="active-filter-bar" class="active-filter-bar" style="display:none;">
+          <span style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">Active Filters:</span>
+          <div id="chip-od" class="filter-chip" style="display:none;" onclick="toggleOD(null)"></div>
+          <div id="chip-cat" class="filter-chip" style="display:none;" onclick="toggleCat(null)"></div>
+          <div id="chip-proj" class="filter-chip" style="display:none;" onclick="toggleProj(null)"></div>
+          <button class="btn-clear-all" onclick="clearAllFilters()">Clear All ✕</button>
+        </div>
+
+        <div class="dash-section-label">By Category — click to filter & view breakdown</div>
+        <div class="cards-grid" id="cat-cards"></div>
+
+        <div id="cat-breakdown-wrap" style="display: none; margin-top: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 24px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+            <div>
+              <div style="font-size:14px;font-weight:700;" id="cat-bd-title"></div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Most used equipment types</div>
+            </div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:700;color:var(--accent);" id="cat-bd-total">0</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+            <div>
+              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Equipment Types</div>
+              <div id="cat-bd-types"></div>
+            </div>
+            <div>
+              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">By O.D</div>
+              <div id="cat-bd-ods"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dash-section-label">By Project — click to filter</div>
+        <div class="proj-filter-wrap">
+          <input class="proj-search" type="text" id="proj-search-input" placeholder="🔍 Search project..." oninput="filterProjList()">
+          <div class="proj-list" id="proj-list"></div>
+        </div>
+
+        <div class="dash-section-label">By O.D — click to filter</div>
+        <div class="od-buttons" id="od-buttons"></div>
+
+        <div id="od-chart-wrap" style="display: none; margin-top: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 24px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+            <div>
+              <div style="font-size:14px;font-weight:700;" id="od-chart-title"></div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Equipment breakdown by category</div>
+            </div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:700;color:var(--accent);" id="od-chart-total">0</div>
+          </div>
+          <div id="od-chart-bars"></div>
+        </div>
+      </div>
+
+      <!-- ================= 2. EQUIPMENT LIST PAGE ================= -->
+      <div class="page" id="page-equipment">
+        <div class="section-title">Equipment List</div>
+        <div class="section-sub">Master database of all HAC PMV machinery</div>
+
+        <div class="toolbar">
+          <input class="search-box" type="text" id="search-input" placeholder="🔍 Search by name, code, SAP, brand..." oninput="renderTable()">
+          <select id="filter-cat" onchange="renderTable()"><option value="">All Categories</option></select>
+          <select id="filter-type" onchange="renderTable()"><option value="">All Types</option></select>
+          <select id="filter-proj" onchange="renderTable()"><option value="">All Projects</option></select>
+          <button class="btn-add" id="btn-add-eq" style="display:none;" onclick="openAddModal()">+ Add Equipment</button>
+          <label id="btn-import-eq" style="display:none; background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 8px 14px; border-radius: var(--radius); cursor: pointer; font-size: 13px; font-weight: 600; white-space: nowrap;">
+            📥 Import Excel
+            <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="importExcel(this)">
+          </label>
+          <label id="btn-clear-import" style="display:none; background:rgba(248,81,73,.15); border: 1px solid rgba(248,81,73,.4); color: #f85149; padding: 8px 14px; border-radius: var(--radius); cursor: pointer; font-size: 13px; font-weight: 600; white-space: nowrap;">
+            🗑️ Clear & Import
+            <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="clearAndImport(this)">
+          </label>
+        </div>
+        
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th><th>Equipment</th><th>Category</th><th>Brand / Model</th>
+                <th>Code</th><th>Project</th><th>O.D</th><th>Year</th>
+                <th id="actions-col" style="display:none;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+          </table>
+        </div>
+        <div id="table-loading" class="loading"><div class="spinner"></div>Loading equipment...</div>
+        <div id="table-empty" class="empty" style="display:none">No equipment found.</div>
+      </div>
+
+      <!-- ================= 3. TRANSFERS LOG PAGE ================= -->
+      <div class="page" id="page-transfers">
+        <div class="section-title">Transfer Log</div>
+        <div class="section-sub">History of all equipment transfers</div>
+        <div class="toolbar">
+          <input class="search-box" type="text" id="transfer-search" placeholder="Search by code or equipment name..." oninput="filterTransfers()">
+        </div>
+        <div id="transfers-list"></div>
+      </div>
+
+      <!-- ================= 4. CENTRAL WORKSHOP PAGE ================= -->
+      <div class="page" id="page-workshop">
+        <div class="section-title">PMV Central Workshop Operations</div>
+        <div class="section-sub">Maintenance workflow, stages, and ready equipment requests</div>
+
+        <div class="news-ticker-container">
+          <div class="ticker-label">⚡ Live Workshop Updates</div>
+          <div class="ticker-wrap">
+            <div class="ticker-move" id="ws-ticker-content">Connecting to central workshop live feed...</div>
+          </div>
+        </div>
+
+        <div class="cards-grid" style="grid-template-columns: repeat(7, 1fr); margin-bottom:18px;">
+          <div class="dash-card" onclick="setWsStatusFilter('All')">
+            <div class="dash-card-label">Active Workshop</div>
+            <div class="dash-card-val" id="ws-total-count" style="color:var(--text);">0</div>
+            <div class="dash-card-sub">In queue</div>
+          </div>
+          <div class="dash-card" onclick="setWsStatusFilter('Ready')">
+            <div class="dash-card-label">Ready</div>
+            <div class="dash-card-val" id="ws-ready-count" style="color:var(--status-ready);">0</div>
+            <div class="dash-card-sub">Can request</div>
+          </div>
+          <div class="dash-card" onclick="setWsStatusFilter('In Progress')">
+            <div class="dash-card-label">In Progress</div>
+            <div class="dash-card-val" id="ws-progress-count" style="color:var(--status-progress);">0</div>
+            <div class="dash-card-sub">Under repair</div>
+          </div>
+          <div class="dash-card" onclick="setWsStatusFilter('Waiting')">
+            <div class="dash-card-label">Waiting</div>
+            <div class="dash-card-val" id="ws-waiting-count" style="color:var(--status-waiting);">0</div>
+            <div class="dash-card-sub">Awaiting parts</div>
+          </div>
+          <div class="dash-card" onclick="setWsStatusFilter('Delay')">
+            <div class="dash-card-label">Delay</div>
+            <div class="dash-card-val" id="ws-delay-count" style="color:var(--status-delay);">0</div>
+            <div class="dash-card-sub">Over schedule</div>
+          </div>
+          <div class="dash-card" onclick="setWsStatusFilter('External')">
+            <div class="dash-card-label">External</div>
+            <div class="dash-card-val" id="ws-external-count" style="color:var(--status-external);">0</div>
+            <div class="dash-card-sub">Outside vendor</div>
+          </div>
+          <div class="dash-card" onclick="setWsStatusFilter('Dispatched')">
+            <div class="dash-card-label">Dispatched</div>
+            <div class="dash-card-val" id="ws-dispatched-count" style="color:var(--status-dispatched);">0</div>
+            <div class="dash-card-sub">Exited to site</div>
+          </div>
+        </div>
+
+        <div class="ws-view-tabs">
+          <button class="ws-tab-btn active" id="ws-tab-active-btn" onclick="switchWsTab('active')">🛠️ Active Workshop</button>
+          <button class="ws-tab-btn" id="ws-tab-archive-btn" onclick="switchWsTab('archive')">📦 Dispatched / Archive List</button>
+        </div>
+
+        <div class="toolbar">
+          <input class="search-box" type="text" id="ws-search" placeholder="Search by equipment, code, report..." oninput="renderWsTable()">
+          <select id="ws-dept-filter" onchange="renderWsTable()">
+            <option value="All">All Departments</option>
+            <option value="Mechanics">Mechanics</option>
+            <option value="Denting">Denting</option>
+            <option value="Blacksmith">Blacksmith</option>
+            <option value="Welding">Welding</option>
+            <option value="Painting">Painting</option>
+            <option value="Electric">Electric</option>
+            <option value="Testing">Testing</option>
+          </select>
+        </div>
+
+        <div class="table-wrap" style="margin-bottom:20px;">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Equipment</th>
+                <th>Code / Condition Report</th>
+                <th>Projects (In / Out)</th>
+                <th>Dates</th>
+                <th>Duration</th>
+                <th>Department</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="ws-table-body"></tbody>
+          </table>
+        </div>
+
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;">
+          <div style="font-weight:700;font-size:14px;margin-bottom:10px;">📅 Monthly Performance Statistics</div>
+          <table>
+            <thead>
+              <tr><th>Month</th><th>Received</th><th>Repaired</th><th>Dispatched</th></tr>
+            </thead>
+            <tbody id="ws-monthly-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ================= 5. FOLLOW-UP REQUESTS PAGE ================= -->
+      <div class="page" id="page-followup">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+          <div>
+            <div class="section-title">Equipment Follow-Up 2026</div>
+            <div class="section-sub" style="margin-bottom:0;">Live project provision requests · Click cards to filter status</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="btn-sm" onclick="exportFuCSV()">⬇ Export CSV</button>
+            <button id="fu-btn-undo" class="btn-sm" style="display:none;background:rgba(240,165,0,.15);border-color:rgba(240,165,0,.4);color:var(--accent);" onclick="undoLastFuStatus()" title="Undo last status change">↩ Undo</button>
+            <button id="fu-btn-add" class="btn-sm" style="display:none;background:rgba(63,185,80,.15);border-color:rgba(63,185,80,.4);color:var(--green);" onclick="openAddFuModal()">+ Add Equipment</button>
+            <label id="fu-btn-upload" class="btn-sm" style="display:none;background:rgba(88,166,255,.15);border-color:rgba(88,166,255,.4);color:var(--blue);cursor:pointer;">
+              📂 Update Excel
+              <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="updateFuFromExcel(this)"/>
+            </label>
+            <button id="fu-btn-clear" class="btn-sm" style="display:none;background:rgba(248,81,73,.1);border-color:rgba(248,81,73,.3);color:var(--red);" onclick="clearFollowUpData()">🗑 Clear Data</button>
+          </div>
+        </div>
+
+        <div class="cards-grid" style="grid-template-columns:repeat(6,1fr);margin-bottom:16px;">
+          <div class="dash-card active" id="fu-card-all" onclick="setFuCardProv(null)">
+            <div class="dash-card-label">All Requests</div>
+            <div class="dash-card-val" id="fu-kpi-total">0</div>
+          </div>
+          <div class="dash-card" id="fu-card-rental" onclick="setFuCardProv('Rental')">
+            <div class="dash-card-label">Rental</div>
+            <div class="dash-card-val" id="fu-kpi-rental" style="color:var(--rental)">0</div>
+          </div>
+          <div class="dash-card" id="fu-card-transfer" onclick="setFuCardProv('Transfer')">
+            <div class="dash-card-label">Transfer</div>
+            <div class="dash-card-val" id="fu-kpi-transfer" style="color:var(--transfer)">0</div>
+          </div>
+          <div class="dash-card" id="fu-card-hold" onclick="setFuCardProv('Hold')">
+            <div class="dash-card-label">Hold</div>
+            <div class="dash-card-val" id="fu-kpi-hold" style="color:var(--hold)">0</div>
+          </div>
+          <div class="dash-card" id="fu-card-pending" onclick="setFuCardProv('Pending')">
+            <div class="dash-card-label">Pending</div>
+            <div class="dash-card-val" id="fu-kpi-pending" style="color:var(--pending)">0</div>
+          </div>
+          <div class="dash-card" id="fu-card-cancel" onclick="setFuCardProv('Cancel')">
+            <div class="dash-card-label">Cancel</div>
+            <div class="dash-card-val" id="fu-kpi-cancel" style="color:var(--cancel)">0</div>
+          </div>
+        </div>
+
+        <div class="toolbar" style="margin-bottom:12px;">
+          <select id="fu-equip-filter" onchange="renderFollowUpTable()" style="min-width:200px;">
+            <option value="">All Equipment</option>
+          </select>
+          <select id="fu-proj-filter" onchange="renderFollowUpTable()" style="min-width:220px;">
+            <option value="">All Projects</option>
+          </select>
+          <button class="btn-sm" id="fu-clear-filters-btn" style="display:none;color:var(--accent);border-color:rgba(240,165,0,.4);" onclick="clearFuFilters()">Clear Filters ✕</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Equipment</th>
+                <th>Capacity</th>
+                <th>Qty</th>
+                <th>SAP</th>
+                <th>Project</th>
+                <th>Provision (Editable)</th>
+                <th>From</th>
+                <th>To</th>
+                <th>Days</th>
+                <th>Notes</th>
+                <th id="fu-actions-col" style="display:none;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="fu-table-body"></tbody>
+          </table>
+        </div>
+        <div style="padding:10px 14px;background:var(--surface2);border-top:1px solid var(--border);display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);">
+          <span id="fu-table-count">0 requests</span>
+          <span id="fu-table-days" style="font-family:'JetBrains Mono'">Total: 0 days</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODALS ================= -->
+
+<!-- VIEWER NAME PROMPT MODAL -->
+<div class="modal-overlay" id="viewer-name-modal" style="z-index:9999;">
+  <div class="modal" style="width:380px;text-align:center;">
+    <div class="auth-logo" style="margin-bottom:6px;">HAC · PMV PORTAL</div>
+    <div class="modal-title" style="margin-bottom:6px;">Welcome, Team Member!</div>
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">Please enter your full name to proceed to the portal:</p>
+    <form id="viewer-name-form" onsubmit="submitViewerName(event)">
+      <div class="form-group" style="margin-bottom:16px;">
+        <input type="text" id="viewer-name-input" placeholder="e.g. Eng. Ahmed Mostafa" required style="text-align:center;font-size:14px;font-weight:600;">
+      </div>
+      <button type="submit" class="btn-primary">Continue to Portal ›</button>
+    </form>
+  </div>
+</div>
+
+<!-- ACTIVE VIEWERS & ACCESS HISTORY MODAL (FOR ADMIN) -->
+<div class="modal-overlay" id="active-viewers-modal">
+  <div class="modal" style="width:520px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <div class="modal-title" style="margin:0;color:var(--text);display:flex;align-items:center;gap:8px;">
+        👥 Team Viewers Access Monitor
+      </div>
+      <button class="btn-sm" onclick="closeModal('active-viewers-modal')">✕</button>
+    </div>
+
+    <!-- TABS: LIVE VS HISTORY -->
+    <div style="display:flex;gap:8px;margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:10px;align-items:center;">
+      <button class="btn-sm active" id="tab-live-btn" onclick="switchViewerModalTab('live')">
+        🟢 المتواجدون الآن (<span id="count-live-tab">0</span>)
+      </button>
+      <button class="btn-sm" id="tab-history-btn" onclick="switchViewerModalTab('history')">
+        🕒 سجل الدخول السابق (History)
+      </button>
+      <button class="btn-sm" id="btn-clear-history" style="margin-left:auto;color:var(--red);border-color:rgba(248,81,73,.3);display:none;" onclick="clearAccessHistory()">
+        🗑 مسح السجل
+      </button>
+    </div>
+
+    <!-- TAB 1: LIVE VIEWERS -->
+    <div id="viewers-live-content" style="display:flex;flex-direction:column;gap:8px;max-height:360px;overflow-y:auto;">
+      <!-- Populated live -->
+    </div>
+
+    <!-- TAB 2: ACCESS HISTORY LOG -->
+    <div id="viewers-history-content" style="display:none;flex-direction:column;gap:8px;max-height:360px;overflow-y:auto;">
+      <!-- Populated from persistent logs -->
+    </div>
+  </div>
+</div>
+
+<!-- WORKSHOP REQUEST MODAL -->
+<div class="modal-overlay" id="requestModal">
+  <div class="modal" style="width:400px;">
+    <div class="modal-title" style="color:var(--status-ready)">Request Equipment Transfer</div>
+    <p id="req-eq-info" style="font-size:12px;color:var(--text-muted);margin-bottom:16px;font-weight:600;"></p>
+    <form id="equipment-request-form" onsubmit="submitWsRequest(event)">
+      <input type="hidden" id="req-eq-code">
+      <input type="hidden" id="req-eq-name">
+      <div class="form-group" style="margin-bottom:12px;">
+        <label>Your Name (Engineer / Team Member)</label>
+        <input type="text" id="req-user-name" required placeholder="Enter full name...">
+      </div>
+      <div class="form-group" style="margin-bottom:16px;">
+        <label>Destination Project Name</label>
+        <input type="text" id="req-dest-project" list="project-suggestions" required placeholder="Select or type destination project...">
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeModal('requestModal')">Cancel</button>
+        <button type="submit" class="btn-save" style="background:var(--status-ready);color:#fff;">Submit Request</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ADD/EDIT EQUIPMENT MODAL -->
+<div class="modal-overlay" id="eq-modal">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">Add Equipment</div>
+    <div class="form-grid">
+      <div class="form-group"><label>Category</label>
+        <select id="f-category">
+          <option>Earthmoving Equipment</option><option>Compaction Equipment</option>
+          <option>Power &amp; Utilities</option><option>Concrete Equipment</option>
+          <option>Lifting Equipment</option><option>Ground Engineering</option>
+          <option>Special Equipment</option><option>Pumping Equipment</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Equipment Type</label><input type="text" id="f-equipment" placeholder="e.g. Excavator"></div>
+      <div class="form-group full"><label>Brand / Model</label><input type="text" id="f-brand"></div>
+      <div class="form-group"><label>Code / Board No.</label><input type="text" id="f-code"></div>
+      <div class="form-group"><label>Code SAP</label><input type="text" id="f-sap"></div>
+      <div class="form-group"><label>Chassis No.</label><input type="text" id="f-chassis"></div>
+      <div class="form-group"><label>Engine Model</label><input type="text" id="f-engine"></div>
+      <div class="form-group"><label>Engine S/N</label><input type="text" id="f-enginesn"></div>
+      <div class="form-group"><label>Manuf. Year</label><input type="number" id="f-year"></div>
+      <div class="form-group"><label>Power</label><input type="text" id="f-power"></div>
+      <div class="form-group"><label>Current Project</label><input type="text" id="f-project" list="project-suggestions" oninput="autoFillOd()"></div>
+      <div class="form-group"><label>O.D (auto-filled)</label><input type="text" id="f-od" placeholder="Auto from project"></div>
+      <div class="form-group"><label>Cost Center</label><input type="text" id="f-costcenter"></div>
+      <div class="form-group"><label>Market Value</label><input type="text" id="f-value"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('eq-modal')">Cancel</button>
+      <button class="btn-save" onclick="saveEquipment()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- TRANSFER MODAL -->
+<div class="modal-overlay" id="transfer-modal">
+  <div class="modal">
+    <div class="modal-title">Transfer Equipment</div>
+    <input type="hidden" id="t-eq-id">
+    <div class="form-grid">
+      <div class="form-group full"><label>Equipment</label><input type="text" id="t-eq-name" readonly></div>
+      <div class="form-group"><label>From Project</label><input type="text" id="t-from" readonly></div>
+      <div class="form-group">
+        <label>To Project (Type for Recommendations)</label>
+        <input type="text" id="t-to" list="project-suggestions" oninput="autoFillTransferOd()" placeholder="Search or select site...">
+      </div>
+      <div class="form-group"><label>New O.D (auto)</label><input type="text" id="t-od" readonly></div>
+      <div class="form-group"><label>Transfer Date</label><input type="date" id="t-date"></div>
+      <div class="form-group"><label>Requested By</label><input type="text" id="t-requested-by" placeholder="Engineer name..."></div>
+      <div class="form-group full">
+        <label>PDF Attachment</label>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+          <input type="text" id="t-attachment" placeholder="PDF link..." style="flex:1;min-width:180px;">
+          <label style="background:var(--accent);color:#000;padding:7px 12px;border-radius:var(--radius);cursor:pointer;font-size:11px;font-weight:700;">
+            📎 Upload PDF
+            <input type="file" accept="application/pdf" style="display:none;" onchange="uploadToCloudinary(this)">
+          </label>
+          <span id="upload-status" style="font-size: 11px;"></span>
+        </div>
+      </div>
+      <div class="form-group full"><label>Notes</label><textarea id="t-notes" rows="2"></textarea></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('transfer-modal')">Cancel</button>
+      <button class="btn-save" onclick="saveTransfer()">Confirm Transfer</button>
+    </div>
+  </div>
+</div>
+
+<datalist id="project-suggestions"></datalist>
+<datalist id="equipment-suggestions"></datalist>
+
+<div class="breakdown-overlay" id="type-detail-modal">
+  <div class="breakdown-box" style="width:640px;max-height:85vh;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
+      <div>
+        <div class="breakdown-title" id="type-detail-title"></div>
+        <div class="breakdown-sub" id="type-detail-sub" style="font-size:11px;color:var(--text-muted)"></div>
+      </div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:700;color:var(--accent);" id="type-detail-count"></div>
+    </div>
+    <div id="type-detail-content" style="overflow-y:auto;max-height:60vh;"></div>
+    <button class="breakdown-close" onclick="closeModal('type-detail-modal')">Close</button>
+  </div>
+</div>
+
+<div class="breakdown-overlay" id="history-modal">
+  <div class="breakdown-box" style="width:600px;">
+    <div class="breakdown-title" id="hist-title"></div>
+    <div class="breakdown-sub" id="hist-sub" style="font-size:11px;color:var(--text-muted)"></div>
+    <div id="hist-content"></div>
+    <button class="breakdown-close" onclick="closeModal('history-modal')">Close</button>
+  </div>
+</div>
+
+<!-- ADD FOLLOW-UP EQUIPMENT MODAL -->
+<div class="modal-overlay" id="fu-add-modal">
+  <div class="modal">
+    <div class="modal-title">Add Follow-Up Request</div>
+    <div class="form-grid">
+      <div class="form-group" style="position:relative;">
+        <label>Equipment</label>
+        <input type="text" id="fu-f-equipment" placeholder="e.g. Excavator" autocomplete="off"
+          oninput="fuEqSearch(this.value)" onblur="setTimeout(fuEqHide,200)" onkeydown="fuEqKey(event)">
+        <div id="fu-eq-dropdown" style="
+          display:none;position:absolute;bottom:100%;left:0;right:0;
+          background:var(--surface);border:1px solid var(--accent);border-radius:var(--radius);
+          max-height:180px;overflow-y:auto;z-index:9999;margin-bottom:3px;
+          box-shadow:0 -4px 16px rgba(0,0,0,0.5);
+        "></div>
+      </div>
+      <div class="form-group"><label>Capacity</label><input type="text" id="fu-f-capacity" placeholder="e.g. 20 Ton"></div>
+      <div class="form-group"><label>Qty</label><input type="number" id="fu-f-qty" value="1" min="1"></div>
+      <div class="form-group"><label>SAP Code</label><input type="text" id="fu-f-sap"></div>
+      <div class="form-group full"><label>Project</label><input type="text" id="fu-f-project" list="project-suggestions" placeholder="Select or type project..." oninput="autoFillFuSap()"></div>
+      <div class="form-group"><label>Submission Date</label><input type="date" id="fu-f-submission"></div>
+      <div class="form-group"><label>Provision Status</label>
+        <select id="fu-f-provision">
+          <option value="Pending">Pending</option>
+          <option value="Rental">Rental</option>
+          <option value="Transfer">Transfer</option>
+          <option value="Hold">Hold</option>
+          <option value="Cancel">Cancel</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Date From</label>
+        <input type="date" id="fu-f-datefrom" onchange="calcFuDays()" oninput="calcFuDays()">
+      </div>
+      <div class="form-group">
+        <label>Date To</label>
+        <input type="date" id="fu-f-dateto" onchange="calcFuDays()" oninput="calcFuDays()">
+      </div>
+      <div class="form-group">
+        <label>Days (Auto - Max 30/Month)</label>
+        <input type="number" id="fu-f-days" value="0" min="0">
+      </div>
+      <div class="form-group full"><label>Notes</label><textarea id="fu-f-notes" rows="2"></textarea></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('fu-add-modal')">Cancel</button>
+      <button class="btn-save" onclick="saveFuEquipment()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- LIBRARIES -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<script>
+// 1. DUAL CLOUD SERVERS (Main + Workshop)
+const mainConfig = {
+  apiKey:"AIzaSyBb9KUiy-0IJFMPqLrGDF3EZxQ1k68UDL4",
+  authDomain:"equipment-list-hac.firebaseapp.com",
+  projectId:"equipment-list-hac",
+  storageBucket:"equipment-list-hac.firebasestorage.app",
+  messagingSenderId:"453574081349",
+  appId:"1:453574081349:web:3c705185463d987c649c2c"
+};
+
+const workshopConfig = {
+  apiKey: "AIzaSyCM7_rM982XONCH2ZGd1gZsO7pbsGULdY4",
+  authDomain: "hac-pmv-workshop.firebaseapp.com",
+  projectId: "hac-pmv-workshop",
+  storageBucket: "hac-pmv-workshop.firebasestorage.app",
+  messagingSenderId: "274147648226",
+  appId: "1:274147648226:web:9b74830c75c5cf236374bb"
+};
+
+const mainApp = firebase.initializeApp(mainConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+const wsApp = firebase.initializeApp(workshopConfig, "workshopApp");
+const wsDb = wsApp.firestore();
+
+const ADMINS = ["magdygaperarqam@gmail.com"];
+
+const OD_MAP = {"Bab Masr":"Eng. Mostafa Morsi","El Bank El Araby":"Eng. Mostafa Morsi","Kayan":"Eng. Mostafa Morsi","Luxor":"Eng. Mostafa Morsi","Mansoura 2":"Eng. Mostafa Morsi","R05":"Eng. Mostafa Morsi","SCB":"Eng. Mostafa Morsi","Al Shohadaa Central hospital":"Eng. Tamer Hagag","Alamein Station":"Eng. Tamer Hagag","Haptowen":"Eng. Tamer Hagag","Locanda":"Eng. Tamer Hagag","Naser Institute":"Eng. Tamer Hagag","Silver Sand":"Eng. Tamer Hagag","Sofitel Hotel":"Eng. Tamer Hagag","Soul":"Eng. Tamer Hagag","swan Lake - 2":"Eng. Tamer Hagag","Wadi Natroun":"Eng. Tamer Hagag","Abou Oweikal":"Eng. Ahmed Nezar","Abou Qir JV":"Eng. Ahmed Nezar","Alex Tram":"Eng. Ahmed Nezar","El Ayaat Project":"Eng. Ahmed Nezar","intake mostakbal Misr":"Eng. Ahmed Nezar","Metro Line 4":"Eng. Ahmed Nezar","Mostakbal Masr Zone (G)":"Eng. Ahmed Nezar","Safaga Port":"Eng. Ahmed Nezar","Sokhna Port":"Eng. Ahmed Nezar","TBM - Metro L4":"Eng. Ahmed Nezar","Toshka":"Eng. Ahmed Nezar","Benban 200 MW":"Eng. Hany Fayd","El Dabaa":"Eng. Hany Fayd","marasy":"Eng. Essam Ibrahim","Ras Elhekma":"Eng. Waled Fahmy","Allam Block ( 10th of ramadan )":"Eng. Mohamed Mostafa","Allam Block ( Safaga Port )":"Eng. Mohamed Mostafa","Central Workshop":"Eng. Mohamed Mostafa","hassan allam complex":"Eng. Mohamed Mostafa","Heavy Transportation Workshop":"Eng. Mohamed Mostafa","Scaffolding":"Eng. Mohamed Mostafa","Ware House( 10th of ramadan )":"Eng. Mohamed Mostafa","10th OF RAMADAN":"Eng. Mohamed Mostafa","Sant Catreen":"Eng. Abdelaziz Ibrahim","Cairo Festival":"Eng. Hamdy Swillam","Hard 350":"Eng. Hamdy Swillam","Mansoura 1":"Eng. Hamdy Swillam","Mavida Garden":"Eng. Hamdy Swillam","Allam steel":"Eng. Salah Shaker","New Capital Tran-Hub":"Eng. Mohamed Salem","Afrexim Bank":"Eng. Islam El Sayed","Al Alamen Towers JV":"Eng. Mohamed Abdellatif"};
+const CAT_COLORS = {"Earthmoving Equipment":"#f0a500","Compaction Equipment":"#58a6ff","Power & Utilities":"#3fb950","Concrete Equipment":"#e05c00","Lifting Equipment":"#a371f7","Ground Engineering":"#39d353","Special Equipment":"#ff7b72","Pumping Equipment":"#ffa657"};
+
+let currentUser=null, isAdmin=false;
+let allEquipment=[], allTransfers=[];
+let editingId=null;
+let multiFilter={od:null, cat:null, proj:null};
+
+// LIVE PRESENCE & PERSISTENT ACCESS LOGS
+let viewerSessionId = null;
+let viewerPingInterval = null;
+let activeViewersList = [];
+let viewerAccessHistoryList = [];
+let currentViewerModalTab = 'live';
+
+function getOd(p){
+  if(!p) return '';
+  if(OD_MAP[p]) return OD_MAP[p];
+  const l=p.toLowerCase();
+  for(const [k,v] of Object.entries(OD_MAP)) if(k.toLowerCase()===l) return v;
+  return '';
+}
+
+function formatExcelDate(val) {
+  if (!val || val === '—' || val === '') return '—';
+  const num = Number(val);
+  if (!isNaN(num) && num > 30000 && num < 70000) {
+    const date = new Date(Math.round((num - 25569) * 86400 * 1000));
+    return date.toISOString().split('T')[0];
+  }
+  try {
+    const d = new Date(val);
+    if (!isNaN(d.getTime()) && String(val).includes('-')) {
+      return d.toISOString().split('T')[0];
+    }
+  } catch(e){}
+  return String(val).trim() || '—';
+}
+
+// AUTH
+function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-pass').value.trim();
+  const errBox = document.getElementById('auth-err');
+  const btn = document.getElementById('btn-login-submit');
+
+  if(!email || !pass) { errBox.textContent = 'Enter email & password'; return; }
+  btn.disabled = true; btn.textContent = 'Signing in... ⏳'; errBox.textContent = '';
+
+  auth.signInWithEmailAndPassword(email, pass).catch(function(e){
+    btn.disabled = false; btn.textContent = 'Sign In';
+    errBox.textContent = e.code === 'auth/network-request-failed' ? 'Connection error!' : 'Invalid credentials';
+  });
+}
+
+function doLogout() {
+  cleanupViewerPresence();
+  sessionStorage.removeItem('viewer_name');
+  auth.signOut();
+}
+
+auth.onAuthStateChanged(function(user) {
+  const btn = document.getElementById('btn-login-submit');
+  if(btn) { btn.disabled = false; btn.textContent = 'Sign In'; }
+
+  if(user){
+    currentUser = user;
+    isAdmin = ADMINS.includes(user.email);
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('role-badge').textContent = isAdmin ? 'Admin' : 'Viewer';
+    document.getElementById('role-badge').className = 'badge-role' + (isAdmin ? ' admin' : '');
+
+    document.getElementById('btn-add-eq').style.display = isAdmin ? 'flex' : 'none';
+    document.getElementById('btn-import-eq').style.display = isAdmin ? 'inline-flex' : 'none';
+    document.getElementById('btn-clear-import').style.display = isAdmin ? 'inline-flex' : 'none';
+    document.getElementById('actions-col').style.display = isAdmin ? '' : 'none';
+    document.getElementById('fu-actions-col').style.display = isAdmin ? '' : 'none';
+    document.getElementById('fu-btn-upload').style.display = isAdmin ? 'inline-flex' : 'none';
+    document.getElementById('fu-btn-clear').style.display  = isAdmin ? 'inline-flex' : 'none';
+    document.getElementById('fu-btn-add').style.display    = isAdmin ? 'inline-flex' : 'none';
+    document.getElementById('btn-viewers-log').style.display = isAdmin ? 'inline-flex' : 'none';
+
+    loadData();
+    initWorkshopLive();
+
+    if (!isAdmin) {
+      checkAndPromptViewerName();
+    } else {
+      initAdminPresenceListener();
+      initAdminHistoryListener();
+    }
+  } else {
+    currentUser = null;
+    cleanupViewerPresence();
+    document.getElementById('auth-screen').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+  }
+});
+
+// ─── VIEWER NAME PROMPT & PERSISTENT ACCESS LOGGING ───
+function checkAndPromptViewerName() {
+  const storedName = sessionStorage.getItem('viewer_name');
+  if (!storedName) {
+    document.getElementById('viewer-name-modal').classList.add('open');
+    document.getElementById('viewer-name-input').focus();
+  } else {
+    startViewerPresence(storedName);
+  }
+}
+
+window.submitViewerName = function(e) {
+  if (e) e.preventDefault();
+  const nameInput = document.getElementById('viewer-name-input');
+  const name = nameInput.value.trim();
+  if (!name) return;
+  sessionStorage.setItem('viewer_name', name);
+  document.getElementById('viewer-name-modal').classList.remove('open');
+  
+  // 1. بدء الجلسة الحية المتصلة الآن
+  startViewerPresence(name);
+  
+  // 2. تسجيل دائم في الهيستوري (حتى لو الأدمن غير متصل)
+  logViewerAccessHistory(name);
+
+  toast('Welcome, ' + name + ' ✓');
+};
+
+function logViewerAccessHistory(name) {
+  const isMobile = window.innerWidth <= 860;
+  const now = new Date();
+  
+  db.collection('viewer_access_logs').add({
+    name: name,
+    device: isMobile ? 'Mobile' : 'Desktop',
+    date: now.toISOString().split('T')[0],
+    time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    timestamp: Date.now(),
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  }).catch(function(err){
+    console.log('Access log save error:', err);
+  });
+}
+
+function startViewerPresence(name) {
+  if (isAdmin) return;
+  if (!viewerSessionId) {
+    viewerSessionId = 'v_' + Math.random().toString(36).substr(2, 9);
+  }
+  const isMobile = window.innerWidth <= 860;
+  const userAgent = isMobile ? 'Mobile' : 'Desktop';
+
+  const sessionRef = db.collection('active_viewers').doc(viewerSessionId);
+  sessionRef.set({
+    name: name,
+    device: userAgent,
+    startedAt: new Date().toISOString(),
+    lastSeen: Date.now()
+  }).catch(function(err){ console.log('Silent presence error:', err); });
+
+  if (viewerPingInterval) clearInterval(viewerPingInterval);
+  viewerPingInterval = setInterval(function() {
+    sessionRef.update({ lastSeen: Date.now() }).catch(function(e){});
+  }, 25000);
+}
+
+function cleanupViewerPresence() {
+  if (viewerPingInterval) clearInterval(viewerPingInterval);
+  if (viewerSessionId && !isAdmin) {
+    db.collection('active_viewers').doc(viewerSessionId).delete().catch(function(e){});
+    viewerSessionId = null;
+  }
+}
+
+window.addEventListener('beforeunload', function() {
+  cleanupViewerPresence();
+});
+
+// مراقبة المتواجدين الآن للأدمن
+function initAdminPresenceListener() {
+  const badge = document.getElementById('viewer-presence-indicator');
+  const badgeText = document.getElementById('viewer-presence-text');
+
+  db.collection('active_viewers').onSnapshot(function(snapshot) {
+    const now = Date.now();
+    activeViewersList = [];
+
+    snapshot.forEach(function(doc) {
+      const data = doc.data();
+      if (now - (data.lastSeen || 0) < 60000) {
+        activeViewersList.push(data);
+      } else {
+        doc.ref.delete().catch(function(e){});
+      }
+    });
+
+    document.getElementById('count-live-tab').textContent = activeViewersList.length;
+
+    if (activeViewersList.length > 0) {
+      badge.style.display = 'inline-flex';
+      if (activeViewersList.length === 1) {
+        badgeText.textContent = (activeViewersList[0].name || 'Viewer') + ' Online';
+      } else {
+        badgeText.textContent = activeViewersList.length + ' Viewers Online';
+      }
+    } else {
+      badge.style.display = 'none';
+    }
+
+    if(currentViewerModalTab === 'live') {
+      renderLiveViewersList();
+    }
+  }, function(err) {
+    console.log('Presence listener error:', err);
+  });
+}
+
+// تحميل سجل الدخول الدائم (History) للأدمن
+function initAdminHistoryListener() {
+  db.collection('viewer_access_logs')
+    .orderBy('timestamp', 'desc')
+    .limit(100)
+    .onSnapshot(function(snapshot) {
+      viewerAccessHistoryList = snapshot.docs.map(function(doc) {
+        return Object.assign({ id: doc.id }, doc.data());
+      });
+      if(currentViewerModalTab === 'history') {
+        renderHistoryViewersList();
+      }
+    }, function(err){
+      console.log('History load error:', err);
+    });
+}
+
+window.openViewersModal = function(tab) {
+  switchViewerModalTab(tab || 'live');
+  document.getElementById('active-viewers-modal').classList.add('open');
+};
+
+window.switchViewerModalTab = function(tab) {
+  currentViewerModalTab = tab;
+  const liveBtn = document.getElementById('tab-live-btn');
+  const histBtn = document.getElementById('tab-history-btn');
+  const liveContent = document.getElementById('viewers-live-content');
+  const histContent = document.getElementById('viewers-history-content');
+  const clearBtn = document.getElementById('btn-clear-history');
+
+  if(tab === 'live') {
+    liveBtn.classList.add('active');
+    histBtn.classList.remove('active');
+    liveContent.style.display = 'flex';
+    histContent.style.display = 'none';
+    clearBtn.style.display = 'none';
+    renderLiveViewersList();
+  } else {
+    histBtn.classList.add('active');
+    liveBtn.classList.remove('active');
+    liveContent.style.display = 'none';
+    histContent.style.display = 'flex';
+    clearBtn.style.display = 'inline-flex';
+    renderHistoryViewersList();
+  }
+};
+
+function renderLiveViewersList() {
+  const container = document.getElementById('viewers-live-content');
+  if (!activeViewersList.length) {
+    container.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);">No engineers currently online.</div>';
+  } else {
+    container.innerHTML = activeViewersList.map(function(v) {
+      let timeStr = 'Just now';
+      try {
+        timeStr = new Date(v.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      } catch(e){}
+      return '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--surface2);padding:10px 14px;border-radius:var(--radius);border:1px solid var(--border);">'
+        + '<div>'
+          + '<div style="font-weight:700;color:var(--text);font-size:13px;display:flex;align-items:center;gap:6px;">'
+            + '<span class="viewer-pulse-dot"></span> ' + (v.name || 'Viewer') 
+          + '</div>'
+          + '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Online since: ' + timeStr + '</div>'
+        + '</div>'
+        + '<span class="badge" style="background:var(--surface3);color:var(--accent);font-size:11px;">' + (v.device === 'Mobile' ? '📱 Mobile' : '💻 Desktop') + '</span>'
+      + '</div>';
+    }).join('');
+  }
+}
+
+function renderHistoryViewersList() {
+  const container = document.getElementById('viewers-history-content');
+  if (!viewerAccessHistoryList.length) {
+    container.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);">No past access logs found.</div>';
+  } else {
+    container.innerHTML = viewerAccessHistoryList.map(function(h) {
+      return '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--surface2);padding:9px 12px;border-radius:var(--radius);border:1px solid var(--border);">'
+        + '<div>'
+          + '<div style="font-weight:700;color:var(--text);font-size:13px;">' + (h.name || 'Viewer') + '</div>'
+          + '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">📅 ' + (h.date || '—') + ' · ⏰ ' + (h.time || '—') + '</div>'
+        + '</div>'
+        + '<span class="badge" style="background:var(--surface3);color:var(--text-muted);font-size:11px;">' + (h.device === 'Mobile' ? '📱 Mobile' : '💻 Desktop') + '</span>'
+      + '</div>';
+    }).join('');
+  }
+}
+
+window.clearAccessHistory = function() {
+  if(!isAdmin) return;
+  if(!confirm('Clear all access history logs permanently?')) return;
+
+  db.collection('viewer_access_logs').get().then(function(snap){
+    const batch = db.batch();
+    snap.docs.forEach(function(d){ batch.delete(d.ref); });
+    return batch.commit();
+  }).then(function(){
+    toast('Access logs cleared ✓');
+  }).catch(function(err){
+    toast('Error clearing logs: ' + err.message, 'error');
+  });
+};
+
+// LOAD DATA
+function loadData() {
+  document.getElementById('table-loading').style.display = 'block';
+  Promise.all([
+    db.collection('equipment').orderBy('sn', 'asc').get(),
+    db.collection('transfers').orderBy('timestamp', 'desc').get(),
+    db.collection('followup').orderBy('sn', 'asc').get()
+  ]).then(function(results) {
+    allEquipment = results[0].docs.map(function(d){ return Object.assign({id: d.id}, d.data()); });
+    allTransfers = results[1].docs.map(function(d){ return Object.assign({id: d.id}, d.data()); });
+
+    if(!results[2].empty) {
+      FU_DATA = results[2].docs.map(function(d){ return Object.assign({id: d.id}, d.data()); });
+    } else {
+      initFollowUpDefault();
+    }
+
+    renderDashboard();
+    renderTable();
+    populateFilters();
+    renderTransfers();
+    setupFollowUpUI();
+    populateProjectSuggestions();
+  }).catch(function(err){
+    console.error(err);
+    document.getElementById('table-loading').style.display = 'none';
+    if(err.code === 'resource-exhausted') {
+      toast('⚠️ Firebase Daily Quota Exceeded. Reading local cache.', 'error');
+      setupFollowUpUI();
+    }
+  });
+}
+
+function getFiltered(){
+  return allEquipment.filter(function(e){
+    if(multiFilter.od && e.od!==multiFilter.od) return false;
+    if(multiFilter.cat && e.category!==multiFilter.cat) return false;
+    if(multiFilter.proj && e.project!==multiFilter.proj) return false;
+    return true;
+  });
+}
+
+function updateFilterChips(){
+  const bar = document.getElementById('active-filter-bar');
+  const chipOd  = document.getElementById('chip-od');
+  const chipCat = document.getElementById('chip-cat');
+  const chipProj= document.getElementById('chip-proj');
+  if(!bar) return;
+  const any = multiFilter.od || multiFilter.cat || multiFilter.proj;
+  bar.style.display = any ? 'flex' : 'none';
+  if(chipOd){
+    chipOd.style.display = multiFilter.od ? 'inline-flex' : 'none';
+    if(multiFilter.od) chipOd.innerHTML = '<span>O.D: <b>'+multiFilter.od+'</b></span><span class="filter-chip-close">✕</span>';
+  }
+  if(chipCat){
+    chipCat.style.display = multiFilter.cat ? 'inline-flex' : 'none';
+    if(multiFilter.cat) chipCat.innerHTML = '<span>Cat: <b>'+multiFilter.cat.replace(' Equipment','')+'</b></span><span class="filter-chip-close">✕</span>';
+  }
+  if(chipProj){
+    chipProj.style.display = multiFilter.proj ? 'inline-flex' : 'none';
+    if(multiFilter.proj) chipProj.innerHTML = '<span>Project: <b>'+multiFilter.proj+'</b></span><span class="filter-chip-close">✕</span>';
+  }
+}
+
+// DASHBOARD RENDER
+function renderDashboard(){
+  const base = getFiltered();
+  const catCount={};
+  const forCat = allEquipment.filter(function(e){
+    if(multiFilter.od && e.od!==multiFilter.od) return false;
+    if(multiFilter.proj && e.project!==multiFilter.proj) return false;
+    return true;
+  });
+  forCat.forEach(function(e){ if(e.category) catCount[e.category]=(catCount[e.category]||0)+1; });
+
+  document.getElementById('cat-cards').innerHTML = Object.entries(catCount).sort(function(a,b){return b[1]-a[1];}).map(function(pair){
+    const cat = pair[0], cnt = pair[1];
+    return '<div class="dash-card '+(multiFilter.cat===cat?'active':'')+'" onclick="toggleCat(\''+cat.replace(/'/g,"\\'")+'\')">'
+      +'<div class="dash-card-val" style="color:'+(CAT_COLORS[cat]||'var(--accent)')+'">'+cnt+'</div>'
+      +'<div class="dash-card-label">'+cat.replace(' Equipment','')+'</div>'
+      +'<div class="dash-card-sub">click to filter · ℹ breakdown</div>'
+    +'</div>';
+  }).join('');
+
+  const projCount={};
+  const forProj = allEquipment.filter(function(e){
+    if(multiFilter.od && e.od!==multiFilter.od) return false;
+    if(multiFilter.cat && e.category!==multiFilter.cat) return false;
+    return true;
+  });
+  forProj.forEach(function(e){ if(e.project) projCount[e.project]=(projCount[e.project]||0)+1; });
+  window._projData = Object.entries(projCount).sort(function(a,b){return b[1]-a[1];});
+  renderProjList();
+
+  const odCount={};
+  allEquipment.forEach(function(e){ if(e.od) odCount[e.od]=(odCount[e.od]||0)+1; });
+  document.getElementById('od-buttons').innerHTML =
+    '<button class="od-btn '+(!multiFilter.od?'active':'')+'" onclick="toggleOD(null)">All</button>'
+    + Object.entries(odCount).sort(function(a,b){return b[1]-a[1];}).map(function(pair){
+      return '<button class="od-btn '+(multiFilter.od===pair[0]?'active':'')+'" onclick="toggleOD(\''+pair[0].replace(/'/g,"\\'")+'\')">'+pair[0]+' <span style="opacity:.5;font-size:10px">('+pair[1]+')</span></button>';
+    }).join('');
+
+  if(multiFilter.od){
+    const odData = allEquipment.filter(function(e){ return e.od === multiFilter.od; });
+    const total = odData.length;
+    const catBreak = {};
+    odData.forEach(function(e){ if(e.category) catBreak[e.category] = (catBreak[e.category]||0)+1; });
+    const sorted = Object.entries(catBreak).sort(function(a,b){ return b[1]-a[1]; });
+    const maxVal = sorted[0] ? sorted[0][1] : 1;
+    const COLORS = ['#f0a500','#58a6ff','#3fb950','#f85149','#bc8cff','#ff7b72','#79c0ff','#d2a8ff'];
+
+    document.getElementById('od-chart-title').textContent = multiFilter.od;
+    document.getElementById('od-chart-total').textContent = base.length + (base.length!==total?' / '+total:'');
+    document.getElementById('od-chart-bars').innerHTML = sorted.map(function(pair, i){
+      const cat = pair[0], cnt = pair[1];
+      return '<div style="margin-bottom:10px;cursor:pointer;" onclick="toggleCat(\''+cat.replace(/'/g,"\\'")+'\')">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">'
+          +'<span style="font-size:12px;color:'+(multiFilter.cat===cat?COLORS[i%COLORS.length]:'var(--text)')+';font-weight:'+(multiFilter.cat===cat?700:400)+'">'+cat.replace(' Equipment','')+'</span>'
+          +'<span style="font-size:12px;font-family:\'JetBrains Mono\',monospace;color:'+COLORS[i%COLORS.length]+'">'+cnt+' <span style="color:var(--text-muted);font-size:10px">('+Math.round(cnt/total*100)+'%)</span></span>'
+        +'</div>'
+        +'<div style="height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;">'
+          +'<div style="height:100%;width:'+Math.round(cnt/maxVal*100)+'%;background:'+COLORS[i%COLORS.length]+';border-radius:4px;"></div>'
+        +'</div>'
+      +'</div>';
+    }).join('');
+    document.getElementById('od-chart-wrap').style.display = 'block';
+  } else {
+    document.getElementById('od-chart-wrap').style.display = 'none';
+  }
+
+  const filtered = getFiltered();
+  document.getElementById('kpi-total').textContent = filtered.length;
+  document.getElementById('kpi-projects').textContent = Array.from(new Set(filtered.map(function(e){return e.project;}).filter(Boolean))).length;
+  document.getElementById('kpi-ods').textContent = Array.from(new Set(filtered.map(function(e){return e.od;}).filter(Boolean))).length;
+  document.getElementById('kpi-updated').textContent = allTransfers.length ? allTransfers[0].date||'—' : '—';
+  document.getElementById('kpi-transfers-sub').textContent = allTransfers.length + ' transfers logged';
+
+  updateFilterChips();
+}
+
+function renderCatBreakdown(){
+  const wrap = document.getElementById('cat-breakdown-wrap');
+  if(!multiFilter.cat){ wrap.style.display='none'; return; }
+  const cat = multiFilter.cat;
+  const base = allEquipment.filter(function(e){
+    if(multiFilter.od && e.od!==multiFilter.od) return false;
+    if(multiFilter.proj && e.project!==multiFilter.proj) return false;
+    return e.category===cat;
+  });
+  const typeData={};
+  base.forEach(function(e){
+    if(!e.equipment) return;
+    if(!typeData[e.equipment]) typeData[e.equipment]={count:0};
+    typeData[e.equipment].count++;
+  });
+  const typesSorted = Object.entries(typeData).sort(function(a,b){return b[1].count-a[1].count;}).slice(0,8);
+  const maxT = typesSorted[0]?typesSorted[0][1].count:1;
+
+  const odCount={};
+  base.forEach(function(e){ if(e.od) odCount[e.od]=(odCount[e.od]||0)+1; });
+  const odsSorted = Object.entries(odCount).sort(function(a,b){return b[1]-a[1];});
+  const maxO = odsSorted[0]?odsSorted[0][1]:1;
+
+  document.getElementById('cat-bd-title').textContent = cat.replace(' Equipment','');
+  document.getElementById('cat-bd-total').textContent = base.length;
+
+  document.getElementById('cat-bd-types').innerHTML = typesSorted.map(function(pair){
+    return '<div style="margin-bottom:8px;cursor:pointer;border-radius:6px;padding:4px;" onclick="showTypeDetail(\''+pair[0].replace(/'/g,"\\'")+'\',\''+cat.replace(/'/g,"\\'")+'\')">'
+      +'<div style="display:flex;justify-content:space-between;margin-bottom:3px;font-size:12px;">'
+        +'<span>'+pair[0]+'</span><span style="color:'+CAT_COLORS[cat]+';font-family:\'JetBrains Mono\'">'+pair[1].count+' ›</span>'
+      +'</div>'
+      +'<div style="height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;">'
+        +'<div style="height:100%;width:'+Math.round(pair[1].count/maxT*100)+'%;background:'+CAT_COLORS[cat]+'"></div>'
+      +'</div>'
+    +'</div>';
+  }).join('');
+
+  document.getElementById('cat-bd-ods').innerHTML = odsSorted.map(function(pair){
+    return '<div style="margin-bottom:8px;font-size:12px;">'
+      +'<div style="display:flex;justify-content:space-between;margin-bottom:3px;">'
+        +'<span>'+pair[0]+'</span><span style="color:#58a6ff;font-family:\'JetBrains Mono\'">'+pair[1]+'</span>'
+      +'</div>'
+      +'<div style="height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;">'
+        +'<div style="height:100%;width:'+Math.round(pair[1]/maxO*100)+'%;background:#58a6ff"></div>'
+      +'</div>'
+    +'</div>';
+  }).join('');
+
+  wrap.style.display='block';
+}
+
+function showTypeDetail(type, cat) {
+  const base = allEquipment.filter(function(e){
+    if(multiFilter.od && e.od!==multiFilter.od) return false;
+    if(multiFilter.proj && e.project!==multiFilter.proj) return false;
+    return e.category===cat && e.equipment===type;
+  });
+  const color = CAT_COLORS[cat]||'var(--accent)';
+  const powerGroups={};
+  base.forEach(function(e){
+    const pw = String(e.power||'').trim()||'—';
+    if(!powerGroups[pw]) powerGroups[pw]=[];
+    powerGroups[pw].push(e);
+  });
+  const sorted = Object.entries(powerGroups).sort(function(a,b){return b[1].length-a[1].length;});
+
+  document.getElementById('type-detail-title').textContent = type;
+  document.getElementById('type-detail-sub').textContent = cat.replace(' Equipment','') + ' · ' + (multiFilter.proj||multiFilter.od||'All');
+  document.getElementById('type-detail-count').textContent = base.length;
+
+  document.getElementById('type-detail-content').innerHTML = sorted.map(function(pair){
+    return '<div style="margin-bottom:16px;">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);font-size:13px;font-weight:700;color:'+color+'">'
+        +'<span>⚡ '+(pair[0]==='—'?'No Power Data':pair[0])+'</span><span style="background:'+color+';color:#000;border-radius:10px;padding:1px 8px;font-size:11px;">'+pair[1].length+'</span>'
+      +'</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">'
+        + pair[1].map(function(e){
+          return '<div style="background:var(--surface2);border-radius:6px;padding:6px 10px;border:1px solid var(--border);display:flex;justify-content:space-between;font-size:12px;">'
+            +'<span class="code-cell">'+(e.code||'—')+'</span><span style="color:var(--text-muted);font-size:11px">'+(e.project||'—')+'</span>'
+          +'</div>';
+        }).join('')
+      +'</div>'
+    +'</div>';
+  }).join('');
+
+  document.getElementById('type-detail-modal').classList.add('open');
+}
+
+function toggleOD(od) { multiFilter.od = od; renderDashboard(); renderTable(); renderCatBreakdown(); updateFilterChips(); }
+function toggleCat(cat) { multiFilter.cat = multiFilter.cat===cat?null:cat; renderDashboard(); renderTable(); renderCatBreakdown(); updateFilterChips(); }
+function toggleProj(proj) { multiFilter.proj = multiFilter.proj===proj?null:proj; renderDashboard(); renderTable(); renderCatBreakdown(); updateFilterChips(); }
+function clearAllFilters() {
+  multiFilter={od:null,cat:null,proj:null};
+  document.getElementById('active-filter-bar').style.display='none';
+  document.getElementById('cat-breakdown-wrap').style.display='none';
+  document.getElementById('od-chart-wrap').style.display='none';
+  document.getElementById('search-input').value='';
+  renderDashboard(); renderTable(); updateFilterChips();
+}
+
+function renderProjList(filter){
+  filter = filter || '';
+  const data = (window._projData||[]).filter(function(pair){
+    return !filter || pair[0].toLowerCase().indexOf(filter.toLowerCase()) !== -1;
+  });
+  document.getElementById('proj-list').innerHTML = data.map(function(pair){
+    return '<div class="proj-row '+(multiFilter.proj===pair[0]?'active':'')+'" onclick="toggleProj(\''+pair[0].replace(/'/g,"\\'").replace(/\"/g,'&quot;')+'\')">'
+      +'<div class="proj-row-left"><div class="proj-dot"></div><div><div class="proj-name">'+pair[0]+'</div><div class="proj-od">'+(getOd(pair[0])||'')+'</div></div></div>'
+      +'<div class="proj-count">'+pair[1]+'</div>'
+    +'</div>';
+  }).join('');
+}
+function filterProjList(){ renderProjList(document.getElementById('proj-search-input').value); }
+
+function populateFilters(){
+  const cats = Array.from(new Set(allEquipment.map(function(e){return e.category;}).filter(Boolean))).sort();
+  const types = Array.from(new Set(allEquipment.map(function(e){return e.equipment;}).filter(Boolean))).sort();
+  const projs = Array.from(new Set(allEquipment.map(function(e){return e.project;}).filter(Boolean))).sort();
+  document.getElementById('filter-cat').innerHTML='<option value="">All Categories</option>'+cats.map(function(c){return '<option>'+c+'</option>';}).join('');
+  document.getElementById('filter-type').innerHTML='<option value="">All Types</option>'+types.map(function(t){return '<option>'+t+'</option>';}).join('');
+  document.getElementById('filter-proj').innerHTML='<option value="">All Projects</option>'+projs.map(function(p){return '<option>'+p+'</option>';}).join('');
+}
+
+function populateProjectSuggestions() {
+  const set = new Set(Object.keys(OD_MAP));
+  allEquipment.forEach(function(e){ if(e.project) set.add(e.project); });
+  FU_DATA.forEach(function(r){ if(r.project) set.add(r.project); });
+  const dl = document.getElementById('project-suggestions');
+  if(dl) {
+    dl.innerHTML = Array.from(set).sort().map(function(p){
+      return '<option value="'+p+'">';
+    }).join('');
+  }
+}
+
+document.addEventListener('click', function(e){
+  const row = e.target.closest('tbody tr');
+  if(row) {
+    const tbody = row.closest('tbody');
+    tbody.querySelectorAll('tr').forEach(function(r){ r.classList.remove('selected-row'); });
+    row.classList.add('selected-row');
+  }
+});
+
+function renderTable() {
+  const q = document.getElementById('search-input').value.toLowerCase();
+  const cat = document.getElementById('filter-cat').value;
+  const type = document.getElementById('filter-type').value;
+  const proj = document.getElementById('filter-proj').value;
+
+  const data = allEquipment.filter(function(e){
+    const mQ = !q || [e.equipment, e.brand, e.code, e.project, e.od, e.sap].some(function(v){
+      return v && String(v).toLowerCase().indexOf(q) !== -1;
+    });
+    const mCat = !cat || e.category === cat;
+    const mType = !type || e.equipment === type;
+    const mProj = !proj || e.project === proj;
+    if(multiFilter.od && e.od !== multiFilter.od) return false;
+    if(multiFilter.cat && e.category !== multiFilter.cat) return false;
+    if(multiFilter.proj && e.project !== multiFilter.proj) return false;
+    return mQ && mCat && mType && mProj;
+  });
+
+  document.getElementById('table-loading').style.display = 'none';
+  document.getElementById('table-empty').style.display = data.length ? 'none' : 'block';
+  
+  document.getElementById('table-body').innerHTML = data.map(function(e, i){
+    return '<tr style="cursor:pointer;" onclick="showEquipHistory(\''+e.id+'\')">'
+      +'<td style="color:var(--text-muted)">'+(e.sn || (i+1))+'</td>'
+      +'<td style="font-weight:600">'+(e.equipment||'')+'</td>'
+      +'<td><span class="cat-badge">'+(e.category||'')+'</span></td>'
+      +'<td style="color:var(--text-muted)">'+(e.brand||'')+'</td>'
+      +'<td class="code-cell">'+(e.code||'')+'</td>'
+      +'<td>'+(e.project||'—')+'</td>'
+      +'<td style="color:var(--text-muted);font-size:12px">'+(e.od||'—')+'</td>'
+      +'<td style="font-family:monospace;font-size:12px">'+(e.year||'—')+'</td>'
+      +(isAdmin ? '<td><div class="action-btns">'
+        +'<button class="btn-transfer" onclick="event.stopPropagation();openTransferModal(\''+e.id+'\')">Transfer</button>'
+        +'<button class="btn-edit" onclick="event.stopPropagation();openEditModal(\''+e.id+'\')">Edit</button>'
+        +'<button class="btn-del" onclick="event.stopPropagation();deleteEquipment(\''+e.id+'\')">Delete</button>'
+      +'</div></td>' : '')
+    +'</tr>';
+  }).join('');
+}
+
+// ─── WORKSHOP LIVE SYSTEM ───
+let wsEquipment = [];
+let wsMonthly = [];
+let currentWsTab = 'active';
+let wsStatusFilter = 'All';
+
+function initWorkshopLive() {
+  wsDb.collection('equipment').onSnapshot(function(snapshot){
+    wsEquipment = snapshot.docs.map(function(doc){ return Object.assign({id: doc.id}, doc.data()); });
+    renderWsTable();
+    updateWsTicker();
+  });
+
+  wsDb.collection('monthly_stats').onSnapshot(function(snapshot){
+    wsMonthly = snapshot.docs.map(function(doc){ return Object.assign({id: doc.id}, doc.data()); });
+    wsMonthly.sort(function(a,b){ return (a.month||"").localeCompare(b.month||""); });
+    renderWsMonthly();
+  });
+}
+
+function updateWsTicker() {
+  const ticker = document.getElementById("ws-ticker-content");
+  if(!wsEquipment.length){ ticker.textContent = "No equipment currently in workshop."; return; }
+  ticker.innerHTML = wsEquipment.map(function(item){
+    const highlight = item.status==='Ready'?'color:var(--status-ready);font-weight:bold':(item.status==='Delay'?'color:var(--status-delay);font-weight:bold':'');
+    return '<span style="display:inline-block;margin-right:30px;">'
+      +'Equipment: <strong>'+(item.name||'—')+'</strong> ('+(item.code||'—')+') — Project: '+(item.project||'—')+' — Status: <span style="'+highlight+'">'+(item.status||'—')+'</span> ('+(item.dept||'—')+')'
+    +'</span>';
+  }).join(' ··· ');
+}
+
+function renderWsTable() {
+  const q = (document.getElementById('ws-search').value||'').toLowerCase().trim();
+  const dept = document.getElementById('ws-dept-filter').value;
+
+  let filtered = wsEquipment.filter(function(item){
+    const isArchived = (item.status === 'Dispatched');
+    return currentWsTab === 'active' ? !isArchived : isArchived;
+  });
+
+  if(wsStatusFilter !== 'All') filtered = filtered.filter(function(i){ return i.status === wsStatusFilter; });
+  if(dept !== 'All') filtered = filtered.filter(function(i){ return i.dept === dept; });
+  if(q) {
+    filtered = filtered.filter(function(i){
+      return [i.name, i.code, i.report, i.project].some(function(val){ return val && val.toLowerCase().indexOf(q) !== -1; });
+    });
+  }
+
+  document.getElementById("ws-total-count").textContent = wsEquipment.filter(function(i){ return i.status !== 'Dispatched'; }).length;
+  document.getElementById("ws-ready-count").textContent = wsEquipment.filter(function(i){ return i.status === 'Ready'; }).length;
+  document.getElementById("ws-progress-count").textContent = wsEquipment.filter(function(i){ return i.status === 'In Progress'; }).length;
+  document.getElementById("ws-waiting-count").textContent = wsEquipment.filter(function(i){ return i.status === 'Waiting'; }).length;
+  document.getElementById("ws-delay-count").textContent = wsEquipment.filter(function(i){ return i.status === 'Delay'; }).length;
+  document.getElementById("ws-external-count").textContent = wsEquipment.filter(function(i){ return i.status === 'External'; }).length;
+  document.getElementById("ws-dispatched-count").textContent = wsEquipment.filter(function(i){ return i.status === 'Dispatched'; }).length;
+
+  document.getElementById('ws-table-body').innerHTML = filtered.map(function(item, i){
+    const statusClass = 'status-' + (item.status ? item.status.replace(/\s+/g, '-') : 'Waiting');
+    
+    // زرار الطلب متاح للأدمن وللفيور لأي معدة Ready
+    let actionBtn = '<span style="font-size:11px;color:var(--text-muted);font-style:italic">Not Ready</span>';
+    if(item.status === 'Ready'){
+      actionBtn = '<button class="btn-request" onclick="openWsRequestModal(\''+(item.code||'')+'\', \''+(item.name||'').replace(/'/g,"\\'")+'\')">Request</button>';
+    }
+
+    return '<tr>'
+      +'<td style="color:var(--text-muted)">'+(i+1)+'</td>'
+      +'<td><strong>'+(item.name||'—')+'</strong></td>'
+      +'<td><div><span class="code-cell">'+(item.code||'—')+'</span></div><div style="font-size:11px;color:var(--text-muted)">'+(item.report||'No report')+'</div></td>'
+      +'<td><div>📥 '+(item.project||'—')+'</div>'+(item.exitProject ? '<div style="color:var(--red);font-size:10px">📤 '+item.exitProject+'</div>':'')+'</td>'
+      +'<td style="font-size:11px"><div>In: '+(item.entryDate||'—')+'</div><div>Out: '+(item.exitDate||'Active')+'</div></td>'
+      +'<td style="font-weight:700;color:var(--accent)">'+calculateDays(item.entryDate, item.exitDate, item.status)+'</td>'
+      +'<td>'+(item.dept||'Mechanics')+'</td>'
+      +'<td><span class="status-badge '+statusClass+'">'+(item.status||'Waiting')+'</span></td>'
+      +'<td>'+actionBtn+'</td>'
+    +'</tr>';
+  }).join('');
+}
+
+function calculateDays(entry, exit, status){
+  if(!entry) return '—';
+  const start = new Date(entry);
+  const end = (status === 'Dispatched' && exit) ? new Date(exit) : new Date();
+  return Math.ceil(Math.abs(end - start)/(1000*60*60*24)) + ' Days';
+}
+
+function switchWsTab(tab){
+  currentWsTab = tab;
+  document.getElementById('ws-tab-active-btn').classList.toggle('active', tab==='active');
+  document.getElementById('ws-tab-archive-btn').classList.toggle('active', tab==='archive');
+  renderWsTable();
+}
+
+function setWsStatusFilter(status){
+  wsStatusFilter = status;
+  renderWsTable();
+}
+
+function renderWsMonthly(){
+  document.getElementById('ws-monthly-tbody').innerHTML = wsMonthly.map(function(stat){
+    return '<tr>'
+      +'<td><strong>'+stat.month+'</strong></td>'
+      +'<td>'+stat.received+'</td>'
+      +'<td style="color:var(--status-ready)">'+stat.repaired+'</td>'
+      +'<td style="color:var(--status-dispatched)">'+stat.dispatched+'</td>'
+    +'</tr>';
+  }).join('');
+}
+
+function openWsRequestModal(code, name) {
+  document.getElementById("req-eq-code").value = code;
+  document.getElementById("req-eq-name").value = name;
+  document.getElementById("req-eq-info").textContent = "Equipment: " + name + " (" + code + ")";
+  
+  const currentName = isAdmin ? "Eng. Mahmoud Osama (Admin)" : (sessionStorage.getItem('viewer_name') || "");
+  document.getElementById("req-user-name").value = currentName;
+  document.getElementById("req-dest-project").value = "";
+  document.getElementById("requestModal").classList.add("open");
+}
+
+function submitWsRequest(e) {
+  e.preventDefault();
+  const userName = document.getElementById("req-user-name").value.trim();
+  const destProject = document.getElementById("req-dest-project").value.trim();
+  const eqCode = document.getElementById("req-eq-code").value;
+  const eqName = document.getElementById("req-eq-name").value;
+
+  wsDb.collection("transfer_requests").add({
+    userName: userName,
+    destProject: destProject,
+    eqCode: eqCode,
+    eqName: eqName,
+    timestamp: new Date().toISOString()
+  }).then(function(){
+    closeModal("requestModal");
+    toast("✅ Request Sent to Eng. Mahmoud Osama!", "success");
+  }).catch(function(err){
+    alert("Error: " + err.message);
+  });
+}
+
+// ─── 5. FOLLOW-UP SYSTEM LOGIC ───
+let FU_DATA = [];
+let fuFilters = { prov: null };
+let fuStatusHistory = [];
+
+function initFollowUpDefault() {
+  FU_DATA = [];
+  setupFollowUpUI();
+}
+
+function setupFollowUpUI() {
+  const equips = Array.from(new Set(FU_DATA.map(function(r){ return (r.equipment||'').trim(); }).filter(Boolean))).sort();
+  const eqSel = document.getElementById('fu-equip-filter');
+  const currentEq = eqSel.value;
+  eqSel.innerHTML = '<option value="">All Equipment</option>' + equips.map(function(e){ return '<option value="'+e+'">'+e+'</option>'; }).join('');
+  if(equips.includes(currentEq)) eqSel.value = currentEq;
+
+  const projs = Array.from(new Set(FU_DATA.map(function(r){ return (r.project||'').trim(); }).filter(Boolean))).sort();
+  const projSel = document.getElementById('fu-proj-filter');
+  const currentProj = projSel.value;
+  projSel.innerHTML = '<option value="">All Projects</option>' + projs.map(function(p){ return '<option value="'+p+'">'+p+'</option>'; }).join('');
+  if(projs.includes(currentProj)) projSel.value = currentProj;
+
+  renderFollowUpTable();
+}
+
+function getScopedFuData() {
+  const eq = document.getElementById('fu-equip-filter').value;
+  const proj = document.getElementById('fu-proj-filter').value;
+  return FU_DATA.filter(function(r){
+    if(proj && (r.project||'').trim() !== proj) return false;
+    if(eq && (r.equipment||'').trim() !== eq) return false;
+    return true;
+  });
+}
+
+function getFilteredFuData() {
+  const scoped = getScopedFuData();
+  if(!fuFilters.prov) return scoped;
+  return scoped.filter(function(r){
+    return r.provision === fuFilters.prov;
+  });
+}
+
+function setFuCardProv(prov) {
+  if(fuFilters.prov === prov) {
+    fuFilters.prov = null;
+  } else {
+    fuFilters.prov = prov;
+  }
+  renderFollowUpTable();
+}
+
+function clearFuFilters() {
+  fuFilters.prov = null;
+  document.getElementById('fu-equip-filter').value = '';
+  document.getElementById('fu-proj-filter').value = '';
+  renderFollowUpTable();
+}
+
+window.changeFuStatus = function(docId, newStatus) {
+  const item = FU_DATA.find(function(r){ return r.id === docId; });
+  if(!item) return;
+  const oldStatus = item.provision;
+  if(oldStatus === newStatus) return;
+
+  fuStatusHistory.push({ docId: docId, oldStatus: oldStatus, newStatus: newStatus, equipName: item.equipment });
+  if(fuStatusHistory.length > 20) fuStatusHistory.shift();
+
+  item.provision = newStatus;
+  item._lastChange = oldStatus;
+  renderFollowUpTable();
+  updateUndoBtn();
+
+  if(!docId || docId.startsWith('local_')) {
+    toast('Saved locally ✓');
+    return;
+  }
+
+  db.collection('followup').doc(docId).update({ provision: newStatus })
+    .then(function(){
+      toast('✓ Status: ' + oldStatus + ' → ' + newStatus);
+    })
+    .catch(function(err){
+      if(err.code === 'resource-exhausted') {
+        toast('⚠️ Firebase quota reached. Saved in local memory.', 'error');
+      } else {
+        item.provision = oldStatus;
+        fuStatusHistory.pop();
+        renderFollowUpTable();
+        updateUndoBtn();
+        toast('Failed to update status', 'error');
+      }
+    });
+};
+
+function undoLastFuStatus() {
+  if(!fuStatusHistory.length) return;
+  const last = fuStatusHistory.pop();
+  const item = FU_DATA.find(function(r){ return r.id === last.docId; });
+  if(!item) { updateUndoBtn(); return; }
+  item.provision = last.oldStatus;
+  delete item._lastChange;
+  renderFollowUpTable();
+  updateUndoBtn();
+
+  if(!last.docId || last.docId.startsWith('local_')) {
+    toast('↩ Undo: ' + last.newStatus + ' → ' + last.oldStatus);
+    return;
+  }
+
+  db.collection('followup').doc(last.docId).update({ provision: last.oldStatus })
+    .then(function(){
+      toast('↩ Undo: ' + last.newStatus + ' → ' + last.oldStatus);
+    })
+    .catch(function(err){
+      if(err.code === 'resource-exhausted') {
+        toast('↩ Undone locally (Cloud quota full)');
+      } else {
+        item.provision = last.newStatus;
+        fuStatusHistory.push(last);
+        renderFollowUpTable();
+        updateUndoBtn();
+        toast('Undo failed', 'error');
+      }
+    });
+}
+
+function updateUndoBtn() {
+  const btn = document.getElementById('fu-btn-undo');
+  if(!btn) return;
+  if(fuStatusHistory.length) {
+    const last = fuStatusHistory[fuStatusHistory.length - 1];
+    btn.style.display = 'inline-flex';
+    btn.title = 'Undo: ' + (last.equipName||'') + '  ' + last.newStatus + ' → ' + last.oldStatus;
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+function duplicateFuRow(docId) {
+  var src = FU_DATA.find(function(r){ return r.id === docId; });
+  if(!src) return;
+  var copy = Object.assign({}, src);
+  delete copy.id;
+  copy.sn = FU_DATA.length + 1;
+  copy.provision = 'Pending';
+  copy.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+
+  db.collection('followup').add(copy).then(function(ref){
+    copy.id = ref.id;
+    FU_DATA.push(copy);
+    setupFollowUpUI();
+    toast('⧉ Row duplicated ✓');
+  }).catch(function(err){
+    if(err.code === 'resource-exhausted'){
+      copy.id = 'local_' + Date.now();
+      FU_DATA.push(copy);
+      setupFollowUpUI();
+      toast('Duplicated locally (quota full)');
+    } else {
+      toast('Error: ' + err.message, 'error');
+    }
+  });
+}
+
+function removeFuRow(docId) {
+  if(!confirm('Remove this row?')) return;
+  var idx = FU_DATA.findIndex(function(r){ return r.id === docId; });
+  if(idx === -1) return;
+  FU_DATA.splice(idx, 1);
+  setupFollowUpUI();
+  toast('Row removed ✓');
+
+  if(!docId || docId.startsWith('local_')) return;
+  db.collection('followup').doc(docId).delete().catch(function(err){
+    toast('Cloud delete failed: ' + err.message, 'error');
+  });
+}
+
+function renderFollowUpTable() {
+  const scopedData = getScopedFuData();
+  const data = getFilteredFuData();
+  const tbody = document.getElementById('fu-table-body');
+
+  const counts = {Rental:0, Transfer:0, Hold:0, Pending:0, Cancel:0};
+  scopedData.forEach(function(r){ if(counts[r.provision] !== undefined) counts[r.provision]++; });
+
+  document.getElementById('fu-kpi-total').textContent = scopedData.length;
+  document.getElementById('fu-kpi-rental').textContent = counts.Rental;
+  document.getElementById('fu-kpi-transfer').textContent = counts.Transfer;
+  document.getElementById('fu-kpi-hold').textContent = counts.Hold;
+  document.getElementById('fu-kpi-pending').textContent = counts.Pending;
+  document.getElementById('fu-kpi-cancel').textContent = counts.Cancel;
+
+  const cardMap = {
+    'Rental': 'fu-card-rental',
+    'Transfer': 'fu-card-transfer',
+    'Hold': 'fu-card-hold',
+    'Pending': 'fu-card-pending',
+    'Cancel': 'fu-card-cancel'
+  };
+  ['fu-card-all','fu-card-rental','fu-card-transfer','fu-card-hold','fu-card-pending','fu-card-cancel'].forEach(function(cid){
+    const el = document.getElementById(cid);
+    if(el) el.classList.remove('active');
+  });
+  if(!fuFilters.prov) {
+    const allEl = document.getElementById('fu-card-all');
+    if(allEl) allEl.classList.add('active');
+  } else if(cardMap[fuFilters.prov]) {
+    const actEl = document.getElementById(cardMap[fuFilters.prov]);
+    if(actEl) actEl.classList.add('active');
+  }
+
+  const eqVal = document.getElementById('fu-equip-filter').value;
+  const projVal = document.getElementById('fu-proj-filter').value;
+  const hasFilter = fuFilters.prov || eqVal || projVal;
+  const clrBtn = document.getElementById('fu-clear-filters-btn');
+  if(clrBtn) clrBtn.style.display = hasFilter ? 'inline-flex' : 'none';
+
+  if(!data.length){
+    tbody.innerHTML = '<tr><td colspan="12" class="empty">No follow-up requests matching filter</td></tr>';
+    document.getElementById('fu-table-count').textContent = '0 requests';
+    return;
+  }
+
+  const totalDays = data.reduce(function(s,r){ return s + (Number(r.days)||0); }, 0);
+  document.getElementById('fu-table-count').textContent = data.length + ' requests (filtered from ' + FU_DATA.length + ')';
+  document.getElementById('fu-table-days').textContent = 'Total: ' + totalDays.toLocaleString() + ' days';
+
+  tbody.innerHTML = data.map(function(r, i){
+    const pClass = 'badge-' + (r.provision ? r.provision.toLowerCase() : 'hold');
+    const wasLabel = r._lastChange ? '<div style="font-size:9px;color:var(--accent);margin-top:2px;">(Was: '+r._lastChange+')</div>' : '';
+
+    const statusSelect = '<select class="badge '+pClass+'" onchange="changeFuStatus(\''+r.id+'\', this.value)" style="border:none;cursor:pointer;outline:none;font-weight:700;">'
+      + '<option value="Rental" '+(r.provision==='Rental'?'selected':'')+'>Rental</option>'
+      + '<option value="Transfer" '+(r.provision==='Transfer'?'selected':'')+'>Transfer</option>'
+      + '<option value="Hold" '+(r.provision==='Hold'?'selected':'')+'>Hold</option>'
+      + '<option value="Pending" '+(r.provision==='Pending'?'selected':'')+'>Pending</option>'
+      + '<option value="Cancel" '+(r.provision==='Cancel'?'selected':'')+'>Cancel</option>'
+    + '</select>' + wasLabel;
+
+    return '<tr>'
+      +'<td style="color:var(--text-dim);font-family:\'JetBrains Mono\'">'+(i+1)+'</td>'
+      +'<td style="font-weight:600;">'+(r.equipment||'—')+'</td>'
+      +'<td style="color:var(--text-muted)">'+(r.capacity||'—')+'</td>'
+      +'<td style="font-family:\'JetBrains Mono\'">'+(r.qty||1)+'</td>'
+      +'<td class="code-cell">'+(r.sap||'—')+'</td>'
+      +'<td>'+(r.project||'—')+'</td>'
+      +'<td>'+statusSelect+'</td>'
+      +'<td style="font-size:11px;font-family:\'JetBrains Mono\'">'+formatExcelDate(r.date_from)+'</td>'
+      +'<td style="font-size:11px;font-family:\'JetBrains Mono\'">'+formatExcelDate(r.date_to)+'</td>'
+      +'<td style="font-family:\'JetBrains Mono\'">'+(r.days||'—')+'</td>'
+      +'<td style="font-size:11px;color:var(--text-muted);max-width:160px;white-space:normal">'+(r.notes||'')+'</td>'
+      +(isAdmin
+        ? '<td><div class="action-btns">'
+            +'<button class="btn-edit" title="Duplicate" onclick="duplicateFuRow(\''+r.id+'\')">⧉ Dup</button>'
+            +'<button class="btn-del" title="Remove" onclick="removeFuRow(\''+r.id+'\')">✕ Remove</button>'
+          +'</div></td>'
+        : '<td style="display:none;"></td>')
+    +'</tr>';
+  }).join('');
+}
+
+function clearFollowUpData() {
+  if(!isAdmin) return;
+  if(!confirm('⚠️ This will DELETE all Follow-Up records.\nAre you sure?')) return;
+
+  toast('⏳ Deleting records...');
+  
+  db.collection('followup').get().then(function(snap){
+    if(snap.empty){
+      FU_DATA = [];
+      setupFollowUpUI();
+      toast('Follow-Up data cleared ✓');
+      return;
+    }
+    const docs = snap.docs;
+    const batchSize = 400;
+    let p = Promise.resolve();
+
+    for(let i = 0; i < docs.length; i += batchSize){
+      (function(chunk){
+        p = p.then(function(){
+          const batch = db.batch();
+          chunk.forEach(function(d){ batch.delete(d.ref); });
+          return batch.commit();
+        });
+      })(docs.slice(i, i + batchSize));
+    }
+
+    p.then(function(){
+      FU_DATA = [];
+      fuStatusHistory = [];
+      setupFollowUpUI();
+      updateUndoBtn();
+      toast('✅ Follow-Up data deleted from server (' + docs.length + ' records)');
+    }).catch(function(err){
+      if(err.code === 'resource-exhausted') {
+        FU_DATA = [];
+        setupFollowUpUI();
+        toast('⚠️ Cleared locally (Firebase free daily quota is full, resets at 10 AM Cairo)', 'error');
+      } else {
+        toast('Error: ' + err.message, 'error');
+      }
+    });
+  }).catch(function(err){
+    if(err.code === 'resource-exhausted') {
+      FU_DATA = [];
+      setupFollowUpUI();
+      toast('⚠️ Cleared locally (Firebase quota full, resets at 10 AM Cairo)');
+    } else {
+      toast('Error: ' + err.message, 'error');
+    }
+  });
+}
+
+function calcFuDays() {
+  const fromVal = document.getElementById('fu-f-datefrom').value;
+  const toVal   = document.getElementById('fu-f-dateto').value;
+  const daysEl  = document.getElementById('fu-f-days');
+
+  if (fromVal && toVal) {
+    const dFrom = new Date(fromVal);
+    const dTo   = new Date(toVal);
+    const diffTime = dTo - dFrom;
+
+    if (diffTime >= 0) {
+      let days = Math.round(diffTime / (1000 * 60 * 60 * 24));
+      if (days === 31) days = 30;
+      if (days === 0) days = 1;
+      daysEl.value = days;
+    } else {
+      daysEl.value = 0;
+      toast('⚠️ Date To must be after Date From', 'error');
+    }
+  }
+}
+
+var _fuEqActiveIdx = -1;
+
+function fuEqSearch(val) {
+  var dd = document.getElementById('fu-eq-dropdown');
+  var q = val.trim().toLowerCase();
+  if(!q) { dd.style.display='none'; return; }
+
+  var names = Array.from(new Set(allEquipment.map(function(e){ return (e.equipment||'').trim(); }).filter(Boolean))).sort();
+  var matches = names.filter(function(n){ return n.toLowerCase().indexOf(q) !== -1; });
+
+  if(!matches.length) { dd.style.display='none'; return; }
+
+  _fuEqActiveIdx = -1;
+  dd.innerHTML = matches.map(function(n, i){
+    return '<div data-idx="'+i+'" style="padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);" '
+      +'onmousedown="fuEqSelect(\''+n.replace(/'/g,"\\'")+'\')" '
+      +'onmouseover="fuEqHover(this)">'
+      + n.replace(new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')', 'gi'), '<b style="color:var(--accent)">$1</b>')
+    +'</div>';
+  }).join('');
+  dd.style.display = 'block';
+}
+
+function fuEqSelect(name) {
+  document.getElementById('fu-f-equipment').value = name;
+  document.getElementById('fu-eq-dropdown').style.display = 'none';
+  _fuEqActiveIdx = -1;
+}
+
+function fuEqHide() {
+  document.getElementById('fu-eq-dropdown').style.display = 'none';
+}
+
+function fuEqHover(el) {
+  Array.from(el.parentNode.children).forEach(function(c){ c.style.background=''; });
+  el.style.background = 'var(--surface2)';
+  _fuEqActiveIdx = Number(el.dataset.idx);
+}
+
+function fuEqKey(e) {
+  var dd = document.getElementById('fu-eq-dropdown');
+  var items = dd.querySelectorAll('div');
+  if(!items.length) return;
+  if(e.key === 'ArrowUp') {
+    e.preventDefault();
+    _fuEqActiveIdx = Math.max(0, _fuEqActiveIdx - 1);
+  } else if(e.key === 'ArrowDown') {
+    e.preventDefault();
+    _fuEqActiveIdx = Math.min(items.length - 1, _fuEqActiveIdx + 1);
+  } else if(e.key === 'Enter' && _fuEqActiveIdx >= 0) {
+    e.preventDefault();
+    fuEqSelect(items[_fuEqActiveIdx].textContent);
+    return;
+  } else { return; }
+  items.forEach(function(c){ c.style.background=''; });
+  if(items[_fuEqActiveIdx]) items[_fuEqActiveIdx].style.background = 'var(--surface2)';
+}
+
+function autoFillFuSap() {
+  var proj = document.getElementById('fu-f-project').value.trim().toLowerCase();
+  if(!proj) return;
+  var match = FU_DATA.find(function(r){
+    return (r.project||'').trim().toLowerCase() === proj && r.sap;
+  });
+  if(match) {
+    document.getElementById('fu-f-sap').value = match.sap;
+  }
+}
+
+function openAddFuModal() {
+  ['equipment','capacity','sap','notes'].forEach(function(f){
+    document.getElementById('fu-f-'+f).value = '';
+  });
+  // populate equipment autocomplete from master list
+  var eqDatalist = document.getElementById('equipment-suggestions');
+  if(eqDatalist) {
+    var eqNames = Array.from(new Set(allEquipment.map(function(e){ return (e.equipment||'').trim(); }).filter(Boolean))).sort();
+    eqDatalist.innerHTML = eqNames.map(function(n){ return '<option value="'+n+'">'; }).join('');
+  }
+  document.getElementById('fu-f-qty').value = 1;
+  document.getElementById('fu-f-days').value = 0;
+  document.getElementById('fu-f-provision').value = 'Pending';
+  document.getElementById('fu-f-project').value = '';
+  document.getElementById('fu-f-submission').value = new Date().toISOString().split('T')[0];
+  document.getElementById('fu-f-datefrom').value = '';
+  document.getElementById('fu-f-dateto').value = '';
+  document.getElementById('fu-add-modal').classList.add('open');
+}
+
+function saveFuEquipment() {
+  const equip = document.getElementById('fu-f-equipment').value.trim();
+  if(!equip){ toast('Equipment name is required', 'error'); return; }
+
+  const dateFrom = document.getElementById('fu-f-datefrom').value;
+  const dateTo   = document.getElementById('fu-f-dateto').value;
+  let days = Number(document.getElementById('fu-f-days').value) || 0;
+  
+  if(!days && dateFrom && dateTo){
+    const ms = new Date(dateTo) - new Date(dateFrom);
+    if(ms >= 0) {
+      days = Math.round(ms / 86400000);
+      if (days === 31) days = 30;
+      if (days === 0) days = 1;
+    }
+  }
+
+  const newRecord = {
+    sn: FU_DATA.length + 1,
+    equipment: equip,
+    capacity: document.getElementById('fu-f-capacity').value.trim(),
+    qty: Number(document.getElementById('fu-f-qty').value) || 1,
+    sap: document.getElementById('fu-f-sap').value.trim(),
+    project: document.getElementById('fu-f-project').value.trim(),
+    submission_date: document.getElementById('fu-f-submission').value,
+    provision: document.getElementById('fu-f-provision').value,
+    date_from: dateFrom,
+    date_to: dateTo,
+    days: days,
+    notes: document.getElementById('fu-f-notes').value.trim(),
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  db.collection('followup').add(newRecord).then(function(docRef){
+    newRecord.id = docRef.id;
+    FU_DATA.push(newRecord);
+    setupFollowUpUI();
+    closeModal('fu-add-modal');
+    toast('✅ Follow-Up record added ✓');
+  }).catch(function(err){
+    if(err.code === 'resource-exhausted') {
+      newRecord.id = 'local_' + Date.now();
+      FU_DATA.push(newRecord);
+      setupFollowUpUI();
+      closeModal('fu-add-modal');
+      toast('Saved locally (quota full, will sync later)');
+    } else {
+      toast('Error: ' + err.message, 'error');
+    }
+  });
+}
+
+function exportFuCSV() {
+  const data = getFilteredFuData();
+  const headers = ['#','Equipment','Capacity','Qty','SAP','Project','Engineer','Contact','Submission','Provision','From','To','Days','Notes'];
+  const rows = data.map(function(r,i){
+    return [i+1, r.equipment, r.capacity, r.qty, r.sap, r.project, r.engineer, r.contact, r.submission_date, r.provision, r.date_from, r.date_to, r.days, r.notes];
+  });
+  const csv = [headers].concat(rows).map(function(r){
+    return r.map(function(v){ return '"' + String(v||'').replace(/"/g,'""') + '"'; }).join(',');
+  }).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csv);
+  a.download = 'HAC_FollowUp_Export.csv';
+  a.click();
+}
+
+function updateFuFromExcel(input) {
+  const file = input.files[0];
+  if(!file) return;
+  if(!confirm('Upload & Replace Follow-Up database with this sheet?')) { input.value=''; return; }
+
+  toast('⏳ Reading Excel...');
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'binary'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {defval:'', header:1});
+
+      let headerIdx = -1;
+      for(let i=0; i<Math.min(rows.length,10); i++){
+        const row = rows[i].map(function(c){ return String(c).trim().toLowerCase(); });
+        if(row.some(function(c){ return c.indexOf('equipment')!==-1; }) && row.some(function(c){ return c.indexOf('project')!==-1; })){
+          headerIdx = i; break;
+        }
+      }
+      if(headerIdx < 0){ alert('Header row not found'); return; }
+
+      const headers = rows[headerIdx].map(function(c){ return String(c).trim().toLowerCase(); });
+      const find = function() {
+        const terms = Array.prototype.slice.call(arguments);
+        return headers.findIndex(function(h){
+          return terms.some(function(t){ return h.replace(/[^a-z0-9]/g,'').indexOf(t.replace(/[^a-z0-9]/g,''))!==-1; });
+        });
+      };
+
+      const iSn=0, iEquip=find('equipment'), iCap=find('capacity'), iQty=find('qty','quantity');
+      const iSap=find('sap'), iProj=find('project','desc'), iEng=find('eng','engineer');
+      const iContact=find('contact'), iSub=find('submission','date'), iProv=find('provision','method');
+      const iFrom=find('from'), iTo=find('to'), iDays=find('days'), iNotes=find('notes');
+
+      const newData = [];
+      for(let i=headerIdx+1; i<rows.length; i++){
+        const r = rows[i];
+        const equip = String(r[iEquip]||'').trim();
+        if(!equip) continue;
+
+        const prov = String(r[iProv]||'').trim();
+        const provNorm = prov.charAt(0).toUpperCase() + prov.slice(1).toLowerCase();
+        const provFinal = {'Rental':'Rental','Transfer':'Transfer','Hold':'Hold','Cancel':'Cancel','Pending':'Pending'}[provNorm] || provNorm;
+
+        newData.push({
+          sn: Number(r[iSn]) || (i - headerIdx),
+          equipment: equip,
+          capacity: String(r[iCap]||'').trim(),
+          qty: Number(r[iQty]) || 1,
+          sap: String(r[iSap]||'').trim(),
+          project: String(r[iProj]||'').trim(),
+          engineer: String(r[iEng]||'').trim(),
+          contact: String(r[iContact]||'').trim(),
+          submission_date: String(r[iSub]||'').trim(),
+          provision: provFinal,
+          date_from: formatExcelDate(r[iFrom]),
+          date_to: formatExcelDate(r[iTo]),
+          days: Number(r[iDays]) || 0,
+          notes: String(r[iNotes]||'').trim(),
+        });
+      }
+
+      toast('⏳ Syncing to Cloud...');
+      db.collection('followup').get().then(function(snap){
+        const batch = db.batch();
+        snap.docs.forEach(function(d){ batch.delete(d.ref); });
+        return batch.commit();
+      }).then(function(){
+        const batchSize = 400;
+        let p = Promise.resolve();
+        for(let i=0; i<newData.length; i+=batchSize){
+          (function(startIdx){
+            p = p.then(function(){
+              const batch = db.batch();
+              newData.slice(startIdx, startIdx+batchSize).forEach(function(item){
+                const docRef = db.collection('followup').doc();
+                item.id = docRef.id;
+                batch.set(docRef, item);
+              });
+              return batch.commit();
+            });
+          })(i);
+        }
+        return p;
+      }).then(function(){
+        FU_DATA = newData;
+        setupFollowUpUI();
+        toast('✅ Follow-Up synced (' + newData.length + ' records)!');
+      }).catch(function(err){
+        if(err.code === 'resource-exhausted') {
+          newData.forEach(function(item, idx){ item.id = 'local_' + idx; });
+          FU_DATA = newData;
+          setupFollowUpUI();
+          toast('⚠️ Cloud quota exceeded: Loaded locally (resets 10 AM Cairo)', 'error');
+        } else {
+          alert('Error: ' + err.message);
+        }
+      });
+    } catch(err){
+      alert('Error: ' + err.message);
+    }
+    input.value = '';
+  };
+  reader.readAsBinaryString(file);
+}
+
+// ─── GENERAL UI & CRUD ───
+function showPage(page, el) {
+  document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
+  document.querySelectorAll('.nav-item').forEach(function(n){ n.classList.remove('active'); });
+  document.getElementById('page-'+page).classList.add('active');
+  if(el) el.classList.add('active');
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function toast(msg, type){
+  type = type || 'success';
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'show ' + type;
+  setTimeout(function(){ t.className=''; }, 3000);
+}
+
+function openAddModal() {
+  editingId = null;
+  document.getElementById('modal-title').textContent = 'Add Equipment';
+  ['equipment','brand','code','sap','chassis','engine','enginesn','year','power','project','od','costcenter','value'].forEach(function(f){
+    const el = document.getElementById('f-'+f); if(el) el.value = '';
+  });
+  document.getElementById('eq-modal').classList.add('open');
+}
+
+function openEditModal(id) {
+  const eq = allEquipment.find(function(e){ return e.id === id; });
+  if(!eq) return;
+  editingId = id;
+  document.getElementById('modal-title').textContent = 'Edit Equipment';
+  document.getElementById('f-category').value = eq.category || '';
+  document.getElementById('f-equipment').value = eq.equipment || '';
+  document.getElementById('f-brand').value = eq.brand || '';
+  document.getElementById('f-code').value = eq.code || '';
+  document.getElementById('f-sap').value = eq.sap || '';
+  document.getElementById('f-chassis').value = eq.chassis || '';
+  document.getElementById('f-engine').value = eq.engine || '';
+  document.getElementById('f-enginesn').value = eq.enginesn || '';
+  document.getElementById('f-year').value = eq.year || '';
+  document.getElementById('f-power').value = eq.power || '';
+  document.getElementById('f-project').value = eq.project || '';
+  document.getElementById('f-od').value = eq.od || '';
+  document.getElementById('f-costcenter').value = eq.costcenter || '';
+  document.getElementById('f-value').value = eq.value || '';
+  document.getElementById('eq-modal').classList.add('open');
+}
+
+function autoFillOd() {
+  const od = getOd(document.getElementById('f-project').value);
+  if(od) document.getElementById('f-od').value = od;
+}
+
+function saveEquipment() {
+  const project = document.getElementById('f-project').value.trim();
+  const data = {
+    category: document.getElementById('f-category').value,
+    equipment: document.getElementById('f-equipment').value,
+    brand: document.getElementById('f-brand').value,
+    code: document.getElementById('f-code').value,
+    sap: document.getElementById('f-sap').value,
+    chassis: document.getElementById('f-chassis').value,
+    engine: document.getElementById('f-engine').value,
+    enginesn: document.getElementById('f-enginesn').value,
+    year: document.getElementById('f-year').value,
+    power: document.getElementById('f-power').value,
+    project: project,
+    od: getOd(project) || document.getElementById('f-od').value,
+    costcenter: document.getElementById('f-costcenter').value,
+    value: document.getElementById('f-value').value,
+  };
+
+  if(editingId){
+    db.collection('equipment').doc(editingId).update(data)
+      .then(function(){ toast('Updated ✓'); closeModal('eq-modal'); loadData(); });
+  } else {
+    data.sn = allEquipment.length + 1;
+    data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+    db.collection('equipment').add(data)
+      .then(function(){ toast('Added ✓'); closeModal('eq-modal'); loadData(); });
+  }
+}
+
+function deleteEquipment(id) {
+  if(!confirm('Delete equipment?')) return;
+  db.collection('equipment').doc(id).delete().then(function(){ toast('Deleted ✓'); loadData(); });
+}
+
+function openTransferModal(id) {
+  const eq = allEquipment.find(function(e){ return e.id === id; });
+  if(!eq) return;
+  document.getElementById('t-eq-id').value = id;
+  document.getElementById('t-eq-name').value = eq.equipment + ' — ' + eq.code;
+  document.getElementById('t-from').value = eq.project || '—';
+  document.getElementById('t-to').value = '';
+  document.getElementById('t-od').value = '';
+  document.getElementById('t-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('t-requested-by').value = '';
+  document.getElementById('t-attachment').value = '';
+  document.getElementById('t-notes').value = '';
+  document.getElementById('transfer-modal').classList.add('open');
+}
+
+function autoFillTransferOd() {
+  document.getElementById('t-od').value = getOd(document.getElementById('t-to').value) || '(auto)';
+}
+
+function saveTransfer() {
+  const id = document.getElementById('t-eq-id').value;
+  const to = document.getElementById('t-to').value.trim();
+  const from = document.getElementById('t-from').value;
+  const date = document.getElementById('t-date').value;
+  const notes = document.getElementById('t-notes').value;
+  if(!to){ toast('Enter destination project','error'); return; }
+
+  const newOd = getOd(to);
+  const eq = allEquipment.find(function(e){ return e.id === id; });
+  db.collection('transfers').add({
+    equipmentId: id,
+    equipmentName: eq ? eq.equipment : '',
+    code: eq ? eq.code : '',
+    from: from,
+    to: to,
+    date: date,
+    notes: notes,
+    requestedBy: document.getElementById('t-requested-by').value.trim(),
+    attachment: document.getElementById('t-attachment').value.trim(),
+    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+    by: currentUser.email
+  }).then(function(){
+    const upd = {project: to};
+    if(newOd) upd.od = newOd;
+    return db.collection('equipment').doc(id).update(upd);
+  }).then(function(){
+    toast('Transfer recorded ✓');
+    closeModal('transfer-modal');
+    loadData();
+  });
+}
+
+function renderTransfers(){
+  const search = (document.getElementById('transfer-search').value||'').toLowerCase();
+  const filtered = search ? allTransfers.filter(function(t){
+    return (t.code && t.code.toLowerCase().indexOf(search)!==-1) || (t.equipmentName && t.equipmentName.toLowerCase().indexOf(search)!==-1);
+  }) : allTransfers;
+
+  document.getElementById('transfers-list').innerHTML = filtered.map(function(t){
+    return '<div class="transfer-item">'
+      +'<div>'
+        +'<div><strong>'+(t.equipmentName||'—')+'</strong> <span class="code-cell">'+(t.code||'')+'</span></div>'
+        +'<div style="margin-top:4px"><span style="color:var(--text-muted)">'+(t.from||'—')+'</span><span class="transfer-arrow">→</span><span style="color:var(--green)">'+(t.to||'—')+'</span></div>'
+        +(t.notes ? '<div style="color:var(--text-muted);font-size:11px;margin-top:2px">📝 '+t.notes+'</div>' : '')
+        +(t.requestedBy ? '<div style="font-size:11px;color:var(--blue);margin-top:2px">👤 '+t.requestedBy+'</div>' : '')
+        +(t.attachment ? '<div style="margin-top:3px"><a href="'+t.attachment+'" target="_blank" style="font-size:11px;color:var(--accent);text-decoration:none">📎 Document</a></div>' : '')
+        +'<div class="transfer-meta">'+(t.date||'')+' · by '+(t.by||'—')+'</div>'
+      +'</div>'
+      +(isAdmin ? '<button class="btn-del" onclick="deleteTransfer(\''+t.id+'\')">Delete</button>' : '')
+    +'</div>';
+  }).join('');
+}
+function filterTransfers(){ renderTransfers(); }
+
+function deleteTransfer(id){
+  if(!confirm('Revert and delete transfer?')) return;
+  const transfer = allTransfers.find(function(t){ return t.id === id; });
+  let p = Promise.resolve();
+  if(transfer && transfer.equipmentId && transfer.from){
+    const upd = {project: transfer.from};
+    const od = getOd(transfer.from);
+    if(od) upd.od = od;
+    p = db.collection('equipment').doc(transfer.equipmentId).update(upd);
+  }
+  p.then(function(){ return db.collection('transfers').doc(id).delete(); })
+   .then(function(){ toast('Reverted ✓'); loadData(); });
+}
+
+function showEquipHistory(id){
+  const eq = allEquipment.find(function(e){ return e.id === id; });
+  if(!eq) return;
+  const transfers = allTransfers.filter(function(t){ return t.equipmentId === id; })
+    .sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+
+  document.getElementById('hist-title').textContent = (eq.equipment||'Equipment') + ' — ' + (eq.code||'');
+  document.getElementById('hist-sub').textContent = (eq.brand||'') + ' · Site: ' + (eq.project||'—') + ' · O.D: ' + (eq.od||'—');
+
+  const details = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px;padding:10px;background:var(--surface2);border-radius:var(--radius);font-size:11px;">'
+      +'<div>SAP: <b>'+(eq.sap||'—')+'</b></div><div>Year: <b>'+(eq.year||'—')+'</b></div>'
+      +'<div>Category: <b>'+(eq.category||'—')+'</b></div><div>Center: <b>'+(eq.costcenter||'—')+'</b></div>'
+    +'</div>';
+
+  const timeline = transfers.length ? transfers.map(function(t){
+    return '<div style="border-left:2px solid var(--accent);padding-left:10px;margin-bottom:10px;">'
+      +'<div style="font-weight:600">'+t.to+' <span style="font-size:10px;color:var(--text-muted);font-weight:normal">('+t.date+')</span></div>'
+      +'<div style="font-size:11px;color:var(--text-muted)">From: '+t.from+' · By: '+(t.requestedBy||'—')+'</div>'
+    +'</div>';
+  }).join('') : '<div class="empty">No past transfers.</div>';
+
+  document.getElementById('hist-content').innerHTML = details + timeline;
+  document.getElementById('history-modal').classList.add('open');
+}
+
+function importExcel(input) {
+  const file = input.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const wb = XLSX.read(e.target.result, {type:'binary'});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+    const promises = rows.map(function(row){ return db.collection('equipment').add(row); });
+    Promise.all(promises).then(function(){ toast('Excel imported ✓'); loadData(); });
+  };
+  reader.readAsBinaryString(file);
+}
+
+function clearAndImport(input) {
+  if(!confirm('Delete existing and replace?')) { input.value=''; return; }
+  db.collection('equipment').get().then(function(snap){
+    const batch = db.batch();
+    snap.docs.forEach(function(d){ batch.delete(d.ref); });
+    return batch.commit();
+  }).then(function(){ importExcel(input); });
+}
+
+function uploadToCloudinary(input) {
+  const file = input.files[0]; if (!file) return;
+  const status = document.getElementById('upload-status');
+  status.textContent = '⏳ Uploading...';
+  const fd = new FormData(); fd.append('file', file);
+  fetch('https://tmpfiles.org/api/v1/upload', { method:'POST', body:fd })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if(d.data && d.data.url) {
+        document.getElementById('t-attachment').value = d.data.url.replace('tmpfiles.org/','tmpfiles.org/dl/');
+        status.textContent = '✓ Done!';
+      }
+    }).catch(function(){ status.textContent = '✗ Error'; });
+}
+
+document.querySelectorAll('.modal-overlay, .breakdown-overlay').forEach(function(o){
+  o.addEventListener('click', function(e){ if(e.target===o) o.classList.remove('open'); });
+});
+document.getElementById('login-pass').addEventListener('keydown', function(e){ if(e.key==='Enter') doLogin(); });
+</script>
+</body>
+</html>
