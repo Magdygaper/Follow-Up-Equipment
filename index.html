@@ -71,10 +71,6 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 .fleet-flag{font-size:14px;line-height:1;}
 .fleet-count{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);background:var(--surface2);padding:1px 6px;border-radius:8px;}
 .fleet-btn.active .fleet-count{color:var(--accent);}
-/* زر تغيير الدولة (علم الدولة جنب العنوان) — يفتح قايمة الاختيار */
-.fleet-pill{cursor:pointer;background:rgba(240,165,0,.1);border:1px solid rgba(240,165,0,.3);color:var(--accent);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;transition:all .2s;}
-.fleet-pill::after{content:' ▾';font-size:9px;opacity:.75;}
-.fleet-pill:hover{border-color:var(--accent);background:rgba(240,165,0,.18);}
 
 /* SIDEBAR DIVIDERS */
 .nav-divider{margin:16px 0 6px 0;padding:0 8px;display:flex;align-items:center;gap:8px;}
@@ -443,7 +439,6 @@ tr.selected-row td:nth-child(2){
           </div>
           <div style="display:flex;gap:8px;align-items:center;">
             <span style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;" id="exec-date-label"></span>
-<span id="exec-fleet-pick" class="fleet-pill" onclick="openFleetPicker()">🇪🇬 Egypt</span>
             <button onclick="printExecSummary()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);padding:6px 14px;border-radius:var(--radius);cursor:pointer;font-size:12px;font-weight:600;">📄 PDF</button>
           </div>
         </div>
@@ -538,7 +533,7 @@ tr.selected-row td:nth-child(2){
       <div class="page" id="page-dashboard">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
           <div class="section-title" id="dash-fleet-title">Egypt Fleet — Dashboard</div>
-         <span id="dash-fleet-badge" class="fleet-pill" onclick="openFleetPicker()">🇪🇬 Egypt</span>
+          <span id="dash-fleet-badge" style="background:rgba(240,165,0,.1);border:1px solid rgba(240,165,0,.3);color:var(--accent);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;">🇪🇬 Egypt</span>
         </div>
         <div class="section-sub">Click any card to filter equipment</div>
 
@@ -624,7 +619,7 @@ tr.selected-row td:nth-child(2){
       <div class="page" id="page-equipment">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
           <div class="section-title" id="eq-fleet-title">Egypt Fleet — Equipment List</div>
-         <span id="eq-fleet-badge" class="fleet-pill" onclick="openFleetPicker()">🇪🇬 Egypt</span>
+          <span id="eq-fleet-badge" style="background:rgba(240,165,0,.1);border:1px solid rgba(240,165,0,.3);color:var(--accent);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;">🇪🇬 Egypt</span>
         </div>
         <div class="section-sub">Master database of all HAC PMV machinery</div>
 
@@ -1110,17 +1105,7 @@ tr.selected-row td:nth-child(2){
     </div>
   </div>
 </div>
-<!-- قايمة اختيار الدولة (الدوسة على العلم) -->
-<div class="modal-overlay" id="fleet-picker-modal">
-  <div class="modal" style="width:340px;max-width:94vw;padding:22px 18px;">
-    <div class="modal-title" style="font-size:15px;margin-bottom:4px;">🌍 اختر الدولة / Fleet</div>
-    <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">اضغط على الدولة لعرض معداتها</div>
-    <div id="fleet-picker-list" style="display:grid;gap:8px;"></div>
-    <div class="modal-actions" style="margin-top:16px;">
-      <button class="btn-cancel" onclick="closeModal('fleet-picker-modal')">إغلاق</button>
-    </div>
-  </div>
-</div>
+
 <div id="toast"></div>
 
 <!-- LIBRARIES -->
@@ -1193,43 +1178,11 @@ function switchFleet(fleet, btn) {
   if(dashBadge) dashBadge.textContent = label;
   const eqTitle = document.getElementById('eq-fleet-title');
   if(eqTitle) eqTitle.textContent = label + suffix + ' — Equipment List';
-   const eqBadge = document.getElementById('eq-fleet-badge');
+  const eqBadge = document.getElementById('eq-fleet-badge');
   if(eqBadge) eqBadge.textContent = label;
-  const execPick = document.getElementById('exec-fleet-pick');
-  if(execPick) execPick.textContent = label;
-}
 }
 
-function openFleetPicker(){
-  const counts = {};
-  allEquipment.forEach(function(e){ const f = e.fleet || 'egypt'; counts[f] = (counts[f]||0) + 1; });
-  const items = [
-    {key:'egypt',  flag:'🇪🇬', name:'Egypt',        c:(counts.egypt||0) + (counts.archive||0)},
-    {key:'ksa',    flag:'🇸🇦', name:'Saudi Arabia', c:(counts.ksa||0)},
-    {key:'algeria',flag:'🇩🇿', name:'Algeria',      c:(counts.algeria||0)},
-    {key:'uae',    flag:'🇦🇪', name:'UAE',          c:(counts.uae||0)},
-    {key:'jv',     flag:'🤝', name:'JV Projects',   c:(counts.jv||0)},
-    {key:'all',    flag:'🌍', name:'All Countries', c:allEquipment.length}
-  ];
-  const list = document.getElementById('fleet-picker-list');
-  if(list){
-    list.innerHTML = items.map(function(it){
-      const active = currentFleet === it.key;
-      return '<div onclick="pickFleet(\'' + it.key + '\')" style="cursor:pointer;display:flex;align-items:center;gap:10px;background:' + (active ? 'rgba(240,165,0,.12)' : 'var(--surface2)') + ';border:' + (active ? '1px solid rgba(240,165,0,.6)' : '1px solid var(--border)') + ';border-radius:var(--radius);padding:12px 14px;">'
-        + '<span style="font-size:18px;">' + it.flag + '</span>'
-        + '<span style="flex:1;font-size:13px;font-weight:600;color:var(--text);">' + it.name + '</span>'
-        + '<span style="font-family:\'JetBrains Mono\',monospace;font-size:12px;color:var(--text-muted);background:var(--surface3);padding:1px 8px;border-radius:10px;">' + it.c + '</span>'
-        + (active ? '<span style="color:var(--accent);font-size:14px;">✓</span>' : '')
-      + '</div>';
-    }).join('');
-  }
-  document.getElementById('fleet-picker-modal').classList.add('open');
-}
 
-function pickFleet(f){
-  switchFleet(f, document.getElementById('fleet-btn-' + f) || null);
-  closeModal('fleet-picker-modal');
-}
 function getFleetEquipment() {
   if(currentFleet === 'all') return allEquipment; // وضع كل الدول = كل المعدات
   return allEquipment.filter(function(e){ return (e.fleet || 'egypt') === currentFleet; });
