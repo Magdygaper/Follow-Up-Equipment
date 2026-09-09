@@ -682,6 +682,7 @@ tr.selected-row td:nth-child(2){
                 <th>To</th>
                 <th>Days</th>
                 <th>Notes</th>
+                <th id="fu-actions-col" style="display:none;">Actions</th>
               </tr>
             </thead>
             <tbody id="fu-table-body"></tbody>
@@ -843,6 +844,7 @@ tr.selected-row td:nth-child(2){
 </div>
 
 <datalist id="project-suggestions"></datalist>
+<datalist id="equipment-suggestions"></datalist>
 
 <div class="breakdown-overlay" id="type-detail-modal">
   <div class="breakdown-box" style="width:640px;max-height:85vh;">
@@ -872,13 +874,11 @@ tr.selected-row td:nth-child(2){
   <div class="modal">
     <div class="modal-title">Add Follow-Up Request</div>
     <div class="form-grid">
-      <div class="form-group"><label>Equipment</label><input type="text" id="fu-f-equipment" placeholder="e.g. Excavator"></div>
+      <div class="form-group"><label>Equipment</label><input type="text" id="fu-f-equipment" list="equipment-suggestions" placeholder="e.g. Excavator" autocomplete="off"></div>
       <div class="form-group"><label>Capacity</label><input type="text" id="fu-f-capacity" placeholder="e.g. 20 Ton"></div>
       <div class="form-group"><label>Qty</label><input type="number" id="fu-f-qty" value="1" min="1"></div>
       <div class="form-group"><label>SAP Code</label><input type="text" id="fu-f-sap"></div>
       <div class="form-group full"><label>Project</label><input type="text" id="fu-f-project" list="project-suggestions" placeholder="Select or type project..."></div>
-      <div class="form-group"><label>Engineer</label><input type="text" id="fu-f-engineer"></div>
-      <div class="form-group"><label>Contact (Phone)</label><input type="text" id="fu-f-contact" placeholder="e.g. 010..."></div>
       <div class="form-group"><label>Submission Date</label><input type="date" id="fu-f-submission"></div>
       <div class="form-group"><label>Provision Status</label>
         <select id="fu-f-provision">
@@ -919,45 +919,6 @@ tr.selected-row td:nth-child(2){
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <script>
-  // ─── درع الحماية البرمجي الشامل (HAC Security Shield) ───
-(function() {
-  // 1. قفل النطاق (Domain Lock)
-  const allowedDomains = [
-    "magdygaper.github.io",
-    "equipment-list-hac.web.app",
-    "equipment-list-hac.firebaseapp.com"
-  ];
-  if (!allowedDomains.includes(window.location.hostname)) {
-    document.documentElement.innerHTML = `
-      <div style="background:#0d1117;color:#f85149;height:100vh;display:flex;align-items:center;justify-content:center;font-family:sans-serif;flex-direction:column;text-align:center;padding:20px;">
-        <h2 style="font-size:22px;margin-bottom:10px;">⛔ Access Denied</h2>
-        <p style="font-size:14px;color:#7d8590;">غير مصرح بتشغيل هذه المنظومة خارج النطاق الرسمي لشركة حسن علام.</p>
-      </div>`;
-    throw new Error("Access Denied: Unauthorized Domain");
-  }
-
-  // 2. منع كليك يمين
-  document.addEventListener('contextmenu', e => e.preventDefault());
-
-  // 3. منع اختصارات الحفظ والفحص والطباعة
-  document.addEventListener('keydown', e => {
-    // منع F12
-    if (e.key === 'F12' || e.keyCode === 123) { e.preventDefault(); return false; }
-    // منع Ctrl+S (حفظ) و Ctrl+U (عرض الكود) و Ctrl+P (طباعة)
-    if (e.ctrlKey && ['s','S','u','U','p','P'].includes(e.key)) { e.preventDefault(); return false; }
-    // منع Ctrl+Shift+I / J / C (فتح أدوات المطورين)
-    if (e.ctrlKey && e.shiftKey && ['I','i','J','j','C','c'].includes(e.key)) { e.preventDefault(); return false; }
-  });
-
-  // 4. مصيدة المطورين (Debugger Loop)
-  setInterval(() => {
-    const t0 = performance.now();
-    debugger;
-    if (performance.now() - t0 > 100) {
-      document.body.innerHTML = "";
-    }
-  }, 1000);
-})();
 // 1. DUAL CLOUD SERVERS (Main + Workshop)
 const mainConfig = {
   apiKey:"AIzaSyBb9KUiy-0IJFMPqLrGDF3EZxQ1k68UDL4",
@@ -1063,6 +1024,7 @@ auth.onAuthStateChanged(function(user) {
     document.getElementById('btn-import-eq').style.display = isAdmin ? 'inline-flex' : 'none';
     document.getElementById('btn-clear-import').style.display = isAdmin ? 'inline-flex' : 'none';
     document.getElementById('actions-col').style.display = isAdmin ? '' : 'none';
+    document.getElementById('fu-actions-col').style.display = isAdmin ? '' : 'none';
     document.getElementById('fu-btn-upload').style.display = isAdmin ? 'inline-flex' : 'none';
     document.getElementById('fu-btn-clear').style.display  = isAdmin ? 'inline-flex' : 'none';
     document.getElementById('fu-btn-add').style.display    = isAdmin ? 'inline-flex' : 'none';
@@ -1910,6 +1872,46 @@ function updateUndoBtn() {
   }
 }
 
+function duplicateFuRow(docId) {
+  var src = FU_DATA.find(function(r){ return r.id === docId; });
+  if(!src) return;
+  var copy = Object.assign({}, src);
+  delete copy.id;
+  copy.sn = FU_DATA.length + 1;
+  copy.provision = 'Pending';
+  copy.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+
+  db.collection('followup').add(copy).then(function(ref){
+    copy.id = ref.id;
+    FU_DATA.push(copy);
+    setupFollowUpUI();
+    toast('⧉ Row duplicated ✓');
+  }).catch(function(err){
+    if(err.code === 'resource-exhausted'){
+      copy.id = 'local_' + Date.now();
+      FU_DATA.push(copy);
+      setupFollowUpUI();
+      toast('Duplicated locally (quota full)');
+    } else {
+      toast('Error: ' + err.message, 'error');
+    }
+  });
+}
+
+function removeFuRow(docId) {
+  if(!confirm('Remove this row?')) return;
+  var idx = FU_DATA.findIndex(function(r){ return r.id === docId; });
+  if(idx === -1) return;
+  FU_DATA.splice(idx, 1);
+  setupFollowUpUI();
+  toast('Row removed ✓');
+
+  if(!docId || docId.startsWith('local_')) return;
+  db.collection('followup').doc(docId).delete().catch(function(err){
+    toast('Cloud delete failed: ' + err.message, 'error');
+  });
+}
+
 function renderFollowUpTable() {
   const scopedData = getScopedFuData();
   const data = getFilteredFuData();
@@ -1951,7 +1953,7 @@ function renderFollowUpTable() {
   if(clrBtn) clrBtn.style.display = hasFilter ? 'inline-flex' : 'none';
 
   if(!data.length){
-    tbody.innerHTML = '<tr><td colspan="11" class="empty">No follow-up requests matching filter</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" class="empty">No follow-up requests matching filter</td></tr>';
     document.getElementById('fu-table-count').textContent = '0 requests';
     return;
   }
@@ -1984,6 +1986,12 @@ function renderFollowUpTable() {
       +'<td style="font-size:11px;font-family:\'JetBrains Mono\'">'+formatExcelDate(r.date_to)+'</td>'
       +'<td style="font-family:\'JetBrains Mono\'">'+(r.days||'—')+'</td>'
       +'<td style="font-size:11px;color:var(--text-muted);max-width:160px;white-space:normal">'+(r.notes||'')+'</td>'
+      +(isAdmin
+        ? '<td><div class="action-btns">'
+            +'<button class="btn-edit" title="Duplicate" onclick="duplicateFuRow(\''+r.id+'\')">⧉ Dup</button>'
+            +'<button class="btn-del" title="Remove" onclick="removeFuRow(\''+r.id+'\')">✕ Remove</button>'
+          +'</div></td>'
+        : '<td style="display:none;"></td>')
     +'</tr>';
   }).join('');
 }
@@ -2064,9 +2072,15 @@ function calcFuDays() {
 }
 
 function openAddFuModal() {
-  ['equipment','capacity','sap','engineer','contact','notes'].forEach(function(f){
+  ['equipment','capacity','sap','notes'].forEach(function(f){
     document.getElementById('fu-f-'+f).value = '';
   });
+  // populate equipment autocomplete from master list
+  var eqDatalist = document.getElementById('equipment-suggestions');
+  if(eqDatalist) {
+    var eqNames = Array.from(new Set(allEquipment.map(function(e){ return (e.equipment||'').trim(); }).filter(Boolean))).sort();
+    eqDatalist.innerHTML = eqNames.map(function(n){ return '<option value="'+n+'">'; }).join('');
+  }
   document.getElementById('fu-f-qty').value = 1;
   document.getElementById('fu-f-days').value = 0;
   document.getElementById('fu-f-provision').value = 'Pending';
@@ -2101,8 +2115,6 @@ function saveFuEquipment() {
     qty: Number(document.getElementById('fu-f-qty').value) || 1,
     sap: document.getElementById('fu-f-sap').value.trim(),
     project: document.getElementById('fu-f-project').value.trim(),
-    engineer: document.getElementById('fu-f-engineer').value.trim(),
-    contact: document.getElementById('fu-f-contact').value.trim(),
     submission_date: document.getElementById('fu-f-submission').value,
     provision: document.getElementById('fu-f-provision').value,
     date_from: dateFrom,
