@@ -276,7 +276,7 @@ tr.selected-row td:nth-child(2){
     font-size: 22px !important;
   }
 
-  /* 1. عمود الرقم (#) بالورشة */
+  /* عمود الرقم (#) بالورشة */
   #page-workshop .table-wrap table th:nth-child(1),
   #page-workshop .table-wrap table td:nth-child(1) {
     width: 36px !important;
@@ -286,7 +286,7 @@ tr.selected-row td:nth-child(2){
     text-align: center !important;
   }
 
-  /* 2. عمود المعدة فقط بالورشة ينزل سطرين بأناقة */
+  /* عمود المعدة فقط بالورشة ينزل سطرين بأناقة */
   #page-workshop .table-wrap table th:nth-child(2),
   #page-workshop .table-wrap table td:nth-child(2) {
     left: 36px !important;
@@ -338,13 +338,11 @@ tr.selected-row td:nth-child(2){
       <div class="topbar-title">Equipment Management Portal</div>
     </div>
     <div class="topbar-right">
-      <!-- رادار التتبع الحي للفيور النشط (يظهر فقط للأدمن) -->
       <div class="viewer-presence-badge" id="viewer-presence-indicator" onclick="openViewersModal('live')" title="Click to view online engineers">
         <span class="viewer-pulse-dot"></span>
         <span id="viewer-presence-text">0 Online</span>
       </div>
 
-      <!-- زر فتح سجل الدخول الدائم (History) للأدمن -->
       <button class="btn-sm" id="btn-viewers-log" style="display:none;color:var(--accent);border-color:rgba(240,165,0,.4);gap:4px;" onclick="openViewersModal('history')">
         🕒 Access Log
       </button>
@@ -414,7 +412,7 @@ tr.selected-row td:nth-child(2){
         <div class="nav-divider-line"></div>
       </div>
       <button class="nav-item" onclick="showPage('workshop',this)">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"></path></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"></path></svg>
         Central Workshop
       </button>
 
@@ -960,10 +958,7 @@ tr.selected-row td:nth-child(2){
       <button class="btn-sm" onclick="closeModal('owned-detail-modal')">✕</button>
     </div>
 
-    <!-- DETAIL SECTIONS -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;font-size:12px;">
-      
-      <!-- 1. Asset & Location -->
       <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;">
         <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;margin-bottom:8px;">📌 Project &amp; Asset Info</div>
         <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05);"><span>Profit Center:</span><b id="dt-profit-center">—</b></div>
@@ -974,7 +969,6 @@ tr.selected-row td:nth-child(2){
         <div style="display:flex;justify-content:space-between;padding:4px 0;"><span>Market Value:</span><b id="dt-market-value" style="color:var(--green);">—</b></div>
       </div>
 
-      <!-- 2. Operations & Hours -->
       <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;">
         <div style="font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;margin-bottom:8px;">⏱️ Operations &amp; Timesheet</div>
         <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05);"><span>Daily WH:</span><b id="dt-daily-wh">—</b></div>
@@ -985,7 +979,6 @@ tr.selected-row td:nth-child(2){
         <div style="display:flex;justify-content:space-between;padding:4px 0;"><span>Utilization:</span><b id="dt-util" style="color:var(--blue);">—</b></div>
       </div>
 
-      <!-- 3. Availability & Maintenance -->
       <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;">
         <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;margin-bottom:8px;">🛠️ Availability &amp; Breakdown</div>
         <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05);"><span>Availability Rate:</span><b id="dt-avail">—</b></div>
@@ -995,7 +988,6 @@ tr.selected-row td:nth-child(2){
         <div style="display:flex;justify-content:space-between;padding:4px 0;"><span>B.M Status:</span><b id="dt-bm-status">—</b></div>
       </div>
 
-      <!-- 4. Financial & Fuel -->
       <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;">
         <div style="font-size:11px;font-weight:700;color:#bc8cff;text-transform:uppercase;margin-bottom:8px;">💰 Costing &amp; Fuel</div>
         <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05);"><span>Unit Price / Rate:</span><b id="dt-unit-price">—</b></div>
@@ -1421,7 +1413,6 @@ auth.onAuthStateChanged(function(user) {
     document.getElementById('fu-btn-add').style.display    = isAdmin ? 'inline-flex' : 'none';
     document.getElementById('btn-viewers-log').style.display = isAdmin ? 'inline-flex' : 'none';
 
-    // Owned module permissions
     document.getElementById('btn-import-owned').style.display = isAdmin ? 'inline-flex' : 'none';
     document.getElementById('btn-add-owned').style.display = isAdmin ? 'inline-flex' : 'none';
     document.getElementById('btn-clear-owned').style.display = isAdmin ? 'inline-flex' : 'none';
@@ -1443,442 +1434,244 @@ auth.onAuthStateChanged(function(user) {
   }
 });
 
-// ─── FLEET SWITCHING ───
-function switchFleet(fleet, btn) {
-  currentFleet = fleet;
-  document.querySelectorAll('.fleet-btn').forEach(function(b){ b.classList.remove('active'); });
-  if(btn) btn.classList.add('active');
-  multiFilter = {od:null, cat:null, proj:null};
-  renderDashboard();
-  populateFilters();
-  renderTable();
-  renderExecutiveSummary();
-  renderTransfers();
-  renderCatBreakdown();
-  
-  const labels = {egypt:'🇪🇬 Egypt',ksa:'🇸🇦 Saudi Arabia',algeria:'🇩🇿 Algeria',uae:'🇦🇪 UAE',jv:'🤝 JV Projects',archive:'📦 Archive',all:'🌍 All Countries'};
-  const label = labels[fleet] || fleet;
-  const suffix = fleet === 'all' ? '' : ' Fleet';
-  const execTitle = document.getElementById('exec-fleet-title');
-  if(execTitle) execTitle.textContent = label + suffix + ' — Executive Summary';
-  const dashTitle = document.getElementById('dash-fleet-title');
-  if(dashTitle) dashTitle.textContent = label + suffix + ' — Dashboard';
-  const dashBadge = document.getElementById('dash-fleet-badge');
-  if(dashBadge) dashBadge.textContent = label;
-  const eqTitle = document.getElementById('eq-fleet-title');
-  if(eqTitle) eqTitle.textContent = label + suffix + ' — Equipment List';
-  const eqBadge = document.getElementById('eq-fleet-badge');
-  if(eqBadge) eqBadge.textContent = label;
-  const execPick = document.getElementById('exec-fleet-pick');
-  if(execPick) execPick.textContent = label;
+// ─── VIEWER NAME PROMPT & PERSISTENT ACCESS LOGGING ───
+function checkAndPromptViewerName() {
+  const storedName = sessionStorage.getItem('viewer_name');
+  if (!storedName) {
+    document.getElementById('viewer-name-modal').classList.add('open');
+    document.getElementById('viewer-name-input').focus();
+  } else {
+    startViewerPresence(storedName);
+  }
 }
 
-function openFleetPicker(){
-  const counts = {};
-  allEquipment.forEach(function(e){ const f = e.fleet || 'egypt'; counts[f] = (counts[f]||0) + 1; });
-  const items = [
-    {key:'egypt',  flag:'🇪🇬', name:'Egypt',        c:(counts.egypt||0) + (counts.archive||0)},
-    {key:'ksa',    flag:'🇸🇦', name:'Saudi Arabia', c:(counts.ksa||0)},
-    {key:'algeria',flag:'🇩🇿', name:'Algeria',      c:(counts.algeria||0)},
-    {key:'uae',    flag:'🇦🇪', name:'UAE',          c:(counts.uae||0)},
-    {key:'jv',     flag:'🤝', name:'JV Projects',   c:(counts.jv||0)},
-    {key:'all',    flag:'🌍', name:'All Countries', c:allEquipment.length}
-  ];
-  const list = document.getElementById('fleet-picker-list');
-  if(list){
-    list.innerHTML = items.map(function(it){
-      const active = currentFleet === it.key;
-      return '<div onclick="pickFleet(\'' + it.key + '\')" style="cursor:pointer;display:flex;align-items:center;gap:10px;background:' + (active ? 'rgba(240,165,0,.12)' : 'var(--surface2)') + ';border:' + (active ? '1px solid rgba(240,165,0,.6)' : '1px solid var(--border)') + ';border-radius:var(--radius);padding:12px 14px;">'
-        + '<span style="font-size:18px;">' + it.flag + '</span>'
-        + '<span style="flex:1;font-size:13px;font-weight:600;color:var(--text);">' + it.name + '</span>'
-        + '<span style="font-family:\'JetBrains Mono\',monospace;font-size:12px;color:var(--text-muted);background:var(--surface3);padding:1px 8px;border-radius:10px;">' + it.c + '</span>'
-        + (active ? '<span style="color:var(--accent);font-size:14px;">✓</span>' : '')
+window.submitViewerName = function(e) {
+  if (e) e.preventDefault();
+  const nameInput = document.getElementById('viewer-name-input');
+  const name = nameInput.value.trim();
+  if (!name) return;
+  sessionStorage.setItem('viewer_name', name);
+  document.getElementById('viewer-name-modal').classList.remove('open');
+  
+  startViewerPresence(name);
+  logViewerAccessHistory(name);
+
+  toast('Welcome, ' + name + ' ✓');
+};
+
+function logViewerAccessHistory(name) {
+  const isMobile = window.innerWidth <= 860;
+  const now = new Date();
+  
+  db.collection('viewer_access_logs').add({
+    name: name,
+    device: isMobile ? 'Mobile' : 'Desktop',
+    date: now.toISOString().split('T')[0],
+    time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    timestamp: Date.now(),
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  }).catch(function(err){
+    console.log('Access log save error:', err);
+  });
+}
+
+function startViewerPresence(name) {
+  if (isAdmin) return;
+  if (!viewerSessionId) {
+    viewerSessionId = 'v_' + Math.random().toString(36).substr(2, 9);
+  }
+  const isMobile = window.innerWidth <= 860;
+  const userAgent = isMobile ? 'Mobile' : 'Desktop';
+
+  const sessionRef = db.collection('active_viewers').doc(viewerSessionId);
+  sessionRef.set({
+    name: name,
+    device: userAgent,
+    startedAt: new Date().toISOString(),
+    lastSeen: Date.now()
+  }).catch(function(err){ console.log('Silent presence error:', err); });
+
+  if (viewerPingInterval) clearInterval(viewerPingInterval);
+  viewerPingInterval = setInterval(function() {
+    sessionRef.update({ lastSeen: Date.now() }).catch(function(e){});
+  }, 25000);
+}
+
+function cleanupViewerPresence() {
+  if (viewerPingInterval) clearInterval(viewerPingInterval);
+  if (viewerSessionId && !isAdmin) {
+    db.collection('active_viewers').doc(viewerSessionId).delete().catch(function(e){});
+    viewerSessionId = null;
+  }
+}
+
+window.addEventListener('beforeunload', function() {
+  cleanupViewerPresence();
+});
+
+function initAdminPresenceListener() {
+  const badge = document.getElementById('viewer-presence-indicator');
+  const badgeText = document.getElementById('viewer-presence-text');
+
+  db.collection('active_viewers').onSnapshot(function(snapshot) {
+    const now = Date.now();
+    activeViewersList = [];
+
+    snapshot.forEach(function(doc) {
+      const data = doc.data();
+      if (now - (data.lastSeen || 0) < 60000) {
+        activeViewersList.push(data);
+      } else {
+        doc.ref.delete().catch(function(e){});
+      }
+    });
+
+    document.getElementById('count-live-tab').textContent = activeViewersList.length;
+
+    if (activeViewersList.length > 0) {
+      badge.style.display = 'inline-flex';
+      if (activeViewersList.length === 1) {
+        badgeText.textContent = (activeViewersList[0].name || 'Viewer') + ' Online';
+      } else {
+        badgeText.textContent = activeViewersList.length + ' Viewers Online';
+      }
+    } else {
+      badge.style.display = 'none';
+    }
+
+    if(currentViewerModalTab === 'live') {
+      renderLiveViewersList();
+    }
+  }, function(err) {
+    console.log('Presence listener error:', err);
+  });
+}
+
+function initAdminHistoryListener() {
+  db.collection('viewer_access_logs')
+    .orderBy('timestamp', 'desc')
+    .limit(100)
+    .onSnapshot(function(snapshot) {
+      viewerAccessHistoryList = snapshot.docs.map(function(doc) {
+        return Object.assign({ id: doc.id }, doc.data());
+      });
+      if(currentViewerModalTab === 'history') {
+        renderHistoryViewersList();
+      }
+    }, function(err){
+      console.log('History load error:', err);
+    });
+}
+
+window.openViewersModal = function(tab) {
+  switchViewerModalTab(tab || 'live');
+  document.getElementById('active-viewers-modal').classList.add('open');
+};
+
+window.switchViewerModalTab = function(tab) {
+  currentViewerModalTab = tab;
+  const liveBtn = document.getElementById('tab-live-btn');
+  const histBtn = document.getElementById('tab-history-btn');
+  const liveContent = document.getElementById('viewers-live-content');
+  const histContent = document.getElementById('viewers-history-content');
+  const clearBtn = document.getElementById('btn-clear-history');
+
+  if(tab === 'live') {
+    liveBtn.classList.add('active');
+    histBtn.classList.remove('active');
+    liveContent.style.display = 'flex';
+    histContent.style.display = 'none';
+    clearBtn.style.display = 'none';
+    renderLiveViewersList();
+  } else {
+    histBtn.classList.add('active');
+    liveBtn.classList.remove('active');
+    liveContent.style.display = 'none';
+    histContent.style.display = 'flex';
+    clearBtn.style.display = 'inline-flex';
+    renderHistoryViewersList();
+  }
+};
+
+function renderLiveViewersList() {
+  const container = document.getElementById('viewers-live-content');
+  if (!activeViewersList.length) {
+    container.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);">No engineers currently online.</div>';
+  } else {
+    container.innerHTML = activeViewersList.map(function(v) {
+      let timeStr = 'Just now';
+      try {
+        timeStr = new Date(v.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      } catch(e){}
+      return '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--surface2);padding:10px 14px;border-radius:var(--radius);border:1px solid var(--border);">'
+        + '<div>'
+          + '<div style="font-weight:700;color:var(--text);font-size:13px;display:flex;align-items:center;gap:6px;">'
+            + '<span class="viewer-pulse-dot"></span> ' + (v.name || 'Viewer') 
+          + '</div>'
+          + '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Online since: ' + timeStr + '</div>'
+        + '</div>'
+        + '<span class="badge" style="background:var(--surface3);color:var(--accent);font-size:11px;">' + (v.device === 'Mobile' ? '📱 Mobile' : '💻 Desktop') + '</span>'
       + '</div>';
     }).join('');
   }
-  document.getElementById('fleet-picker-modal').classList.add('open');
 }
 
-function pickFleet(f){
-  switchFleet(f, document.getElementById('fleet-btn-' + f) || null);
-  closeModal('fleet-picker-modal');
-}
-
-function getFleetEquipment() {
-  if(currentFleet === 'all') return allEquipment;
-  return allEquipment.filter(function(e){ return (e.fleet || 'egypt') === currentFleet; });
-}
-
-function updateFleetCounts() {
-  const counts = {egypt:0,ksa:0,algeria:0,uae:0,jv:0,archive:0};
-  allEquipment.forEach(function(e){ const f = e.fleet || 'egypt'; if(counts[f] !== undefined) counts[f]++; });
-  ['egypt','ksa','algeria','uae','jv'].forEach(function(f){
-    const c = (f === 'egypt') ? counts.egypt + counts.archive : counts[f];
-    const el = document.getElementById('fleet-count-' + f);
-    if(el) el.textContent = c || '—';
-  });
-  const allEl = document.getElementById('fleet-count-all');
-  if(allEl) allEl.textContent = allEquipment.length || '—';
-}
-
-// ─── MASTER OWNED FLEET OPERATIONS SYSTEM ───
-function initMasterOwnedDefault() {
-  MASTER_OWNED_DATA = [];
-  setupOwnedUI();
-}
-
-function setupOwnedUI() {
-  const cats = Array.from(new Set(MASTER_OWNED_DATA.map(r => (r.category||'').trim()).filter(Boolean))).sort();
-  document.getElementById('owned-cat-filter').innerHTML = '<option value="">All Categories</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
-
-  const projs = Array.from(new Set(MASTER_OWNED_DATA.map(r => (r.project||'').trim()).filter(Boolean))).sort();
-  document.getElementById('owned-proj-filter').innerHTML = '<option value="">All Projects</option>' + projs.map(p => `<option value="${p}">${p}</option>`).join('');
-
-  renderOwnedTable();
-}
-
-function getFilteredOwnedData() {
-  const q = (document.getElementById('owned-search').value || '').toLowerCase().trim();
-  const cat = document.getElementById('owned-cat-filter').value;
-  const proj = document.getElementById('owned-proj-filter').value;
-  const availTier = document.getElementById('owned-avail-filter').value;
-
-  return MASTER_OWNED_DATA.filter(function(r) {
-    if(cat && (r.category||'').trim() !== cat) return false;
-    if(proj && (r.project||'').trim() !== proj) return false;
-    if(availTier) {
-      const a = Number(r.availability) || 0;
-      if(availTier === 'high' && a < 90) return false;
-      if(availTier === 'med' && (a < 75 || a >= 90)) return false;
-      if(availTier === 'low' && a >= 75) return false;
-    }
-    if(q) {
-      const hay = [r.code, r.equipment, r.project, r.od, r.profitCenter, r.bmStatus, r.model].join(' ').toLowerCase();
-      if(hay.indexOf(q) === -1) return false;
-    }
-    return true;
-  });
-}
-
-function renderOwnedTable() {
-  const data = getFilteredOwnedData();
-  const tbody = document.getElementById('owned-table-body');
-
-  // KPIs
-  const total = MASTER_OWNED_DATA.length;
-  let sumAvail = 0, sumUtil = 0, sumCost = 0, sumFuel = 0, underRepairCount = 0;
-
-  MASTER_OWNED_DATA.forEach(r => {
-    sumAvail += Number(r.availability) || 0;
-    sumUtil += Number(r.utilization) || 0;
-    sumCost += Number(r.totalCost) || 0;
-    sumFuel += Number(r.totalFuel) || 0;
-    if(Number(r.underRepairDays) > 0 || (r.bmStatus && r.bmStatus.toLowerCase().includes('down'))) {
-      underRepairCount++;
-    }
-  });
-
-  document.getElementById('owned-kpi-total').textContent = total;
-  document.getElementById('owned-kpi-avail').textContent = total ? Math.round(sumAvail / total) + '%' : '0%';
-  document.getElementById('owned-kpi-util').textContent = total ? Math.round(sumUtil / total) + '%' : '0%';
-  document.getElementById('owned-kpi-cost').textContent = Math.round(sumCost).toLocaleString();
-  document.getElementById('owned-kpi-fuel').textContent = Math.round(sumFuel).toLocaleString() + ' L';
-  document.getElementById('owned-kpi-repair').textContent = underRepairCount;
-
-  if(!data.length) {
-    tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;color:var(--text-muted);padding:24px;">No owned machinery matching filters.</td></tr>';
-    document.getElementById('owned-table-count').textContent = '0 machinery units';
-    document.getElementById('owned-table-total-cost').textContent = 'Cost: 0 EGP';
-    return;
+function renderHistoryViewersList() {
+  const container = document.getElementById('viewers-history-content');
+  if (!viewerAccessHistoryList.length) {
+    container.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);">No past access logs found.</div>';
+  } else {
+    container.innerHTML = viewerAccessHistoryList.map(function(h) {
+      return '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--surface2);padding:9px 12px;border-radius:var(--radius);border:1px solid var(--border);">'
+        + '<div>'
+          + '<div style="font-weight:700;color:var(--text);font-size:13px;">' + (h.name || 'Viewer') + '</div>'
+          + '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">📅 ' + (h.date || '—') + ' · ⏰ ' + (h.time || '—') + '</div>'
+        + '</div>'
+        + '<span class="badge" style="background:var(--surface3);color:var(--text-muted);font-size:11px;">' + (h.device === 'Mobile' ? '📱 Mobile' : '💻 Desktop') + '</span>'
+      + '</div>';
+    }).join('');
   }
-
-  const filteredCost = data.reduce((s, r) => s + (Number(r.totalCost) || 0), 0);
-  document.getElementById('owned-table-count').textContent = data.length + ' machinery units (of ' + total + ')';
-  document.getElementById('owned-table-total-cost').textContent = 'Cost: ' + Math.round(filteredCost).toLocaleString() + ' EGP';
-
-  tbody.innerHTML = data.map(function(r, i) {
-    const availNum = Number(r.availability) || 0;
-    const availCls = availNum >= 90 ? 'avail-high' : (availNum >= 75 ? 'avail-med' : 'avail-low');
-    const utilNum = Number(r.utilization) || 0;
-
-    return `
-      <tr style="cursor:pointer;" onclick="showOwnedDetails('${r.id}')">
-        <td style="color:var(--text-dim);font-family:'JetBrains Mono'">${i + 1}</td>
-        <td style="font-weight:700;">${r.equipment || '—'}</td>
-        <td class="code-cell">${r.code || '—'}</td>
-        <td><span class="cat-badge">${r.category || 'Special'}</span></td>
-        <td><div>${r.project || '—'}</div><div style="font-size:10px;color:var(--text-muted);">${r.profitCenter ? 'PC: ' + r.profitCenter : ''}</div></td>
-        <td style="font-size:12px;color:var(--text-muted);">${r.od || '—'}</td>
-        <td><span class="avail-badge ${availCls}">${availNum}%</span></td>
-        <td style="font-family:'JetBrains Mono';font-weight:700;color:${utilNum >= 70 ? 'var(--green)' : 'var(--text)'};">${utilNum}%</td>
-        <td style="font-family:'JetBrains Mono';font-size:12px;">${r.workingDays || 0} / ${r.planDay || 30}</td>
-        <td style="font-family:'JetBrains Mono';color:var(--blue);">${Number(r.actualHourMeter || 0).toLocaleString()}</td>
-        <td style="font-family:'JetBrains Mono';">${Number(r.totalFuel || 0).toLocaleString()}</td>
-        <td style="font-family:'JetBrains Mono';font-weight:700;color:var(--accent);">${Number(r.totalCost || 0).toLocaleString()}</td>
-        <td><span class="status-badge ${Number(r.underRepairDays) > 0 ? 'status-Delay' : 'status-Ready'}">${r.bmStatus || (Number(r.underRepairDays) > 0 ? 'In Repair' : 'Working')}</span></td>
-        <td>
-          <button class="btn-sm" style="padding:3px 8px;font-size:11px;" onclick="event.stopPropagation();showOwnedDetails('${r.id}')">Inspect</button>
-        </td>
-      </tr>
-    `;
-  }).join('');
 }
 
-window.showOwnedDetails = function(id) {
-  const r = MASTER_OWNED_DATA.find(x => x.id === id);
-  if(!r) return;
-
-  document.getElementById('owned-dt-title').textContent = (r.equipment || 'Equipment') + ' — ' + (r.code || 'No Code');
-  document.getElementById('owned-dt-sub').textContent = (r.category || 'Asset') + ' · Site: ' + (r.project || '—') + ' · ' + (r.projectDesc || '');
-
-  document.getElementById('dt-profit-center').textContent = r.profitCenter || '—';
-  document.getElementById('dt-proj-desc').textContent = r.projectDesc || '—';
-  document.getElementById('dt-od').textContent = r.od || '—';
-  document.getElementById('dt-hiring-date').textContent = formatExcelDate(r.hiringDate);
-  document.getElementById('dt-model-cap').textContent = (r.model || '—') + ' / ' + (r.mainCapacity || '');
-  document.getElementById('dt-market-value').textContent = Number(r.marketValue || 0).toLocaleString() + ' EGP';
-
-  document.getElementById('dt-daily-wh').textContent = (r.dailyWH || 8) + ' hrs/day';
-  document.getElementById('dt-actual-hm').textContent = Number(r.actualHourMeter || 0).toLocaleString() + ' hrs';
-  document.getElementById('dt-working-days').textContent = r.workingDays || '0';
-  document.getElementById('dt-plan-days').textContent = (r.planDay || 30) + ' days';
-  document.getElementById('dt-overtime').textContent = (r.overtimePerDay || 0) + ' hrs/day';
-  document.getElementById('dt-util').textContent = (r.utilization || 0) + '%';
-
-  document.getElementById('dt-avail').textContent = (r.availability || 0) + '%';
-  document.getElementById('dt-standby-days').textContent = (r.standbyDays || 0) + ' days';
-  document.getElementById('dt-repair-days').textContent = (r.underRepairDays || 0) + ' days';
-  document.getElementById('dt-bm').textContent = r.bm || 'None';
-  document.getElementById('dt-bm-status').textContent = r.bmStatus || 'Operational';
-
-  document.getElementById('dt-unit-price').textContent = Number(r.unitPrice || 0).toLocaleString() + ' ' + (r.rateBasis || 'EGP');
-  document.getElementById('dt-total-cost').textContent = Number(r.totalCost || 0).toLocaleString() + ' EGP';
-  document.getElementById('dt-cost-overtime').textContent = Number(r.costOvertime || 0).toLocaleString() + ' EGP';
-  document.getElementById('dt-total-fuel').textContent = Number(r.totalFuel || 0).toLocaleString() + ' L';
-  document.getElementById('dt-fuel-per-hr').textContent = (r.fuelPerHour || 0) + ' L/hr';
-
-  document.getElementById('owned-detail-modal').classList.add('open');
-};
-
-function importMasterOwnedExcel(input) {
-  const file = input.files[0];
-  if(!file) return;
-  if(!confirm('Upload Master Owned sheet to live cloud database?')) { input.value = ''; return; }
-
-  toast('⏳ Reading Master Owned Excel...');
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    try {
-      const wb = XLSX.read(e.target.result, {type:'binary'});
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws, {defval:'', header:1});
-
-      let headerIdx = -1;
-      for(let i=0; i<Math.min(rows.length, 12); i++){
-        const r = rows[i].map(c => String(c).trim().toLowerCase());
-        if(r.some(c => c.includes('equipment') || c.includes('eq.code') || c.includes('profit center'))){
-          headerIdx = i; break;
-        }
-      }
-      if(headerIdx < 0){ alert('Header row not found in Excel sheet.'); return; }
-
-      const headers = rows[headerIdx].map(c => String(c).trim().toLowerCase().replace(/[^a-z0-9]/g,''));
-      const find = function() {
-        const terms = Array.prototype.slice.call(arguments);
-        return headers.findIndex(h => terms.some(t => h.includes(t.toLowerCase().replace(/[^a-z0-9]/g,''))));
-      };
-
-      const iProfit = find('profitcenter');
-      const iHiring = find('hiringdate');
-      const iOD = find('od');
-      const iProj = find('project');
-      const iProjDesc = find('projectdesc', 'description');
-      const iCat = find('eqcategory', 'category');
-      const iCode = find('eqcode', 'code');
-      const iEquip = find('equipment');
-      const iModel = find('modelcapacity', 'model');
-      const iMainCap = find('maincapacity');
-      const iRateBasis = find('hrdays', 'months', 'ratebasis');
-      const iStandby = find('standbydays', 'standby');
-      const iRepair = find('underrepair', 'repair');
-      const iDailyWH = find('dailyworking', 'dailywork');
-      const iUnitPrice = find('unitprice');
-      const iTotalCost = find('totalcost');
-      const iQty = find('quantity', 'qty');
-      const iAvail = find('availabilaty', 'availability');
-      const iOvertime = find('overtimeperday', 'overtime');
-      const iCostOvertime = find('costovertime');
-      const iPlanDay = find('planday', 'plan');
-      const iActualHM = find('actualhour', 'metrer', 'meter');
-      const iWorkDays = find('workingdays', 'workingdayshr');
-      const iFuel = find('totalfule', 'totalfuel', 'fuel');
-      const iFuelPerHr = find('fuelperhour', 'fuelperhr');
-      const iUtil = find('utilization');
-      const iBM = find('bm');
-      const iBMStatus = find('bmstatus');
-      const iMarketVal = find('marketingvalue', 'marketvalue');
-
-      const newOwned = [];
-      for(let i = headerIdx + 1; i < rows.length; i++){
-        const r = rows[i];
-        const equip = String(r[iEquip] || '').trim();
-        const code = String(r[iCode] || '').trim();
-        if(!equip && !code) continue;
-
-        let availRaw = parseFloat(r[iAvail]);
-        if(!isNaN(availRaw) && availRaw <= 1.0) availRaw = Math.round(availRaw * 100);
-
-        let utilRaw = parseFloat(r[iUtil]);
-        if(!isNaN(utilRaw) && utilRaw <= 1.0) utilRaw = Math.round(utilRaw * 100);
-
-        newOwned.push({
-          profitCenter: String(r[iProfit] || '').trim(),
-          hiringDate: String(r[iHiring] || '').trim(),
-          od: String(r[iOD] || getOd(String(r[iProj] || ''))).trim(),
-          project: String(r[iProj] || '').trim(),
-          projectDesc: String(r[iProjDesc] || '').trim(),
-          category: String(r[iCat] || guessCat(equip)).trim(),
-          code: code,
-          equipment: equip,
-          model: String(r[iModel] || '').trim(),
-          mainCapacity: String(r[iMainCap] || '').trim(),
-          rateBasis: String(r[iRateBasis] || 'Month').trim(),
-          standbyDays: Number(r[iStandby]) || 0,
-          underRepairDays: Number(r[iRepair]) || 0,
-          dailyWH: Number(r[iDailyWH]) || 8,
-          unitPrice: Number(r[iUnitPrice]) || 0,
-          totalCost: Number(r[iTotalCost]) || 0,
-          qty: Number(r[iQty]) || 1,
-          availability: !isNaN(availRaw) ? availRaw : 90,
-          overtimePerDay: Number(r[iOvertime]) || 0,
-          costOvertime: Number(r[iCostOvertime]) || 0,
-          planDay: Number(r[iPlanDay]) || 30,
-          actualHourMeter: Number(r[iActualHM]) || 0,
-          workingDays: Number(r[iWorkDays]) || 0,
-          totalFuel: Number(r[iFuel]) || 0,
-          fuelPerHour: Number(r[iFuelPerHr]) || 0,
-          utilization: !isNaN(utilRaw) ? utilRaw : 75,
-          bm: String(r[iBM] || '').trim(),
-          bmStatus: String(r[iBMStatus] || '').trim(),
-          marketValue: Number(r[iMarketVal]) || 0,
-          updatedAt: new Date().toISOString()
-        });
-      }
-
-      toast('⏳ Syncing ' + newOwned.length + ' records to Cloud...');
-
-      db.collection('master_owned').get().then(function(snap){
-        const batch = db.batch();
-        snap.docs.forEach(d => batch.delete(d.ref));
-        return batch.commit();
-      }).then(function(){
-        const batchSize = 400;
-        let p = Promise.resolve();
-        for(let i=0; i<newOwned.length; i+=batchSize){
-          (function(startIdx){
-            p = p.then(function(){
-              const batch = db.batch();
-              newOwned.slice(startIdx, startIdx+batchSize).forEach(item => {
-                const docRef = db.collection('master_owned').doc();
-                item.id = docRef.id;
-                batch.set(docRef, item);
-              });
-              return batch.commit();
-            });
-          })(i);
-        }
-        return p;
-      }).then(function(){
-        MASTER_OWNED_DATA = newOwned;
-        setupOwnedUI();
-        toast('✅ Master Owned fleet synced (' + newOwned.length + ' units)!');
-      }).catch(function(err){
-        if(err.code === 'resource-exhausted'){
-          newOwned.forEach((it, idx) => it.id = 'owned_local_' + idx);
-          MASTER_OWNED_DATA = newOwned;
-          setupOwnedUI();
-          toast('⚠️ Cloud quota reached: Loaded locally in memory ✓', 'error');
-        } else {
-          alert('Error: ' + err.message);
-        }
-      });
-    } catch(err){
-      alert('Error parsing Excel: ' + err.message);
-    }
-    input.value = '';
-  };
-  reader.readAsBinaryString(file);
-}
-
-function clearMasterOwnedData() {
+window.clearAccessHistory = function() {
   if(!isAdmin) return;
-  if(!confirm('⚠️ Are you sure you want to delete all Master Owned records?')) return;
+  if(!confirm('Clear all access history logs permanently?')) return;
 
-  toast('⏳ Deleting...');
-  db.collection('master_owned').get().then(function(snap){
+  db.collection('viewer_access_logs').get().then(function(snap){
     const batch = db.batch();
-    snap.docs.forEach(d => batch.delete(d.ref));
+    snap.docs.forEach(function(d){ batch.delete(d.ref); });
     return batch.commit();
   }).then(function(){
-    MASTER_OWNED_DATA = [];
-    setupOwnedUI();
-    toast('Master Owned fleet data cleared ✓');
+    toast('Access logs cleared ✓');
   }).catch(function(err){
-    MASTER_OWNED_DATA = [];
-    setupOwnedUI();
-    toast('Cleared locally');
+    toast('Error clearing logs: ' + err.message, 'error');
   });
-}
+};
 
-function exportOwnedCSV() {
-  const data = getFilteredOwnedData();
-  if(!data.length){ toast('No records to export'); return; }
-
-  const headers = [
-    'Profit Center', 'Hiring Date', 'O.D', 'Project', 'Project Description',
-    'Eq.Category', 'Eq.Code', 'Equipment', 'Model / Capacity', 'Main Capacity',
-    'Rate Basis', 'STANDBY (DAYS)', 'Under Repair (Days)', 'Daily Working Hours',
-    'Unit Price', 'Total Cost', 'Quantity', 'Availability %', 'Overtime / Day',
-    'Cost Overtime', 'Plan Day', 'Actual Hour Meter', 'Working Days/HR',
-    'Total Fuel', 'Fuel Per Hour', 'Utilization %', 'B.M', 'B.M Status', 'Market Value'
-  ];
-
-  const rows = data.map(r => [
-    r.profitCenter, r.hiringDate, r.od, r.project, r.projectDesc,
-    r.category, r.code, r.equipment, r.model, r.mainCapacity,
-    r.rateBasis, r.standbyDays, r.underRepairDays, r.dailyWH,
-    r.unitPrice, r.totalCost, r.qty, r.availability + '%', r.overtimePerDay,
-    r.costOvertime, r.planDay, r.actualHourMeter, r.workingDays,
-    r.totalFuel, r.fuelPerHour, r.utilization + '%', r.bm, r.bmStatus, r.marketValue
-  ]);
-
-  const csv = [headers].concat(rows).map(r => r.map(v => '"' + String(v||'').replace(/"/g,'""') + '"').join(',')).join('\n');
-  const a = document.createElement('a');
-  a.href = 'data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csv);
-  a.download = 'HAC_Master_Owned_Export.csv';
-  a.click();
-}
-
-// ─── LOAD DATA EXTENSION ───
+// ─── RESILIENT DATA LOADING (PREVENTS SYSTEM FREEZE) ───
 function loadData() {
   document.getElementById('table-loading').style.display = 'block';
-  Promise.all([
-    db.collection('equipment').orderBy('sn', 'asc').get(),
-    db.collection('transfers').orderBy('timestamp', 'desc').get(),
-    db.collection('followup').orderBy('sn', 'asc').get(),
-    db.collection('master_owned').get()
-  ]).then(function(results) {
-    allEquipment = results[0].docs.map(function(d){ return Object.assign({id: d.id}, d.data()); });
-    allTransfers = results[1].docs.map(function(d){ return Object.assign({id: d.id}, d.data()); });
 
-    if(!results[2].empty) {
-      FU_DATA = results[2].docs.map(function(d){ return Object.assign({id: d.id}, d.data()); });
+  // تحميل آمن ومستقل لكل كولكشن بحيث لو أحدهم تعثر لا يعطل الآخرين
+  const pEq = db.collection('equipment').orderBy('sn', 'asc').get().catch(e => ({ docs: [] }));
+  const pTr = db.collection('transfers').orderBy('timestamp', 'desc').get().catch(e => ({ docs: [] }));
+  const pFu = db.collection('followup').orderBy('sn', 'asc').get().catch(e => ({ docs: [] }));
+  const pMo = db.collection('master_owned').get().catch(e => ({ docs: [] }));
+
+  Promise.all([pEq, pTr, pFu, pMo]).then(function(results) {
+    if(results[0] && results[0].docs) {
+      allEquipment = results[0].docs.map(d => Object.assign({id: d.id}, d.data()));
+    }
+    if(results[1] && results[1].docs) {
+      allTransfers = results[1].docs.map(d => Object.assign({id: d.id}, d.data()));
+    }
+    if(results[2] && results[2].docs && results[2].docs.length > 0) {
+      FU_DATA = results[2].docs.map(d => Object.assign({id: d.id}, d.data()));
     } else {
       initFollowUpDefault();
     }
-
-    if(!results[3].empty) {
-      MASTER_OWNED_DATA = results[3].docs.map(function(d){ return Object.assign({id: d.id}, d.data()); });
+    if(results[3] && results[3].docs && results[3].docs.length > 0) {
+      MASTER_OWNED_DATA = results[3].docs.map(d => Object.assign({id: d.id}, d.data()));
     } else {
       initMasterOwnedDefault();
     }
@@ -1892,154 +1685,1058 @@ function loadData() {
     setupFollowUpUI();
     setupOwnedUI();
     populateProjectSuggestions();
-  }).catch(function(err){
-    console.error(err);
     document.getElementById('table-loading').style.display = 'none';
-    if(err.code === 'resource-exhausted') {
-      toast('⚠️ Firebase Daily Quota Exceeded. Reading local cache.', 'error');
+  }).catch(function(err){
+    console.error('Data load error:', err);
+    document.getElementById('table-loading').style.display = 'none';
+  });
+}
+
+function getFiltered(){
+  return allEquipment.filter(function(e){
+    if(currentFleet !== 'all' && (e.fleet || 'egypt') !== currentFleet) return false;
+
+    if(multiFilter.od && e.od!==multiFilter.od) return false;
+    if(multiFilter.cat && e.category!==multiFilter.cat) return false;
+    if(multiFilter.proj && e.project!==multiFilter.proj) return false;
+    return true;
+  });
+}
+
+function updateFilterChips(){
+  const bar = document.getElementById('active-filter-bar');
+  const chipOd  = document.getElementById('chip-od');
+  const chipCat = document.getElementById('chip-cat');
+  const chipProj= document.getElementById('chip-proj');
+  if(!bar) return;
+  const any = multiFilter.od || multiFilter.cat || multiFilter.proj;
+  bar.style.display = any ? 'flex' : 'none';
+  if(chipOd){
+    chipOd.style.display = multiFilter.od ? 'inline-flex' : 'none';
+    if(multiFilter.od) chipOd.innerHTML = '<span>O.D: <b>'+multiFilter.od+'</b></span><span class="filter-chip-close">✕</span>';
+  }
+  if(chipCat){
+    chipCat.style.display = multiFilter.cat ? 'inline-flex' : 'none';
+    if(multiFilter.cat) chipCat.innerHTML = '<span>Cat: <b>'+multiFilter.cat.replace(' Equipment','')+'</b></span><span class="filter-chip-close">✕</span>';
+  }
+  if(chipProj){
+    chipProj.style.display = multiFilter.proj ? 'inline-flex' : 'none';
+    if(multiFilter.proj) chipProj.innerHTML = '<span>Project: <b>'+multiFilter.proj+'</b></span><span class="filter-chip-close">✕</span>';
+  }
+}
+
+// DASHBOARD RENDER
+function renderDashboard(){
+  renderCountryCards();
+  syncOdVisibility();
+  const fleetData = getFleetEquipment();
+
+  const base = getFiltered();
+  const catCount={};
+  const forCat = fleetData.filter(function(e){
+    if(multiFilter.od && e.od!==multiFilter.od) return false;
+    if(multiFilter.proj && e.project!==multiFilter.proj) return false;
+    return true;
+  });
+  forCat.forEach(function(e){ if(e.category) catCount[e.category]=(catCount[e.category]||0)+1; });
+
+  document.getElementById('cat-cards').innerHTML = Object.entries(catCount).sort(function(a,b){return b[1]-a[1];}).map(function(pair){
+    const cat = pair[0], cnt = pair[1];
+    return '<div class="dash-card '+(multiFilter.cat===cat?'active':'')+'" onclick="toggleCat(\''+cat.replace(/'/g,"\\'")+'\')">'
+      +'<div class="dash-card-val" style="color:'+(CAT_COLORS[cat]||'var(--accent)')+'">'+cnt+'</div>'
+      +'<div class="dash-card-label">'+cat.replace(' Equipment','')+'</div>'
+      +'<div class="dash-card-sub">click to filter · ℹ breakdown</div>'
+    +'</div>';
+  }).join('');
+
+  const projCount={};
+  const forProj = fleetData.filter(function(e){
+    if(multiFilter.od && e.od!==multiFilter.od) return false;
+    if(multiFilter.cat && e.category!==multiFilter.cat) return false;
+    return true;
+  });
+  forProj.forEach(function(e){ if(e.project) projCount[e.project]=(projCount[e.project]||0)+1; });
+  window._projData = Object.entries(projCount).sort(function(a,b){return b[1]-a[1];});
+  renderProjList();
+
+  const odCount={};
+  fleetData.forEach(function(e){ if(e.od) odCount[e.od]=(odCount[e.od]||0)+1; });
+  document.getElementById('od-buttons').innerHTML =
+    '<button class="od-btn '+(!multiFilter.od?'active':'')+'" onclick="toggleOD(null)">All</button>'
+    + Object.entries(odCount).sort(function(a,b){return b[1]-a[1];}).map(function(pair){
+      return '<button class="od-btn '+(multiFilter.od===pair[0]?'active':'')+'" onclick="toggleOD(\''+pair[0].replace(/'/g,"\\'")+'\')">'+pair[0]+' <span style="opacity:.5;font-size:10px">('+pair[1]+')</span></button>';
+    }).join('');
+
+  if(multiFilter.od){
+    const odData = getFleetEquipment().filter(function(e){ return e.od === multiFilter.od; });
+    const total = odData.length;
+    const catBreak = {};
+    odData.forEach(function(e){ if(e.category) catBreak[e.category] = (catBreak[e.category]||0)+1; });
+    const sorted = Object.entries(catBreak).sort(function(a,b){ return b[1]-a[1]; });
+    const maxVal = sorted[0] ? sorted[0][1] : 1;
+    const COLORS = ['#f0a500','#58a6ff','#3fb950','#f85149','#bc8cff','#ff7b72','#79c0ff','#d2a8ff'];
+
+    document.getElementById('od-chart-title').textContent = multiFilter.od;
+    document.getElementById('od-chart-total').textContent = base.length + (base.length!==total?' / '+total:'');
+    document.getElementById('od-chart-bars').innerHTML = sorted.map(function(pair, i){
+      const cat = pair[0], cnt = pair[1];
+      return '<div style="margin-bottom:10px;cursor:pointer;" onclick="toggleCat(\''+cat.replace(/'/g,"\\'")+'\')">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">'
+          +'<span style="font-size:12px;color:'+(multiFilter.cat===cat?COLORS[i%COLORS.length]:'var(--text)')+';font-weight:'+(multiFilter.cat===cat?700:400)+'">'+cat.replace(' Equipment','')+'</span>'
+          +'<span style="font-size:12px;font-family:\'JetBrains Mono\',monospace;color:'+COLORS[i%COLORS.length]+'">'+cnt+' <span style="color:var(--text-muted);font-size:10px">('+Math.round(cnt/total*100)+'%)</span></span>'
+        +'</div>'
+        +'<div style="height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;">'
+          +'<div style="height:100%;width:'+Math.round(cnt/maxVal*100)+'%;background:'+COLORS[i%COLORS.length]+';border-radius:4px;"></div>'
+        +'</div>'
+      +'</div>';
+    }).join('');
+    document.getElementById('od-chart-wrap').style.display = 'block';
+  } else {
+    document.getElementById('od-chart-wrap').style.display = 'none';
+  }
+
+  const filtered = getFiltered();
+  document.getElementById('kpi-total').textContent = filtered.length;
+  document.getElementById('kpi-projects').textContent = Array.from(new Set(filtered.map(function(e){return e.project;}).filter(Boolean))).length;
+  document.getElementById('kpi-ods').textContent = Array.from(new Set(filtered.map(function(e){return e.od;}).filter(Boolean))).length;
+  document.getElementById('kpi-updated').textContent = allTransfers.length ? allTransfers[0].date||'—' : '—';
+  document.getElementById('kpi-transfers-sub').textContent = allTransfers.length + ' transfers logged';
+
+  updateFilterChips();
+}
+
+function renderCatBreakdown(){
+  const wrap = document.getElementById('cat-breakdown-wrap');
+  if(!multiFilter.cat){ wrap.style.display='none'; return; }
+  const cat = multiFilter.cat;
+  const base = allEquipment.filter(function(e){
+    if((e.fleet || 'egypt') !== currentFleet) return false;
+    if(multiFilter.od && e.od!==multiFilter.od) return false;
+    if(multiFilter.proj && e.project!==multiFilter.proj) return false;
+    return e.category===cat;
+  });
+
+  const typeData={};
+  base.forEach(function(e){
+    if(!e.equipment) return;
+    if(!typeData[e.equipment]) typeData[e.equipment]={count:0};
+    typeData[e.equipment].count++;
+  });
+  const typesSorted = Object.entries(typeData).sort(function(a,b){return b[1].count-a[1].count;}).slice(0,8);
+  const maxT = typesSorted[0]?typesSorted[0][1].count:1;
+
+  const odCount={};
+  base.forEach(function(e){ if(e.od) odCount[e.od]=(odCount[e.od]||0)+1; });
+  const odsSorted = Object.entries(odCount).sort(function(a,b){return b[1]-a[1];});
+  const maxO = odsSorted[0]?odsSorted[0][1]:1;
+
+  document.getElementById('cat-bd-title').textContent = cat.replace(' Equipment','');
+  document.getElementById('cat-bd-total').textContent = base.length;
+
+  document.getElementById('cat-bd-types').innerHTML = typesSorted.map(function(pair){
+    return '<div style="margin-bottom:8px;cursor:pointer;border-radius:6px;padding:4px;" onclick="showTypeDetail(\''+pair[0].replace(/'/g,"\\'")+'\',\''+cat.replace(/'/g,"\\'")+'\')">'
+      +'<div style="display:flex;justify-content:space-between;margin-bottom:3px;font-size:12px;">'
+        +'<span>'+pair[0]+'</span><span style="color:'+CAT_COLORS[cat]+';font-family:\'JetBrains Mono\'">'+pair[1].count+' ›</span>'
+      +'</div>'
+      +'<div style="height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;">'
+        +'<div style="height:100%;width:'+Math.round(pair[1].count/maxT*100)+'%;background:'+CAT_COLORS[cat]+'"></div>'
+      +'</div>'
+    +'</div>';
+  }).join('');
+
+  document.getElementById('cat-bd-ods').innerHTML = odsSorted.map(function(pair){
+    return '<div style="margin-bottom:8px;font-size:12px;">'
+      +'<div style="display:flex;justify-content:space-between;margin-bottom:3px;">'
+        +'<span>'+pair[0]+'</span><span style="color:#58a6ff;font-family:\'JetBrains Mono\'">'+pair[1]+'</span>'
+      +'</div>'
+      +'<div style="height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;">'
+        +'<div style="height:100%;width:'+Math.round(pair[1]/maxO*100)+'%;background:#58a6ff"></div>'
+      +'</div>'
+    +'</div>';
+  }).join('');
+
+  wrap.style.display='block';
+}
+
+function showTypeDetail(type, cat) {
+  const base = allEquipment.filter(function(e){
+    if((e.fleet || 'egypt') !== currentFleet) return false;
+    if(multiFilter.od && e.od!==multiFilter.od) return false;
+    if(multiFilter.proj && e.project!==multiFilter.proj) return false;
+    return e.category===cat && e.equipment===type;
+  });
+  const color = CAT_COLORS[cat]||'var(--accent)';
+  const powerGroups={};
+  base.forEach(function(e){
+    const pw = String(e.power||'').trim()||'—';
+    if(!powerGroups[pw]) powerGroups[pw]=[];
+    powerGroups[pw].push(e);
+  });
+  const sorted = Object.entries(powerGroups).sort(function(a,b){return b[1].length-a[1].length;});
+
+  document.getElementById('type-detail-title').textContent = type;
+  document.getElementById('type-detail-sub').textContent = cat.replace(' Equipment','') + ' · ' + (multiFilter.proj||multiFilter.od||'All');
+  document.getElementById('type-detail-count').textContent = base.length;
+
+  document.getElementById('type-detail-content').innerHTML = sorted.map(function(pair){
+    return '<div style="margin-bottom:16px;">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);font-size:13px;font-weight:700;color:'+color+'">'
+        +'<span>⚡ '+(pair[0]==='—'?'No Power Data':pair[0])+'</span><span style="background:'+color+';color:#000;border-radius:10px;padding:1px 8px;font-size:11px;">'+pair[1].length+'</span>'
+      +'</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">'
+        + pair[1].map(function(e){
+          return '<div style="background:var(--surface2);border-radius:6px;padding:6px 10px;border:1px solid var(--border);display:flex;justify-content:space-between;font-size:12px;">'
+            +'<span class="code-cell">'+(e.code||'—')+'</span><span style="color:var(--text-muted);font-size:11px">'+(e.project||'—')+'</span>'
+          +'</div>';
+        }).join('')
+      +'</div>'
+    +'</div>';
+  }).join('');
+
+  document.getElementById('type-detail-modal').classList.add('open');
+}
+
+function toggleOD(od) { multiFilter.od = od; renderDashboard(); renderTable(); renderCatBreakdown(); updateFilterChips(); }
+function toggleCat(cat) { multiFilter.cat = multiFilter.cat===cat?null:cat; renderDashboard(); renderTable(); renderCatBreakdown(); updateFilterChips(); }
+function toggleProj(proj) { multiFilter.proj = multiFilter.proj===proj?null:proj; renderDashboard(); renderTable(); renderCatBreakdown(); updateFilterChips(); }
+function clearAllFilters() {
+  multiFilter={od:null,cat:null,proj:null};
+  document.getElementById('active-filter-bar').style.display='none';
+  document.getElementById('cat-breakdown-wrap').style.display='none';
+  document.getElementById('od-chart-wrap').style.display='none';
+  document.getElementById('search-input').value='';
+  renderDashboard(); renderTable(); updateFilterChips();
+}
+
+function renderProjList(filter){
+  filter = filter || '';
+  const data = (window._projData||[]).filter(function(pair){
+    return !filter || pair[0].toLowerCase().indexOf(filter.toLowerCase()) !== -1;
+  });
+  document.getElementById('proj-list').innerHTML = data.map(function(pair){
+    return '<div class="proj-row '+(multiFilter.proj===pair[0]?'active':'')+'" onclick="toggleProj(\''+pair[0].replace(/'/g,"\\'").replace(/\"/g,'&quot;')+'\')">'
+      +'<div class="proj-row-left"><div class="proj-dot"></div><div><div class="proj-name">'+pair[0]+'</div><div class="proj-od">'+(getOd(pair[0])||'')+'</div></div></div>'
+      +'<div class="proj-count">'+pair[1]+'</div>'
+    +'</div>';
+  }).join('');
+}
+function filterProjList(){ renderProjList(document.getElementById('proj-search-input').value); }
+
+function populateFilters(){
+  const data = getFleetEquipment();
+  const cats = Array.from(new Set(data.map(function(e){return e.category;}).filter(Boolean))).sort();
+  const types = Array.from(new Set(data.map(function(e){return e.equipment;}).filter(Boolean))).sort();
+  const projs = Array.from(new Set(data.map(function(e){return e.project;}).filter(Boolean))).sort();
+  document.getElementById('filter-cat').innerHTML='<option value="">All Categories</option>'+cats.map(function(c){return '<option>'+c+'</option>';}).join('');
+  document.getElementById('filter-type').innerHTML='<option value="">All Types</option>'+types.map(function(t){return '<option>'+t+'</option>';}).join('');
+  document.getElementById('filter-proj').innerHTML='<option value="">All Projects</option>'+projs.map(function(p){return '<option>'+p+'</option>';}).join('');
+}
+
+function populateProjectSuggestions() {
+  const set = new Set(Object.keys(OD_MAP));
+  allEquipment.forEach(function(e){ if(e.project) set.add(e.project); });
+  FU_DATA.forEach(function(r){ if(r.project) set.add(r.project); });
+  const dl = document.getElementById('project-suggestions');
+  if(dl) {
+    dl.innerHTML = Array.from(set).sort().map(function(p){
+      return '<option value="'+p+'">';
+    }).join('');
+  }
+}
+
+document.addEventListener('click', function(e){
+  const row = e.target.closest('tbody tr');
+  if(row) {
+    const tbody = row.closest('tbody');
+    tbody.querySelectorAll('tr').forEach(function(r){ r.classList.remove('selected-row'); });
+    row.classList.add('selected-row');
+  }
+});
+
+function renderTable() {
+  const q = document.getElementById('search-input').value.toLowerCase();
+  const cat = document.getElementById('filter-cat').value;
+  const type = document.getElementById('filter-type').value;
+  const proj = document.getElementById('filter-proj').value;
+
+  const data = getFleetEquipment().filter(function(e){
+    const mQ = !q || [e.equipment, e.brand, e.code, e.project, e.od, e.sap].some(function(v){
+      return v && String(v).toLowerCase().indexOf(q) !== -1;
+    });
+    const mCat = !cat || e.category === cat;
+    const mType = !type || e.equipment === type;
+    const mProj = !proj || e.project === proj;
+    if(multiFilter.od && e.od !== multiFilter.od) return false;
+    if(multiFilter.cat && e.category !== multiFilter.cat) return false;
+    if(multiFilter.proj && e.project !== multiFilter.proj) return false;
+    return mQ && mCat && mType && mProj;
+  });
+
+  document.getElementById('table-loading').style.display = 'none';
+  document.getElementById('table-empty').style.display = data.length ? 'none' : 'block';
+  
+  document.getElementById('table-body').innerHTML = data.map(function(e, i){
+    return '<tr style="cursor:pointer;" onclick="showEquipHistory(\''+e.id+'\')">'
+      +'<td style="color:var(--text-muted)">'+(e.sn || (i+1))+'</td>'
+      +'<td style="font-weight:600">'+(e.equipment||'')+'</td>'
+      +'<td><span class="cat-badge">'+(e.category||'')+'</span></td>'
+      +'<td style="color:var(--text-muted)">'+(e.brand||'')+'</td>'
+      +'<td class="code-cell">'+(e.code||'')+'</td>'
+      +'<td>'+(e.project||'—')+'</td>'
+      +'<td style="color:var(--text-muted);font-size:12px">'+(e.od||'—')+'</td>'
+      +'<td style="font-family:monospace;font-size:12px">'+(e.year||'—')+'</td>'
+      +(isAdmin ? '<td><div class="action-btns">'
+        +'<button class="btn-transfer" onclick="event.stopPropagation();openTransferModal(\''+e.id+'\')">Transfer</button>'
+        +'<button class="btn-edit" onclick="event.stopPropagation();openEditModal(\''+e.id+'\')">Edit</button>'
+        +'<button class="btn-del" onclick="event.stopPropagation();deleteEquipment(\''+e.id+'\')">Delete</button>'
+      +'</div></td>' : '')
+    +'</tr>';
+  }).join('');
+}
+
+// ─── WORKSHOP LIVE SYSTEM ───
+let wsEquipment = [];
+let wsMonthly = [];
+let currentWsTab = 'active';
+let wsStatusFilter = 'All';
+
+function initWorkshopLive() {
+  wsDb.collection('equipment').onSnapshot(function(snapshot){
+    wsEquipment = snapshot.docs.map(function(doc){ return Object.assign({id: doc.id}, doc.data()); });
+    renderWsTable();
+    renderMgmtRow();
+    updateWsTicker();
+  });
+
+  wsDb.collection('monthly_stats').onSnapshot(function(snapshot){
+    wsMonthly = snapshot.docs.map(function(doc){ return Object.assign({id: doc.id}, doc.data()); });
+    wsMonthly.sort(function(a,b){ return (a.month||"").localeCompare(b.month||""); });
+    renderWsMonthly();
+    renderMgmtRow();
+  });
+}
+
+function updateWsTicker() {
+  const ticker = document.getElementById("ws-ticker-content");
+  if(!wsEquipment.length){ ticker.textContent = "No equipment currently in workshop."; return; }
+  ticker.innerHTML = wsEquipment.map(function(item){
+    const highlight = item.status==='Ready'?'color:var(--status-ready);font-weight:bold':(item.status==='Delay'?'color:var(--status-delay);font-weight:bold':'');
+    return '<span style="display:inline-block;margin-right:30px;">'
+      +'Equipment: <strong>'+(item.name||'—')+'</strong> ('+(item.code||'—')+') — Project: '+(item.project||'—')+' — Status: <span style="'+highlight+'">'+(item.status||'—')+'</span> ('+(item.dept||'—')+')'
+    +'</span>';
+  }).join(' ··· ');
+}
+
+function renderWsTable() {
+  const q = (document.getElementById('ws-search').value||'').toLowerCase().trim();
+  const dept = document.getElementById('ws-dept-filter').value;
+
+  let filtered = wsEquipment.filter(function(item){
+    const isArchived = (item.status === 'Dispatched');
+    return currentWsTab === 'active' ? !isArchived : isArchived;
+  });
+
+  if(wsStatusFilter === 'Long'){ filtered = filtered.filter(function(i){ return _mgmtDays(i) > 15; }); }
+  else if(wsStatusFilter !== 'All'){ filtered = filtered.filter(function(i){ return i.status === wsStatusFilter; }); }
+  if(dept !== 'All') filtered = filtered.filter(function(i){ return i.dept === dept; });
+  if(q) {
+    filtered = filtered.filter(function(i){
+      return [i.name, i.code, i.report, i.project].some(function(val){ return val && val.toLowerCase().indexOf(q) !== -1; });
+    });
+  }
+
+  document.getElementById("ws-total-count").textContent = wsEquipment.filter(function(i){ return i.status !== 'Dispatched'; }).length;
+  document.getElementById("ws-ready-count").textContent = wsEquipment.filter(function(i){ return i.status === 'Ready'; }).length;
+  document.getElementById("ws-progress-count").textContent = wsEquipment.filter(function(i){ return i.status === 'In Progress'; }).length;
+  document.getElementById("ws-waiting-count").textContent = wsEquipment.filter(function(i){ return i.status === 'Waiting'; }).length;
+  document.getElementById("ws-delay-count").textContent = wsEquipment.filter(function(i){ return i.status === 'Delay'; }).length;
+  document.getElementById("ws-external-count").textContent = wsEquipment.filter(function(i){ return i.status === 'External'; }).length;
+  document.getElementById("ws-dispatched-count").textContent = wsEquipment.filter(function(i){ return i.status === 'Dispatched'; }).length;
+
+  document.getElementById('ws-table-body').innerHTML = filtered.map(function(item, i){
+    const statusClass = 'status-' + (item.status ? item.status.replace(/\s+/g, '-') : 'Waiting');
+    
+    let actionBtn = '<span style="font-size:11px;color:var(--text-muted);font-style:italic">Not Ready</span>';
+    if(item.status === 'Ready'){
+      actionBtn = '<button class="btn-request" onclick="openWsRequestModal(\''+(item.code||'')+'\', \''+(item.name||'').replace(/'/g,"\\'")+'\')">Request</button>';
+    }
+
+    return '<tr>'
+      +'<td style="color:var(--text-muted)">'+(i+1)+'</td>'
+      +'<td><strong>'+(item.name||'—')+'</strong></td>'
+      +'<td><div><span class="code-cell">'+(item.code||'—')+'</span></div><div style="font-size:11px;color:var(--text-muted)">'+(item.report||'No report')+'</div></td>'
+      +'<td><div>📥 '+(item.project||'—')+'</div>'+(item.exitProject ? '<div style="color:var(--red);font-size:10px">📤 '+item.exitProject+'</div>':'')+'</td>'
+      +'<td style="font-size:11px"><div>In: '+(item.entryDate||'—')+'</div><div>Out: '+(item.exitDate||'Active')+'</div></td>'
+      +'<td style="font-weight:700;color:var(--accent)">'+calculateDays(item.entryDate, item.exitDate, item.status)+'</td>'
+      +'<td>'+(item.dept||'Mechanics')+'</td>'
+      +'<td><span class="status-badge '+statusClass+'">'+(item.status||'Waiting')+'</span></td>'
+      +'<td>'+actionBtn+'</td>'
+    +'</tr>';
+  }).join('');
+}
+
+function calculateDays(entry, exit, status){
+  if(!entry) return '—';
+  const start = new Date(entry);
+  const end = (status === 'Dispatched' && exit) ? new Date(exit) : new Date();
+  return Math.ceil(Math.abs(end - start)/(1000*60*60*24)) + ' Days';
+}
+
+function switchWsTab(tab){
+  currentWsTab = tab;
+  document.getElementById('ws-tab-active-btn').classList.toggle('active', tab==='active');
+  document.getElementById('ws-tab-archive-btn').classList.toggle('active', tab==='archive');
+  renderWsTable();
+}
+
+function setWsStatusFilter(status){
+  wsStatusFilter = status;
+  renderWsTable();
+}
+
+function renderWsMonthly(){
+  document.getElementById('ws-monthly-tbody').innerHTML = wsMonthly.map(function(stat){
+    return '<tr>'
+      +'<td><strong>'+stat.month+'</strong></td>'
+      +'<td>'+stat.received+'</td>'
+      +'<td style="color:var(--status-ready)">'+stat.repaired+'</td>'
+      +'<td style="color:var(--status-dispatched)">'+stat.dispatched+'</td>'
+    +'</tr>';
+  }).join('');
+}
+
+function openWsRequestModal(code, name) {
+  document.getElementById("req-eq-code").value = code;
+  document.getElementById("req-eq-name").value = name;
+  document.getElementById("req-eq-info").textContent = "Equipment: " + name + " (" + code + ")";
+  
+  const currentName = isAdmin ? "Eng. Mahmoud Osama (Admin)" : (sessionStorage.getItem('viewer_name') || "");
+  document.getElementById("req-user-name").value = currentName;
+  document.getElementById("req-dest-project").value = "";
+  document.getElementById("requestModal").classList.add("open");
+}
+
+function submitWsRequest(e) {
+  e.preventDefault();
+  const userName = document.getElementById("req-user-name").value.trim();
+  const destProject = document.getElementById("req-dest-project").value.trim();
+  const eqCode = document.getElementById("req-eq-code").value;
+  const eqName = document.getElementById("req-eq-name").value;
+
+  wsDb.collection("transfer_requests").add({
+    userName: userName,
+    destProject: destProject,
+    eqCode: eqCode,
+    eqName: eqName,
+    timestamp: new Date().toISOString()
+  }).then(function(){
+    closeModal("requestModal");
+    toast("✅ Request Sent to Eng. Mahmoud Osama!", "success");
+  }).catch(function(err){
+    alert("Error: " + err.message);
+  });
+}
+
+// ─── 5. FOLLOW-UP SYSTEM LOGIC ───
+let FU_DATA = [];
+let fuFilters = { prov: null };
+let fuStatusHistory = [];
+
+function initFollowUpDefault() {
+  FU_DATA = [];
+  setupFollowUpUI();
+}
+
+function setupFollowUpUI() {
+  const equips = Array.from(new Set(FU_DATA.map(function(r){ return (r.equipment||'').trim(); }).filter(Boolean))).sort();
+  const eqSel = document.getElementById('fu-equip-filter');
+  const currentEq = eqSel.value;
+  eqSel.innerHTML = '<option value="">All Equipment</option>' + equips.map(function(e){ return '<option value="'+e+'">'+e+'</option>'; }).join('');
+  if(equips.includes(currentEq)) eqSel.value = currentEq;
+
+  const projs = Array.from(new Set(FU_DATA.map(function(r){ return (r.project||'').trim(); }).filter(Boolean))).sort();
+  const projSel = document.getElementById('fu-proj-filter');
+  const currentProj = projSel.value;
+  projSel.innerHTML = '<option value="">All Projects</option>' + projs.map(function(p){ return '<option value="'+p+'">'+p+'</option>'; }).join('');
+  if(projs.includes(currentProj)) projSel.value = currentProj;
+
+  renderFollowUpTable();
+}
+
+function getScopedFuData() {
+  const eq = document.getElementById('fu-equip-filter').value;
+  const proj = document.getElementById('fu-proj-filter').value;
+  return FU_DATA.filter(function(r){
+    if(proj && (r.project||'').trim() !== proj) return false;
+    if(eq && (r.equipment||'').trim() !== eq) return false;
+    return true;
+  });
+}
+
+function getFilteredFuData() {
+  const scoped = getScopedFuData();
+  if(!fuFilters.prov) return scoped;
+  return scoped.filter(function(r){
+    return r.provision === fuFilters.prov;
+  });
+}
+
+function setFuCardProv(prov) {
+  if(fuFilters.prov === prov) {
+    fuFilters.prov = null;
+  } else {
+    fuFilters.prov = prov;
+  }
+  renderFollowUpTable();
+}
+
+function clearFuFilters() {
+  fuFilters.prov = null;
+  document.getElementById('fu-equip-filter').value = '';
+  document.getElementById('fu-proj-filter').value = '';
+  renderFollowUpTable();
+}
+
+window.changeFuStatus = function(docId, newStatus) {
+  const item = FU_DATA.find(function(r){ return r.id === docId; });
+  if(!item) return;
+  const oldStatus = item.provision;
+  if(oldStatus === newStatus) return;
+
+  fuStatusHistory.push({ docId: docId, oldStatus: oldStatus, newStatus: newStatus, equipName: item.equipment });
+  if(fuStatusHistory.length > 20) fuStatusHistory.shift();
+
+  item.provision = newStatus;
+  item._lastChange = oldStatus;
+  renderFollowUpTable();
+  updateUndoBtn();
+
+  if(!docId || docId.startsWith('local_')) {
+    toast('Saved locally ✓');
+    return;
+  }
+
+  db.collection('followup').doc(docId).update({ provision: newStatus })
+    .then(function(){
+      toast('✓ Status: ' + oldStatus + ' → ' + newStatus);
+    })
+    .catch(function(err){
+      if(err.code === 'resource-exhausted') {
+        toast('⚠️ Firebase quota reached. Saved in local memory.', 'error');
+      } else {
+        item.provision = oldStatus;
+        fuStatusHistory.pop();
+        renderFollowUpTable();
+        updateUndoBtn();
+        toast('Failed to update status', 'error');
+      }
+    });
+};
+
+function undoLastFuStatus() {
+  if(!fuStatusHistory.length) return;
+  const last = fuStatusHistory.pop();
+  const item = FU_DATA.find(function(r){ return r.id === last.docId; });
+  if(!item) { updateUndoBtn(); return; }
+  item.provision = last.oldStatus;
+  delete item._lastChange;
+  renderFollowUpTable();
+  updateUndoBtn();
+
+  if(!last.docId || last.docId.startsWith('local_')) {
+    toast('↩ Undo: ' + last.newStatus + ' → ' + last.oldStatus);
+    return;
+  }
+
+  db.collection('followup').doc(last.docId).update({ provision: last.oldStatus })
+    .then(function(){
+      toast('↩ Undo: ' + last.newStatus + ' → ' + last.oldStatus);
+    })
+    .catch(function(err){
+      if(err.code === 'resource-exhausted') {
+        toast('↩ Undone locally (Cloud quota full)');
+      } else {
+        item.provision = last.newStatus;
+        fuStatusHistory.push(last);
+        renderFollowUpTable();
+        updateUndoBtn();
+        toast('Undo failed', 'error');
+      }
+    });
+}
+
+function updateUndoBtn() {
+  const btn = document.getElementById('fu-btn-undo');
+  if(!btn) return;
+  if(fuStatusHistory.length) {
+    const last = fuStatusHistory[fuStatusHistory.length - 1];
+    btn.style.display = 'inline-flex';
+    btn.title = 'Undo: ' + (last.equipName||'') + '  ' + last.newStatus + ' → ' + last.oldStatus;
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+function duplicateFuRow(docId) {
+  var src = FU_DATA.find(function(r){ return r.id === docId; });
+  if(!src) return;
+  var copy = Object.assign({}, src);
+  delete copy.id;
+  copy.sn = FU_DATA.length + 1;
+  copy.provision = 'Pending';
+  copy.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+
+  db.collection('followup').add(copy).then(function(ref){
+    copy.id = ref.id;
+    FU_DATA.push(copy);
+    setupFollowUpUI();
+    toast('⧉ Row duplicated ✓');
+  }).catch(function(err){
+    if(err.code === 'resource-exhausted'){
+      copy.id = 'local_' + Date.now();
+      FU_DATA.push(copy);
       setupFollowUpUI();
-      setupOwnedUI();
+      toast('Duplicated locally (quota full)');
+    } else {
+      toast('Error: ' + err.message, 'error');
     }
   });
 }
 
-// REST OF APPLICATION ENGINE
-function _mgmtDays(it){
-  if(!it || !it.entryDate) return 0;
-  var end = (it.status === 'Dispatched' && it.exitDate) ? new Date(it.exitDate) : new Date();
-  return Math.max(0, Math.round((end - new Date(it.entryDate)) / 86400000));
-}
-function _mgmtRow(dot, label, val, valColor){
-  return '<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid var(--border);">'
-    +'<span style="color:var(--text);">'+dot+' '+label+'</span>'
-    +'<span style="font-family:\'JetBrains Mono\',monospace;font-weight:700;color:'+valColor+';">'+val+'</span></div>';
-}
-function _mgmtBar(c, max, color){
-  return '<div style="height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;margin:4px 0 8px;"><div style="height:100%;width:'+Math.min(100, Math.round(max ? c/max*100 : 0))+'%;background:'+color+';"></div></div>';
-}
-function _mgmtTitle(t){
-  return '<div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">'+t+'</div>';
-}
-function _ageData(){
-  if(currentFleet === 'all') return allEquipment;
-  if(currentFleet === 'egypt') return allEquipment.filter(function(e){ var f = (e.fleet || 'egypt'); return f === 'egypt' || f === 'archive'; });
-  return allEquipment.filter(function(e){ return (e.fleet || 'egypt') === currentFleet; });
+function removeFuRow(docId) {
+  if(!confirm('Remove this row?')) return;
+  var idx = FU_DATA.findIndex(function(r){ return r.id === docId; });
+  if(idx === -1) return;
+  FU_DATA.splice(idx, 1);
+  setupFollowUpUI();
+  toast('Row removed ✓');
+
+  if(!docId || docId.startsWith('local_')) return;
+  db.collection('followup').doc(docId).delete().catch(function(err){
+    toast('Cloud delete failed: ' + err.message, 'error');
+  });
 }
 
-function renderMgmtRow(){
-  var boxRF = document.getElementById('mgmt-redflags');
-  var boxWS = document.getElementById('mgmt-workshop');
-  var boxFA = document.getElementById('mgmt-fleetage');
-  if(!boxRF && !boxWS && !boxFA) return;
+function renderFollowUpTable() {
+  const scopedData = getScopedFuData();
+  const data = getFilteredFuData();
+  const tbody = document.getElementById('fu-table-body');
 
-  var ws = wsEquipment || [];
-  var activeWs = ws.filter(function(i){ return i.status !== 'Dispatched'; });
+  const counts = {Rental:0, Transfer:0, Hold:0, Pending:0, Cancel:0};
+  scopedData.forEach(function(r){ if(counts[r.provision] !== undefined) counts[r.provision]++; });
 
-  var longShop = activeWs.filter(function(i){ return _mgmtDays(i) > 15; }).sort(function(a,b){ return _mgmtDays(b) - _mgmtDays(a); });
-  var fuP = 0, fuH = 0;
-  (FU_DATA || []).forEach(function(r){ if(r.provision === 'Pending') fuP++; else if(r.provision === 'Hold') fuH++; });
-  var wsDelay = ws.filter(function(i){ return i.status === 'Delay'; }).length;
+  document.getElementById('fu-kpi-total').textContent = scopedData.length;
+  document.getElementById('fu-kpi-rental').textContent = counts.Rental;
+  document.getElementById('fu-kpi-transfer').textContent = counts.Transfer;
+  document.getElementById('fu-kpi-hold').textContent = counts.Hold;
+  document.getElementById('fu-kpi-pending').textContent = counts.Pending;
+  document.getElementById('fu-kpi-cancel').textContent = counts.Cancel;
 
-  var rf = _mgmtTitle('🚨 Red Flags — اضغط الكارت للتفاصيل');
-  var tiles = [
-    {c: longShop.length, label:'Workshop > 15d', color:'#f85149', go:"goWsCard('long')"},
-    {c: wsDelay,         label:'Workshop Delay', color:'#f0a500', go:"goWsCard('Delay')"},
-    {c: fuP,             label:'Follow-Up Pending', color:'#f85149', go:"goFu('Pending')"},
-    {c: fuH,             label:'Follow-Up Hold', color:'#f0a500', go:"goFu('Hold')"}
-  ];
-  var anyRF = tiles.some(function(t){ return t.c > 0; });
-  if(anyRF){
-    rf += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
-    tiles.forEach(function(t){
-      if(!t.c) return;
-      rf += '<div style="cursor:pointer;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;text-align:center;" onclick="'+t.go+'" title="اضغط للعرض">'
-        +'<div style="font-size:22px;font-weight:700;color:'+t.color+';font-family:\'JetBrains Mono\',monospace;">'+t.c+'</div>'
-        +'<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">'+t.label+'</div>'
-      +'</div>';
-    });
-    rf += '</div>';
-  } else {
-    rf += '<div style="color:var(--green);font-size:13px;padding:6px 0;">✅ مفيش تنبيهات — كل حاجة تمام</div>';
+  const cardMap = {
+    'Rental': 'fu-card-rental',
+    'Transfer': 'fu-card-transfer',
+    'Hold': 'fu-card-hold',
+    'Pending': 'fu-card-pending',
+    'Cancel': 'fu-card-cancel'
+  };
+  ['fu-card-all','fu-card-rental','fu-card-transfer','fu-card-hold','fu-card-pending','fu-card-cancel'].forEach(function(cid){
+    const el = document.getElementById(cid);
+    if(el) el.classList.remove('active');
+  });
+  if(!fuFilters.prov) {
+    const allEl = document.getElementById('fu-card-all');
+    if(allEl) allEl.classList.add('active');
+  } else if(cardMap[fuFilters.prov]) {
+    const actEl = document.getElementById(cardMap[fuFilters.prov]);
+    if(actEl) actEl.classList.add('active');
   }
-  if(boxRF) boxRF.innerHTML = rf;
 
-  var inNow = activeWs.length;
-  var done = ws.filter(function(i){ return i.status === 'Dispatched' && i.exitDate; });
-  var avgRep = done.length ? (done.reduce(function(s,i){ return s + _mgmtDays(i); }, 0) / done.length).toFixed(1) : '—';
-  var repMo = (wsMonthly && wsMonthly.length) ? (wsMonthly[wsMonthly.length - 1].repaired || '—') : '—';
+  const eqVal = document.getElementById('fu-equip-filter').value;
+  const projVal = document.getElementById('fu-proj-filter').value;
+  const hasFilter = fuFilters.prov || eqVal || projVal;
+  const clrBtn = document.getElementById('fu-clear-filters-btn');
+  if(clrBtn) clrBtn.style.display = hasFilter ? 'inline-flex' : 'none';
 
-  var wsh = _mgmtTitle('🛠️ Workshop Productivity');
-  wsh += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px;">'
-    +'<div><div style="font-size:10px;color:var(--text-muted);">In Workshop Now</div><div style="font-size:24px;font-weight:700;color:var(--accent);font-family:\'JetBrains Mono\',monospace;">'+inNow+'</div></div>'
-    +'<div><div style="font-size:10px;color:var(--text-muted);">Avg Repair</div><div style="font-size:24px;font-weight:700;color:#58a6ff;font-family:\'JetBrains Mono\',monospace;">'+avgRep+'<span style="font-size:11px;"> d</span></div></div>'
-    +'<div><div style="font-size:10px;color:var(--text-muted);">Repaired / Month</div><div style="font-size:24px;font-weight:700;color:#3fb950;font-family:\'JetBrains Mono\',monospace;">'+repMo+'</div></div>'
-    +'<div><div style="font-size:10px;color:var(--text-muted);">Delay Now</div><div style="font-size:24px;font-weight:700;color:#f85149;font-family:\'JetBrains Mono\',monospace;">'+wsDelay+'</div></div>'
-    +'</div>';
+  if(!data.length){
+    tbody.innerHTML = '<tr><td colspan="12" class="empty">No follow-up requests matching filter</td></tr>';
+    document.getElementById('fu-table-count').textContent = '0 requests';
+    return;
+  }
 
-  var months = (wsMonthly || []).slice(-3);
-  wsh += '<div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin:6px 0 4px;">Monthly Flow (in / out)</div>';
-  wsh += months.map(function(m){
-    var rec = Number(m.received) || 0, rep = Number(m.repaired) || 0;
-    var mx = Math.max(rec, rep, 1);
-    return '<div style="display:flex;align-items:center;gap:8px;font-size:11px;margin:4px 0;">'
-      +'<span style="width:38px;color:var(--text-muted);">'+(m.month || '—')+'</span>'
-      +'<div style="flex:1;display:flex;gap:2px;"><div style="height:7px;width:'+Math.round(rec/mx*100)+'%;background:#f0a500;border-radius:2px;"></div><div style="height:7px;width:'+Math.round(rep/mx*100)+'%;background:#3fb950;border-radius:2px;"></div></div>'
-      +'<span style="width:56px;text-align:right;font-family:\'JetBrains Mono\',monospace;color:var(--text-muted);">'+rec+' / '+rep+'</span></div>';
+  const totalDays = data.reduce(function(s,r){ return s + (Number(r.days)||0); }, 0);
+  document.getElementById('fu-table-count').textContent = data.length + ' requests (filtered from ' + FU_DATA.length + ')';
+  document.getElementById('fu-table-days').textContent = 'Total: ' + totalDays.toLocaleString() + ' days';
+
+  tbody.innerHTML = data.map(function(r, i){
+    const pClass = 'badge-' + (r.provision ? r.provision.toLowerCase() : 'hold');
+    const wasLabel = r._lastChange ? '<div style="font-size:9px;color:var(--accent);margin-top:2px;">(Was: '+r._lastChange+')</div>' : '';
+
+    const statusSelect = '<select class="badge '+pClass+'" onchange="changeFuStatus(\''+r.id+'\', this.value)" style="border:none;cursor:pointer;outline:none;font-weight:700;">'
+      + '<option value="Rental" '+(r.provision==='Rental'?'selected':'')+'>Rental</option>'
+      + '<option value="Transfer" '+(r.provision==='Transfer'?'selected':'')+'>Transfer</option>'
+      + '<option value="Hold" '+(r.provision==='Hold'?'selected':'')+'>Hold</option>'
+      + '<option value="Pending" '+(r.provision==='Pending'?'selected':'')+'>Pending</option>'
+      + '<option value="Cancel" '+(r.provision==='Cancel'?'selected':'')+'>Cancel</option>'
+    + '</select>' + wasLabel;
+
+    return '<tr>'
+      +'<td style="color:var(--text-dim);font-family:\'JetBrains Mono\'">'+(i+1)+'</td>'
+      +'<td style="font-weight:600;">'+(r.equipment||'—')+'</td>'
+      +'<td style="color:var(--text-muted)">'+(r.capacity||'—')+'</td>'
+      +'<td style="font-family:\'JetBrains Mono\'">'+(r.qty||1)+'</td>'
+      +'<td class="code-cell">'+(r.sap||'—')+'</td>'
+      +'<td>'+(r.project||'—')+'</td>'
+      +'<td>'+statusSelect+'</td>'
+      +'<td style="font-size:11px;font-family:\'JetBrains Mono\'">'+formatExcelDate(r.date_from)+'</td>'
+      +'<td style="font-size:11px;font-family:\'JetBrains Mono\'">'+formatExcelDate(r.date_to)+'</td>'
+      +'<td style="font-family:\'JetBrains Mono\'">'+(r.days||'—')+'</td>'
+      +'<td style="font-size:11px;color:var(--text-muted);max-width:160px;white-space:normal">'+(r.notes||'')+'</td>'
+      +(isAdmin
+        ? '<td><div class="action-btns">'
+            +'<button class="btn-edit" title="Duplicate" onclick="duplicateFuRow(\''+r.id+'\')">⧉ Dup</button>'
+            +'<button class="btn-del" title="Remove" onclick="removeFuRow(\''+r.id+'\')">✕ Remove</button>'
+          +'</div></td>'
+        : '<td style="display:none;"></td>')
+    +'</tr>';
   }).join('');
-  if(boxWS) boxWS.innerHTML = wsh;
+}
 
-  var data = _ageData();
-  var nowY = new Date().getFullYear();
-  var b1 = 0, b2 = 0, b3 = 0, b4 = 0, na = 0, ages = [];
-  data.forEach(function(e){
-    var y = parseInt(e.year, 10);
-    if(!y || isNaN(y)){ na++; return; }
-    var a = nowY - y; ages.push(a);
-    if(a <= 5) b1++; else if(a <= 10) b2++; else if(a <= 15) b3++; else b4++;
+function clearFollowUpData() {
+  if(!isAdmin) return;
+  if(!confirm('⚠️ This will DELETE all Follow-Up records.\nAre you sure?')) return;
+
+  toast('⏳ Deleting records...');
+  
+  db.collection('followup').get().then(function(snap){
+    if(snap.empty){
+      FU_DATA = [];
+      setupFollowUpUI();
+      toast('Follow-Up data cleared ✓');
+      return;
+    }
+    const docs = snap.docs;
+    const batchSize = 400;
+    let p = Promise.resolve();
+
+    for(let i = 0; i < docs.length; i += batchSize){
+      (function(chunk){
+        p = p.then(function(){
+          const batch = db.batch();
+          chunk.forEach(function(d){ batch.delete(d.ref); });
+          return batch.commit();
+        });
+      })(docs.slice(i, i + batchSize));
+    }
+
+    p.then(function(){
+      FU_DATA = [];
+      fuStatusHistory = [];
+      setupFollowUpUI();
+      updateUndoBtn();
+      toast('✅ Follow-Up data deleted from server (' + docs.length + ' records)');
+    }).catch(function(err){
+      if(err.code === 'resource-exhausted') {
+        FU_DATA = [];
+        setupFollowUpUI();
+        toast('⚠️ Cleared locally (Firebase free daily quota is full, resets at 10 AM Cairo)', 'error');
+      } else {
+        toast('Error: ' + err.message, 'error');
+      }
+    });
+  }).catch(function(err){
+    if(err.code === 'resource-exhausted') {
+      FU_DATA = [];
+      setupFollowUpUI();
+      toast('⚠️ Cleared locally (Firebase quota full, resets at 10 AM Cairo)');
+    } else {
+      toast('Error: ' + err.message, 'error');
+    }
   });
-  var avg = ages.length ? (ages.reduce(function(s,x){ return s + x; }, 0) / ages.length).toFixed(1) : '—';
-  var maxB = Math.max(b1, b2, b3, b4, 1);
-  var total = data.length || 1;
-  var scopeName = {all:'All Countries', egypt:'Egypt', ksa:'Saudi Arabia', algeria:'Algeria', uae:'UAE', jv:'JV'}[currentFleet] || currentFleet;
-
-  var fa = _mgmtTitle('🧓 Fleet Age — ' + scopeName);
-  fa += _mgmtRow('🟢', '≤ 5 yrs (new)', b1, '#3fb950') + _mgmtBar(b1, maxB, '#3fb950');
-  fa += _mgmtRow('🔵', '6–10 yrs', b2, '#58a6ff') + _mgmtBar(b2, maxB, '#58a6ff');
-  fa += _mgmtRow('🟠', '11–15 yrs', b3, '#f0a500') + _mgmtBar(b3, maxB, '#f0a500');
-  fa += _mgmtRow('🔴', '+15 yrs (replace)', b4, '#f85149') + _mgmtBar(b4, maxB, '#f85149');
-  fa += '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);border-top:1px solid var(--border);padding-top:6px;">'
-    +'<span>Avg: <b style="color:var(--text);">'+avg+' yrs</b></span>'
-    +'<span style="color:#f85149;font-weight:700;">'+Math.round(b4 / total * 100) + '% replace</span></div>';
-  if(na) fa += '<div style="font-size:10px;color:var(--text-dim);margin-top:4px;">'+na+' بدون سنة صنع</div>';
-  if(boxFA) boxFA.innerHTML = fa;
 }
 
-function goPage(id){
-  var nav = null;
-  document.querySelectorAll('.nav-item').forEach(function(n){
-    var oc = n.getAttribute('onclick') || '';
-    if(oc.indexOf("'" + id + "'") !== -1) nav = n;
+function calcFuDays() {
+  const fromVal = document.getElementById('fu-f-datefrom').value;
+  const toVal   = document.getElementById('fu-f-dateto').value;
+  const daysEl  = document.getElementById('fu-f-days');
+
+  if (fromVal && toVal) {
+    const dFrom = new Date(fromVal);
+    const dTo   = new Date(toVal);
+    const diffTime = dTo - dFrom;
+
+    if (diffTime >= 0) {
+      let days = Math.round(diffTime / (1000 * 60 * 60 * 24));
+      if (days === 31) days = 30;
+      if (days === 0) days = 1;
+      daysEl.value = days;
+    } else {
+      daysEl.value = 0;
+      toast('⚠️ Date To must be after Date From', 'error');
+    }
+  }
+}
+
+var _fuEqActiveIdx = -1;
+
+function fuEqSearch(val) {
+  var dd = document.getElementById('fu-eq-dropdown');
+  var q = val.trim().toLowerCase();
+  if(!q) { dd.style.display='none'; return; }
+
+  var names = Array.from(new Set(allEquipment.map(function(e){ return (e.equipment||'').trim(); }).filter(Boolean))).sort();
+  var matches = names.filter(function(n){ return n.toLowerCase().indexOf(q) !== -1; });
+
+  if(!matches.length) { dd.style.display='none'; return; }
+
+  _fuEqActiveIdx = -1;
+  dd.innerHTML = matches.map(function(n, i){
+    return '<div data-idx="'+i+'" style="padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);" '
+      +'onmousedown="fuEqSelect(\''+n.replace(/'/g,"\\'")+'\')" '
+      +'onmouseover="fuEqHover(this)">'
+      + n.replace(new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')', 'gi'), '<b style="color:var(--accent)">$1</b>')
+    +'</div>';
+  }).join('');
+  dd.style.display = 'block';
+}
+
+function fuEqSelect(name) {
+  document.getElementById('fu-f-equipment').value = name;
+  document.getElementById('fu-eq-dropdown').style.display = 'none';
+  _fuEqActiveIdx = -1;
+}
+
+function fuEqHide() {
+  document.getElementById('fu-eq-dropdown').style.display = 'none';
+}
+
+function fuEqHover(el) {
+  Array.from(el.parentNode.children).forEach(function(c){ c.style.background=''; });
+  el.style.background = 'var(--surface2)';
+  _fuEqActiveIdx = Number(el.dataset.idx);
+}
+
+function fuEqKey(e) {
+  var dd = document.getElementById('fu-eq-dropdown');
+  var items = dd.querySelectorAll('div');
+  if(!items.length) return;
+  if(e.key === 'ArrowUp') {
+    e.preventDefault();
+    _fuEqActiveIdx = Math.max(0, _fuEqActiveIdx - 1);
+  } else if(e.key === 'ArrowDown') {
+    e.preventDefault();
+    _fuEqActiveIdx = Math.min(items.length - 1, _fuEqActiveIdx + 1);
+  } else if(e.key === 'Enter' && _fuEqActiveIdx >= 0) {
+    e.preventDefault();
+    fuEqSelect(items[_fuEqActiveIdx].textContent);
+    return;
+  } else { return; }
+  items.forEach(function(c){ c.style.background=''; });
+  if(items[_fuEqActiveIdx]) items[_fuEqActiveIdx].style.background = 'var(--surface2)';
+}
+
+function autoFillFuSap() {
+  var proj = document.getElementById('fu-f-project').value.trim().toLowerCase();
+  if(!proj) return;
+  var match = FU_DATA.find(function(r){
+    return (r.project||'').trim().toLowerCase() === proj && r.sap;
   });
-  showPage(id, nav);
+  if(match) {
+    document.getElementById('fu-f-sap').value = match.sap;
+  }
 }
 
-function goWsCard(kind){
-  var s = document.getElementById('ws-search'); if(s) s.value = '';
-  var d = document.getElementById('ws-dept-filter'); if(d) d.value = 'All';
-  wsStatusFilter = (kind === 'long') ? 'Long' : kind;
-  switchWsTab('active');
-  renderWsTable();
-  goPage('workshop');
+function openAddFuModal() {
+  ['equipment','capacity','sap','notes'].forEach(function(f){
+    document.getElementById('fu-f-'+f).value = '';
+  });
+  var eqDatalist = document.getElementById('equipment-suggestions');
+  if(eqDatalist) {
+    var eqNames = Array.from(new Set(allEquipment.map(function(e){ return (e.equipment||'').trim(); }).filter(Boolean))).sort();
+    eqDatalist.innerHTML = eqNames.map(function(n){ return '<option value="'+n+'">'; }).join('');
+  }
+  document.getElementById('fu-f-qty').value = 1;
+  document.getElementById('fu-f-days').value = 0;
+  document.getElementById('fu-f-provision').value = 'Pending';
+  document.getElementById('fu-f-project').value = '';
+  document.getElementById('fu-f-submission').value = new Date().toISOString().split('T')[0];
+  document.getElementById('fu-f-datefrom').value = '';
+  document.getElementById('fu-f-dateto').value = '';
+  document.getElementById('fu-add-modal').classList.add('open');
 }
 
-function goFu(prov){
-  var eqSel = document.getElementById('fu-equip-filter'); if(eqSel) eqSel.value = '';
-  var prSel = document.getElementById('fu-proj-filter'); if(prSel) prSel.value = '';
-  fuFilters.prov = prov;
-  renderFollowUpTable();
-  goPage('followup');
+function saveFuEquipment() {
+  const equip = document.getElementById('fu-f-equipment').value.trim();
+  if(!equip){ toast('Equipment name is required', 'error'); return; }
+
+  const dateFrom = document.getElementById('fu-f-datefrom').value;
+  const dateTo   = document.getElementById('fu-f-dateto').value;
+  let days = Number(document.getElementById('fu-f-days').value) || 0;
+  
+  if(!days && dateFrom && dateTo){
+    const ms = new Date(dateTo) - new Date(dateFrom);
+    if(ms >= 0) {
+      days = Math.round(ms / 86400000);
+      if (days === 31) days = 30;
+      if (days === 0) days = 1;
+    }
+  }
+
+  const newRecord = {
+    sn: FU_DATA.length + 1,
+    equipment: equip,
+    capacity: document.getElementById('fu-f-capacity').value.trim(),
+    qty: Number(document.getElementById('fu-f-qty').value) || 1,
+    sap: document.getElementById('fu-f-sap').value.trim(),
+    project: document.getElementById('fu-f-project').value.trim(),
+    submission_date: document.getElementById('fu-f-submission').value,
+    provision: document.getElementById('fu-f-provision').value,
+    date_from: dateFrom,
+    date_to: dateTo,
+    days: days,
+    notes: document.getElementById('fu-f-notes').value.trim(),
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  db.collection('followup').add(newRecord).then(function(docRef){
+    newRecord.id = docRef.id;
+    FU_DATA.push(newRecord);
+    setupFollowUpUI();
+    closeModal('fu-add-modal');
+    toast('✅ Follow-Up record added ✓');
+  }).catch(function(err){
+    if(err.code === 'resource-exhausted') {
+      newRecord.id = 'local_' + Date.now();
+      FU_DATA.push(newRecord);
+      setupFollowUpUI();
+      closeModal('fu-add-modal');
+      toast('Saved locally (quota full, will sync later)');
+    } else {
+      toast('Error: ' + err.message, 'error');
+    }
+  });
 }
 
+function exportFuCSV() {
+  const data = getFilteredFuData();
+  const headers = ['#','Equipment','Capacity','Qty','SAP','Project','Submission','Provision','From','To','Days','Notes'];
+  const rows = data.map(function(r,i){
+    return [i+1, r.equipment, r.capacity, r.qty, r.sap, r.project, r.submission_date, r.provision, r.date_from, r.date_to, r.days, r.notes];
+  });
+  const csv = [headers].concat(rows).map(function(r){
+    return r.map(function(v){ return '"' + String(v||'').replace(/"/g,'""') + '"'; }).join(',');
+  }).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csv);
+  a.download = 'HAC_FollowUp_Export.csv';
+  a.click();
+}
+
+function updateFuFromExcel(input) {
+  const file = input.files[0];
+  if(!file) return;
+  if(!confirm('Upload & Replace Follow-Up database with this sheet?')) { input.value=''; return; }
+
+  toast('⏳ Reading Excel...');
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'binary'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {defval:'', header:1});
+
+      let headerIdx = -1;
+      for(let i=0; i<Math.min(rows.length,10); i++){
+        const row = rows[i].map(function(c){ return String(c).trim().toLowerCase(); });
+        if(row.some(function(c){ return c.indexOf('equipment')!==-1; }) && row.some(function(c){ return c.indexOf('project')!==-1; })){
+          headerIdx = i; break;
+        }
+      }
+      if(headerIdx < 0){ alert('Header row not found'); return; }
+
+      const headers = rows[headerIdx].map(function(c){ return String(c).trim().toLowerCase(); });
+      const find = function() {
+        const terms = Array.prototype.slice.call(arguments);
+        return headers.findIndex(function(h){
+          return terms.some(function(t){ return h.replace(/[^a-z0-9]/g,'').indexOf(t.replace(/[^a-z0-9]/g,''))!==-1; });
+        });
+      };
+
+      const iSn=0, iEquip=find('equipment'), iCap=find('capacity'), iQty=find('qty','quantity');
+      const iSap=find('sap'), iProj=find('project','desc');
+      const iSub=find('submission','date'), iProv=find('provision','method');
+      const iFrom=find('from'), iTo=find('to'), iDays=find('days'), iNotes=find('notes');
+
+      const newData = [];
+      for(let i=headerIdx+1; i<rows.length; i++){
+        const r = rows[i];
+        const equip = String(r[iEquip]||'').trim();
+        if(!equip) continue;
+
+        const prov = String(r[iProv]||'').trim();
+        const provNorm = prov.charAt(0).toUpperCase() + prov.slice(1).toLowerCase();
+        const provFinal = {'Rental':'Rental','Transfer':'Transfer','Hold':'Hold','Cancel':'Cancel','Pending':'Pending'}[provNorm] || provNorm;
+
+        newData.push({
+          sn: Number(r[iSn]) || (i - headerIdx),
+          equipment: equip,
+          capacity: String(r[iCap]||'').trim(),
+          qty: Number(r[iQty]) || 1,
+          sap: String(r[iSap]||'').trim(),
+          project: String(r[iProj]||'').trim(),
+          submission_date: String(r[iSub]||'').trim(),
+          provision: provFinal,
+          date_from: formatExcelDate(r[iFrom]),
+          date_to: formatExcelDate(r[iTo]),
+          days: Number(r[iDays]) || 0,
+          notes: String(r[iNotes]||'').trim(),
+        });
+      }
+
+      toast('⏳ Syncing to Cloud...');
+      db.collection('followup').get().then(function(snap){
+        const batch = db.batch();
+        snap.docs.forEach(function(d){ batch.delete(d.ref); });
+        return batch.commit();
+      }).then(function(){
+        const batchSize = 400;
+        let p = Promise.resolve();
+        for(let i=0; i<newData.length; i+=batchSize){
+          (function(startIdx){
+            p = p.then(function(){
+              const batch = db.batch();
+              newData.slice(startIdx, startIdx+batchSize).forEach(function(item){
+                const docRef = db.collection('followup').doc();
+                item.id = docRef.id;
+                batch.set(docRef, item);
+              });
+              return batch.commit();
+            });
+          })(i);
+        }
+        return p;
+      }).then(function(){
+        FU_DATA = newData;
+        setupFollowUpUI();
+        toast('✅ Follow-Up synced (' + newData.length + ' records)!');
+      }).catch(function(err){
+        if(err.code === 'resource-exhausted') {
+          newData.forEach(function(item, idx){ item.id = 'local_' + idx; });
+          FU_DATA = newData;
+          setupFollowUpUI();
+          toast('⚠️ Cloud quota exceeded: Loaded locally (resets 10 AM Cairo)', 'error');
+        } else {
+          alert('Error: ' + err.message);
+        }
+      });
+    } catch(err){
+      alert('Error: ' + err.message);
+    }
+    input.value = '';
+  };
+  reader.readAsBinaryString(file);
+}
+
+// ─── GENERAL UI & CRUD ───
 function showPage(page, el) {
   document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
   document.querySelectorAll('.nav-item').forEach(function(n){ n.classList.remove('active'); });
