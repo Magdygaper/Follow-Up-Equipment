@@ -360,7 +360,7 @@ tr.selected-row td:nth-child(2){
 
       <!-- FLEET SELECTOR -->
       <div class="fleet-selector">
-        <div class="fleet-selector-label">🌍 Fleet</div>
+        <div class="fleet-selector-label">🌍 Equipment List 2026</div>
         <button class="fleet-btn active" id="fleet-btn-egypt" onclick="switchFleet('egypt',this)">
           <span class="fleet-flag">🇪🇬</span> Egypt
           <span class="fleet-count" id="fleet-count-egypt">—</span>
@@ -1623,6 +1623,8 @@ function startViewerPresence(name) {
   viewerPingInterval = setInterval(function() {
     sessionRef.update({ lastSeen: Date.now() }).catch(function(e){});
   }, 25000);
+
+  watchForKick();
 }
 
 function cleanupViewerPresence() {
@@ -1649,7 +1651,7 @@ function initAdminPresenceListener() {
     snapshot.forEach(function(doc) {
       const data = doc.data();
       if (now - (data.lastSeen || 0) < 60000) {
-        activeViewersList.push(data);
+        activeViewersList.push(Object.assign({ id: doc.id }, data));
       } else {
         doc.ref.delete().catch(function(e){});
       }
@@ -1739,7 +1741,10 @@ function renderLiveViewersList() {
           + '</div>'
           + '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">Online since: ' + timeStr + '</div>'
         + '</div>'
+        + '<div style="display:flex;align-items:center;gap:8px;">'
         + '<span class="badge" style="background:var(--surface3);color:var(--accent);font-size:11px;">' + (v.device === 'Mobile' ? '📱 Mobile' : '💻 Desktop') + '</span>'
+        + '<button onclick="kickViewer(\'' + v.id + '\', \'' + (v.name || 'Viewer').replace(/'/g,"\\'") + '\')" style="background:rgba(248,81,73,.12);border:1px solid rgba(248,81,73,.45);color:var(--red);padding:5px 10px;border-radius:var(--radius);cursor:pointer;font-size:11px;font-weight:700;white-space:nowrap;">🚫 Kick</button>'
+        + '</div>'
       + '</div>';
     }).join('');
   }
@@ -1760,6 +1765,38 @@ function renderHistoryViewersList() {
       + '</div>';
     }).join('');
   }
+}
+
+// ─── ADMIN: طرد فيور متصل دلوقتي ───
+window.kickViewer = function(sessionId, name) {
+  if (!isAdmin || !sessionId) return;
+  if (!confirm('متأكد إنك عايز تطرد "' + (name || 'الفيور ده') + '" دلوقتي؟')) return;
+  db.collection('kicked_viewers').doc(sessionId).set({
+    kickedAt: Date.now(),
+    kickedBy: (currentUser && currentUser.email) || 'admin'
+  }).then(function(){
+    return db.collection('active_viewers').doc(sessionId).delete();
+  }).then(function(){
+    toast('✓ تم طرد ' + (name || 'الفيور') + ' — هيتقفل عنده اللينك أوتوماتيك');
+  }).catch(function(err){
+    toast('Error kicking viewer: ' + err.message, 'error');
+  });
+};
+
+// ─── VIEWER: مراقبة لو الأدمن طردني ───
+function watchForKick() {
+  if (!viewerSessionId || isAdmin) return;
+  db.collection('kicked_viewers').doc(viewerSessionId).onSnapshot(function(doc) {
+    if (doc.exists) {
+      cleanupViewerPresence();
+      db.collection('kicked_viewers').doc(viewerSessionId).delete().catch(function(e){});
+      sessionStorage.removeItem('viewer_name');
+      alert('⚠️ تم إنهاء جلستك بواسطة الأدمن. هيتم تسجيل خروجك الآن.');
+      location.reload();
+    }
+  }, function(err) {
+    console.log('Kick listener error:', err);
+  });
 }
 
 window.clearAccessHistory = function() {
@@ -5383,6 +5420,61 @@ function buildList(key){
   return {arr:t.list,unit:(key==='fuel'?'L':'money'),total:t.total,rest:t.rest,count:t.count}; 
 }
 
+function daysSum(rows){ return rows.reduce(function(a,r){return a+N(r.days);},0); }
+function groupTop(rows,keyFn,metricFn,n){
+  var map={};
+  rows.forEach(function(r){ var k=keyFn(r); if(!k) return; if(!map[k])map[k]={v:0,c:0}; map[k].v+=metricFn(r); map[k].c++; });
+  return Object.keys(map).map(function(k){return [k,map[k].v,map[k].c];}).sort(function(a,b){return b[1]-a[1];}).slice(0,n||8);
+}
+function bdTile(t,v,colr,titleVal){ return '<div class="mo-tile"'+(titleVal?(' title="'+esc(titleVal)+'"'):'')+'><div class="t">'+esc(t)+'</div><div class="v" style="color:'+colr+'">'+v+'</div></div>'; }
+function bdBar(label,val,fmtFn,act,colr,max){
+  var w=max?Math.min(100,Math.abs(val)/max*100):0;
+  return '<div class="mo-bar-row" style="cursor:pointer" data-act="'+act+'" data-v="'+esc(label)+'">'
+    +'<div class="mo-bar-head"><span>'+esc(label)+'</span><span style="font-family:\'JetBrains Mono\',monospace;color:'+colr+'">'+fmtFn(val)+'</span></div>'
+    +'<div class="mo-bar-track"><div class="mo-bar-fill" style="width:'+w.toFixed(0)+'%;background:'+colr+'"></div></div></div>';
+}
+function bdCol(title,arr,fmtFn,act,colr){
+  var body=arr.length?(function(){ var max=Math.abs(arr[0][1])||1; return arr.map(function(p){return bdBar(p[0],p[1],fmtFn,act,colr,max);}).join(''); })():'<span class="mo-hint">—</span>';
+  return '<div><div class="mo-col-h">'+esc(title)+'</div>'+body+'</div>';
+}
+function showBreakdown(key){
+  var conf={
+    ot:{label:'Overtime Cost',metric:function(r){return N(r.otCost);},unit:'money',colr:'#bc8cff'},
+    fuel:{label:'Fuel Consumption',metric:function(r){return N(r.fuel);},unit:'L',colr:'#ffa657'},
+    deduct:{label:'Total Deduct (Savings)',metric:function(r){return N(r.totalDeduct);},unit:'money',colr:'#3fb950'},
+    value:{label:'Rental Value',metric:function(r){return N(r.totalPrice);},unit:'money',colr:'#58a6ff'}
+  }[key];
+  if(!conf){ showTop(key); return; }
+  var rows=view();
+  var fmtV=function(v){ return conf.unit==='L'?fmtInt(v)+' L':fmtMoney(v); };
+  var total=rows.reduce(function(a,r){return a+conf.metric(r);},0);
+  var units=rows.reduce(function(a,r){return a+unitsOf(r);},0);
+  var days=daysSum(rows);
+  var value=rows.reduce(function(a,r){return a+N(r.totalPrice);},0);
+  var byProj=groupTop(rows,function(r){return S(r.project)||'(No project)';},conf.metric,8);
+  var byOd=groupTop(rows,function(r){return S(r.od)||'-';},conf.metric,8);
+  var byCat=groupTop(rows,function(r){var c=S(r.category); return (c&&CAT_BLOCKLIST.indexOf(c.trim().toLowerCase())<0)?c:null;},conf.metric,8);
+  var topProj=byProj.length?byProj[0][0]:'—', topOd=byOd.length?byOd[0][0]:'—';
+  var tiles=bdTile('Total '+conf.label,fmtV(total),conf.colr,fmtV(total))
+    +bdTile('Per Unit',fmtV(units?total/units:0),'#3fb950')
+    +bdTile('Per Rental Day',fmtV(days?total/days:0),'#f0a500')
+    +bdTile('% of Rental Value',value?(total/value*100).toFixed(1)+'%':'—','#58a6ff')
+    +bdTile('Top Project',esc(topProj),'#a371f7')
+    +bdTile('Top O.D',esc(topOd),'#ffa657');
+  var cols='<div class="mo-3col">'
+    +bdCol('Top Projects — click',byProj,fmtV,'proj',conf.colr)
+    +bdCol('By O.D — click',byOd,fmtV,'od','#58a6ff')
+    +bdCol('By Category — click',byCat,fmtV,'cat','#3fb950')
+    +'</div>';
+  var h='<div class="mr-modal" style="max-width:960px;width:94vw;">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">'
+    +'<div><div style="font-size:16px;font-weight:700;">'+esc(conf.label)+' — Breakdown</div>'
+    +'<div class="mo-hint">كل رقم قابل للضغط للفلتر — والضغط على نفس العنصر تاني بيلغي الفلتر</div></div>'
+    +'<button class="btn-sm" data-act="closeov">✕ Close</button></div>'
+    +'<div class="mo-tiles">'+tiles+'</div>'+cols
+    +'</div>';
+  openOv(h);
+}
 function showTop(key){
   var d=buildList(key);
   var titles={ot:'Top 5 Projects by Overtime Cost',fuel:'Top 5 Projects by Fuel (L)',deduct:'Top 5 Projects by Total Deduct (Savings)',value:'Top 5 Projects by Rental Value',od:'Top 5 O.D by Units',util:'Worst 5 Projects by Utilization'};
@@ -5406,12 +5498,12 @@ function onAct(act,v){
   if(act==='refresh'){ tt('Refreshing...'); load().then(function(){ render(); }); return; }
   if(act==='wipe'){ doWipe(); return; }
   if(act==='month'){ F.month=(F.month===v?null:(v||null)); render(); return; }
-  if(act==='cat'){ F.cat=(F.cat===v?null:v); render(); return; }
-  if(act==='od'){ F.od=(F.od===v?null:v); render(); return; }
+  if(act==='cat'){ F.cat=(F.cat===v?null:v); closeOv(); render(); return; }
+  if(act==='od'){ F.od=(F.od===v?null:v); closeOv(); render(); return; }
   if(act==='proj'){ F.proj=(F.proj===v?null:(v||null)); closeOv(); render(); return; }
   if(act==='clear'){ if(v==='q')F.q=''; else F[v]=null; render(); return; }
   if(act==='clearall'){ F={cat:null,od:null,month:null,proj:null,q:''}; render(); return; }
-  if(act==='top'){ showTop(v); return; }
+  if(act==='top'){ showBreakdown(v); return; }
   if(act==='closeov'){ closeOv(); return; }
   if(act==='noop'){ return; }
 }
@@ -5692,9 +5784,9 @@ function cmpRender(){
 
   var table='<div class="cmp-table-wrap"><table class="cmp-table"><thead><tr>'
     +'<th>#</th><th>Project</th>'
-    +'<th style="color:#3fb950">Owned Equipment</th><th style="color:#3fb950">Owned Cost</th><th style="color:#ffa657">Standby (Eq/Days)</th><th style="color:#bc8cff">Owned OT Cost</th>'
-    +'<th style="color:#58a6ff">Rental Equipment</th><th style="color:#58a6ff">Rental Cost</th><th style="color:#bc8cff">Rental OT Cost</th>'
-    +'<th>Δ Equipment</th><th style="color:#3fb950">Potential Saving</th>'
+    +'<th class="num" style="color:#3fb950">Owned Equipment</th><th class="num" style="color:#3fb950">Owned Cost</th><th class="num" style="color:#ffa657">Standby (Eq/Days)</th><th class="num" style="color:#bc8cff">Owned OT Cost</th>'
+    +'<th class="num" style="color:#58a6ff">Rental Equipment</th><th class="num" style="color:#58a6ff">Rental Cost</th><th class="num" style="color:#bc8cff">Rental OT Cost</th>'
+    +'<th class="num">Δ Equipment</th><th class="num" style="color:#3fb950">Potential Saving</th>'
     +'</tr></thead><tbody>'+tRows+'</tbody></table></div>';
 
   var projSearchBar='<div class="cmp-proj-search-wrap">'
