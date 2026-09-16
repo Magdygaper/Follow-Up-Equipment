@@ -2994,8 +2994,20 @@ function renderMgmtRow(){
   var fuP = 0, fuH = 0;
   (FU_DATA || []).forEach(function(r){ if(r.provision === 'Pending') fuP++; else if(r.provision === 'Hold') fuH++; });
   var wsDelay = ws.filter(function(i){ return i.status === 'Delay'; }).length;
+  var wsReady = ws.filter(function(i){ return i.status === 'Ready'; }).length;
+  var wsWaiting = ws.filter(function(i){ return i.status === 'Waiting'; }).length;
 
   var rf = _mgmtTitle('🚨 Red Flags — اضغط الكارت للتفاصيل');
+  rf += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">'
+    +'<div style="cursor:pointer;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;text-align:center;" onclick="setWsStatusFilter(\'Ready\')" title="اضغط للعرض">'
+      +'<div style="font-size:22px;font-weight:700;color:var(--status-ready);font-family:\'JetBrains Mono\',monospace;">'+wsReady+'</div>'
+      +'<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">✅ Ready — جاهزة</div>'
+    +'</div>'
+    +'<div style="cursor:pointer;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;text-align:center;" onclick="setWsStatusFilter(\'Waiting\')" title="اضغط للعرض">'
+      +'<div style="font-size:22px;font-weight:700;color:var(--status-waiting);font-family:\'JetBrains Mono\',monospace;">'+wsWaiting+'</div>'
+      +'<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">⏳ Waiting — واتينج</div>'
+    +'</div>'
+    +'</div>';
   var tiles = [
     {c: longShop.length, label:'Workshop > 15d', color:'#f85149', go:"goWsCard('long')"},
     {c: wsDelay,         label:'Workshop Delay', color:'#f0a500', go:"goWsCard('Delay')"},
