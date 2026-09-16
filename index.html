@@ -948,12 +948,25 @@ tr.selected-row td:nth-child(2){
   <div class="modal">
     <div class="modal-title" id="modal-title">Add Equipment</div>
     <div class="form-grid">
+      <div class="form-group"><label>Fleet</label>
+        <select id="f-fleet">
+          <option value="egypt">🇪🇬 Egypt</option>
+          <option value="foundation">🏗 Foundation</option>
+          <option value="tunnelling">⛏ Tunnelling (TBM)</option>
+          <option value="ksa">🇸🇦 Saudi Arabia</option>
+          <option value="algeria">🇩🇿 Algeria</option>
+          <option value="uae">🇦🇪 UAE</option>
+          <option value="jv">🤝 JV / Special</option>
+          <option value="archive">📦 Archive</option>
+        </select>
+      </div>
       <div class="form-group"><label>Category</label>
         <select id="f-category">
           <option>Earthmoving Equipment</option><option>Compaction Equipment</option>
           <option>Power &amp; Utilities</option><option>Concrete Equipment</option>
           <option>Lifting Equipment</option><option>Ground Engineering</option>
           <option>Special Equipment</option><option>Pumping Equipment</option>
+          <option>Foundation Support</option><option>Supported Equipment</option>
         </select>
       </div>
       <div class="form-group"><label>Equipment Type</label><input type="text" id="f-equipment" placeholder="e.g. Excavator"></div>
@@ -1113,6 +1126,12 @@ tr.selected-row td:nth-child(2){
       <button onclick="confirmFleetImport('jv')" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:14px;border-radius:var(--radius);cursor:pointer;font-size:13px;font-weight:600;text-align:center;transition:all .2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
         🤝<br><span style="font-size:12px;color:var(--text-muted);">JV / Special</span>
       </button>
+      <button onclick="confirmFleetImport('foundation')" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:14px;border-radius:var(--radius);cursor:pointer;font-size:13px;font-weight:600;text-align:center;transition:all .2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+        🏗️<br><span style="font-size:12px;color:var(--text-muted);">Foundation</span>
+      </button>
+      <button onclick="confirmFleetImport('tunnelling')" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:14px;border-radius:var(--radius);cursor:pointer;font-size:13px;font-weight:600;text-align:center;transition:all .2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+        🛠️<br><span style="font-size:12px;color:var(--text-muted);">Tunnelling (TBM)</span>
+      </button>
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="document.getElementById('fleet-import-modal').classList.remove('open'); _pendingImportInput && (_pendingImportInput.value='');">إلغاء</button>
@@ -1179,7 +1198,7 @@ wsDb.enablePersistence({ synchronizeTabs: true }).catch(function(err) {
 
 const ADMINS = ["magdygaperarqam@gmail.com"];
 
-const OD_MAP = {"Bab Masr":"Eng. Mostafa Morsi","El Bank El Araby":"Eng. Mostafa Morsi","Kayan":"Eng. Mostafa Morsi","Luxor":"Eng. Mostafa Morsi","Mansoura 2":"Eng. Mostafa Morsi","R05":"Eng. Mostafa Morsi","SCB":"Eng. Mostafa Morsi","Al Shohadaa Central hospital":"Eng. Tamer Hagag","Alamein Station":"Eng. Tamer Hagag","Haptowen":"Eng. Tamer Hagag","Locanda":"Eng. Tamer Hagag","Naser Institute":"Eng. Tamer Hagag","Silver Sand":"Eng. Tamer Hagag","Sofitel Hotel":"Eng. Tamer Hagag","Soul":"Eng. Tamer Hagag","swan Lake - 2":"Eng. Tamer Hagag","Wadi Natroun":"Eng. Tamer Hagag","Abou Oweikal":"Eng. Ahmed Nezar","Abou Qir JV":"Eng. Ahmed Nezar","Alex Tram":"Eng. Ahmed Nezar","El Ayaat Project":"Eng. Ahmed Nezar","intake mostakbal Misr":"Eng. Ahmed Nezar","Metro Line 4":"Eng. Ahmed Nezar","Mostakbal Masr Zone (G)":"Eng. Ahmed Nezar","Safaga Port":"Eng. Ahmed Nezar","Sokhna Port":"Eng. Ahmed Nezar","TBM - Metro L4":"Eng. Ahmed Nezar","Toshka":"Eng. Ahmed Nezar","Benban 200 MW":"Eng. Hany Fayd","El Dabaa":"Eng. Hany Fayd","marasy":"Eng. Essam Ibrahim","Ras Elhekma":"Eng. Waled Fahmy","Allam Block ( 10th of ramadan )":"Eng. Mohamed Mostafa","Allam Block ( Safaga Port )":"Eng. Mohamed Mostafa","Central Workshop":"Eng. Mohamed Mostafa","hassan allam complex":"Eng. Mohamed Mostafa","Heavy Transportation Workshop":"Eng. Mohamed Mostafa","Scaffolding":"Eng. Mohamed Mostafa","Ware House( 10th of ramadan )":"Eng. Mohamed Mostafa","10th OF RAMADAN":"Eng. Mohamed Mostafa","Sant Catreen":"Eng. Abdelaziz Ibrahim","Cairo Festival":"Eng. Hamdy Swillam","Hard 350":"Eng. Hamdy Swillam","Mansoura 1":"Eng. Hamdy Swillam","Mavida Garden":"Eng. Hamdy Swillam","Allam steel":"Eng. Salah Shaker","New Capital Tran-Hub":"Eng. Mohamed Salem","Afrexim Bank":"Eng. Islam El Sayed","Al Alamen Towers JV":"Eng. Mohamed Abdellatif"};
+const OD_MAP = {"Bab Masr":"Eng. Mostafa Morsi","El Bank El Araby":"Eng. Mostafa Morsi","Kayan":"Eng. Mostafa Morsi","Luxor":"Eng. Mostafa Morsi","Mansoura 2":"Eng. Mostafa Morsi","R05":"Eng. Mostafa Morsi","SCB":"Eng. Mostafa Morsi","Al Shohadaa Central hospital":"Eng. Tamer Hagag","Alamein Station":"Eng. Tamer Hagag","Haptowen":"Eng. Tamer Hagag","Locanda":"Eng. Tamer Hagag","Naser Institute":"Eng. Tamer Hagag","Silver Sand":"Eng. Tamer Hagag","Sofitel Hotel":"Eng. Tamer Hagag","Soul":"Eng. Tamer Hagag","swan Lake - 2":"Eng. Tamer Hagag","Wadi Natroun":"Eng. Tamer Hagag","Abou Oweikal":"Eng. Ahmed Nezar","Abou Qir JV":"Eng. Ahmed Nezar","Alex Tram":"Eng. Ahmed Nezar","El Ayaat Project":"Eng. Ahmed Nezar","intake mostakbal Misr":"Eng. Ahmed Nezar","Metro Line 4":"Eng. Ahmed Nezar","Mostakbal Masr Zone (G)":"Eng. Ahmed Nezar","Safaga Port":"Eng. Ahmed Nezar","Sokhna Port":"Eng. Ahmed Nezar","TBM - Metro L4":"Eng. Ahmed Nezar","Toshka":"Eng. Ahmed Nezar","Benban 200 MW":"Eng. Hany Fayd","El Dabaa":"Eng. Hany Fayd","marasy":"Eng. Essam Ibrahim","Ras Elhekma":"Eng. Waled Fahmy","Allam Block ( 10th of ramadan )":"Eng. Mohamed Mostafa","Allam Block ( Safaga Port )":"Eng. Mohamed Mostafa","hassan allam complex":"Eng. Mohamed Mostafa","Heavy Transportation Workshop":"Eng. Mohamed Mostafa","Scaffolding":"Eng. Mohamed Mostafa","Ware House( 10th of ramadan )":"Eng. Mohamed Mostafa","10th OF RAMADAN":"Eng. Mohamed Mostafa","Sant Catreen":"Eng. Abdelaziz Ibrahim","Cairo Festival":"Eng. Hamdy Swillam","Hard 350":"Eng. Hamdy Swillam","Mansoura 1":"Eng. Hamdy Swillam","Mavida Garden":"Eng. Hamdy Swillam","Allam steel":"Eng. Salah Shaker","New Capital Tran-Hub":"Eng. Mohamed Salem","Afrexim Bank":"Eng. Islam El Sayed","Al Alamen Towers JV":"Eng. Mohamed Abdellatif","Mac Factory":"Eng. Mohamed Salem","U - Section Alex":"Eng. Ahmed Nezar"};
 const CAT_COLORS = {"Earthmoving Equipment":"#f0a500","Compaction Equipment":"#58a6ff","Power & Utilities":"#3fb950","Concrete Equipment":"#e05c00","Lifting Equipment":"#a371f7","Ground Engineering":"#39d353","Special Equipment":"#ff7b72","Pumping Equipment":"#ffa657"};
 
 let currentUser=null, isAdmin=false;
@@ -1447,7 +1466,7 @@ function renderExecutiveSummary() {
   data.forEach(function(e){ if(e.project && !isCentralWorkshop(e.project)) projCount[e.project] = (projCount[e.project]||0)+1; });
   var projSorted = Object.keys(projCount).map(function(k){ return [k, projCount[k]]; });
   projSorted.sort(function(a,b){ return b[1]-a[1]; });
-  projSorted = projSorted.slice(0,8);
+  projSorted = projSorted.slice(0,10);
   var maxProj = projSorted[0] ? projSorted[0][1] : 1;
 
   var projBarsHtml = '';
@@ -2191,7 +2210,7 @@ function renderTable() {
       +'<td style="color:var(--text-muted)">'+(e.brand||'')+'</td>'
       +'<td class="code-cell">'+(e.code||'')+'</td>'
       +'<td>'+(e.project||'—')+'</td>'
-      +'<td style="color:var(--text-muted);font-size:12px">'+(e.od||'—')+'</td>'
+      +'<td style="color:var(--text-muted);font-size:12px">'+(isCentralWorkshop(e.project) ? '—' : (e.od||'—'))+'</td>'
       +'<td style="font-family:monospace;font-size:12px">'+(e.year||'—')+'</td>'
       +(isAdmin ? '<td><div class="action-btns">'
         +'<button class="btn-transfer" onclick="event.stopPropagation();openTransferModal(\''+e.id+'\')">Transfer</button>'
@@ -3131,6 +3150,8 @@ function openAddModal() {
   ['equipment','brand','code','sap','chassis','engine','enginesn','year','power','project','od','costcenter','value'].forEach(function(f){
     const el = document.getElementById('f-'+f); if(el) el.value = '';
   });
+  const fleetEl = document.getElementById('f-fleet');
+  if(fleetEl) fleetEl.value = (currentFleet && currentFleet !== 'all') ? currentFleet : 'egypt';
   document.getElementById('eq-modal').classList.add('open');
 }
 
@@ -3139,6 +3160,8 @@ function openEditModal(id) {
   if(!eq) return;
   editingId = id;
   document.getElementById('modal-title').textContent = 'Edit Equipment';
+  const fleetEl = document.getElementById('f-fleet');
+  if(fleetEl) fleetEl.value = eq.fleet || 'egypt';
   document.getElementById('f-category').value = eq.category || '';
   document.getElementById('f-equipment').value = eq.equipment || '';
   document.getElementById('f-brand').value = eq.brand || '';
@@ -3163,7 +3186,9 @@ function autoFillOd() {
 
 function saveEquipment() {
   const project = document.getElementById('f-project').value.trim();
+  const fleetEl = document.getElementById('f-fleet');
   const data = {
+    fleet: fleetEl ? fleetEl.value : (currentFleet || 'egypt'),
     category: document.getElementById('f-category').value,
     equipment: document.getElementById('f-equipment').value,
     brand: document.getElementById('f-brand').value,
@@ -3189,7 +3214,6 @@ function saveEquipment() {
         renderTable(); renderDashboard(); updateFleetCounts(); populateFilters();
       });
   } else {
-    data.fleet = currentFleet;
     data.sn = allEquipment.length + 1;
     data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
     db.collection('equipment').add(data)
@@ -3443,10 +3467,15 @@ window.confirmFleetImport = function(fleetValue) {
       };
 
       // Filter rows by fleet/country
+      // For "all", filter every row by Country column. For any other explicitly
+      // chosen fleet (egypt/ksa/algeria/uae/jv/foundation/tunnelling/archive),
+      // the user has already told us which fleet this whole sheet belongs to —
+      // don't require a Country column (Foundation/TBM sheets don't have one).
       const allowedCountries = fleetCountryMap[fleetValue];
       const dataRows = raw.slice(headerIdx + 1).filter(function(r){
         const sn = r[0];
         if(sn === '' || sn === null || isNaN(Number(sn)) || Number(sn) <= 0) return false;
+        if(fleetValue !== 'all') return true;
         if(allowedCountries === null) return true; // all
         const country = get(r, ['Country']).toLowerCase();
         return allowedCountries.some(function(c){ return country.indexOf(c) !== -1; });
