@@ -647,6 +647,10 @@ tr.selected-row td:nth-child(2){
             🗑️ Clear & Import
             <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="clearAndImport(this)">
                     </label>
+          <label id="btn-update-years" style="display:none; background: rgba(63,185,80,.12); border: 1px solid rgba(63,185,80,.4); color: #3fb950; padding: 8px 14px; border-radius: var(--radius); cursor: pointer; font-size: 13px; font-weight: 600; white-space: nowrap;">
+            📅 Update Manuf. Year
+            <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="updateYearsFromExcel(this)">
+          </label>
           <button id="btn-clear-fleet" style="display:none; background:rgba(248,81,73,.12); border:1px solid rgba(248,81,73,.45); color:#f85149; padding:8px 14px; border-radius:var(--radius); cursor:pointer; font-size:13px; font-weight:600; white-space:nowrap;" onclick="clearCurrentFleet()">🗑️ مسح كل معدات الدولة دي</button>
         </div>
 
@@ -1576,6 +1580,7 @@ auth.onAuthStateChanged(function(user) {
     document.getElementById('btn-add-eq').style.display = isAdmin ? 'flex' : 'none';
     document.getElementById('btn-import-eq').style.display = isAdmin ? 'inline-flex' : 'none';
         document.getElementById('btn-clear-fleet').style.display = isAdmin ? 'inline-flex' : 'none';
+        document.getElementById('btn-update-years').style.display = isAdmin ? 'inline-flex' : 'none';
 
     document.getElementById('actions-col').style.display = isAdmin ? '' : 'none';
     document.getElementById('fu-actions-col').style.display = isAdmin ? '' : 'none';
@@ -3414,11 +3419,12 @@ window.confirmFleetImport = function(fleetValue) {
 
       const headers = raw[headerIdx];
       const colIdx = {};
-      headers.forEach(function(h, i){ if(h) colIdx[String(h).trim()] = i; });
+      const normHeader = function(s){ return String(s).replace(/\s+/g,' ').trim(); };
+      headers.forEach(function(h, i){ if(h) colIdx[normHeader(h)] = i; });
 
       const get = function(row, keys) {
         for(const k of keys) {
-          const idx = colIdx[k];
+          const idx = colIdx[normHeader(k)];
           if(idx !== undefined && row[idx] !== '' && row[idx] !== null) return String(row[idx]).trim();
         }
         return '';
@@ -3520,6 +3526,138 @@ window.confirmFleetImport = function(fleetValue) {
   }
 };
 
+function updateYearsFromExcel(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'binary'});
+      const normHeader = function(s){ return String(s).replace(/\s+/g,' ').trim(); };
+      const normKey = function(s){ return String(s||'').trim().toUpperCase().replace(/\s+/g,''); };
+
+      // Scan EVERY sheet (not just one named "All_Data") — real workbooks may split
+      // data across per-country tabs (e.g. "HAC Egypt"). Use any sheet whose header
+      // row has S.n/Equipment columns AND a Manuf Year column.
+      const rowsFound = [];
+      let sheetsWithYearCol = 0;
+      wb.SheetNames.forEach(function(sheetName){
+        const ws = wb.Sheets[sheetName];
+        const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+        let headerIdx = -1;
+        for (let i = 0; i < Math.min(raw.length, 12); i++) {
+          const r = raw[i];
+          if (r.some(function(v){ return String(v).trim() === 'S.n' || String(v).trim() === 'Equipment'; })) {
+            headerIdx = i; break;
+          }
+        }
+        if (headerIdx < 0) return;
+
+        const headers = raw[headerIdx];
+        const colIdx = {};
+        headers.forEach(function(h, i){ if(h) colIdx[normHeader(h)] = i; });
+        if (colIdx['Manuf Year'] === undefined && colIdx['Manuf. Year'] === undefined) return;
+        sheetsWithYearCol++;
+
+        raw.slice(headerIdx + 1).forEach(function(r){
+          const sn = r[0];
+          if (sn === '' || sn === null || isNaN(Number(sn)) || Number(sn) <= 0) return;
+          rowsFound.push({row: r, colIdx: colIdx, sheet: sheetName});
+        });
+      });
+
+      if (!rowsFound.length) {
+        alert(sheetsWithYearCol
+          ? 'لقيت عمود Manuf Year بس مفيش صفوف بيانات جواه.'
+          : 'مفيش أي شيت في الملف فيه عمود Manuf Year مع S.n/Equipment. اتأكد من اسم العمود أو ابعتلي الملف أراجعه.');
+        input.value=''; return;
+      }
+
+      const get = function(row, colIdx, keys) {
+        for (const k of keys) {
+          const idx = colIdx[normHeader(k)];
+          if (idx !== undefined && row[idx] !== '' && row[idx] !== null) return String(row[idx]).trim();
+        }
+        return '';
+      };
+
+      // Build lookup maps from equipment already loaded in the app (no re-import, no new docs)
+      const bySap = {}, byChassis = {}, byCode = {};
+      const addToMap = function(map, key, doc) {
+        if (!key) return;
+        if (map[key] === undefined) map[key] = doc;
+        else map[key] = null; // duplicate key across docs -> ambiguous, skip
+      };
+      allEquipment.forEach(function(doc) {
+        addToMap(bySap, normKey(doc.sapCode), doc);
+        addToMap(byChassis, normKey(doc.chassis), doc);
+        addToMap(byCode, normKey(doc.code), doc);
+      });
+
+      let matched = 0, unmatched = 0, ambiguous = 0, noYear = 0;
+      const updates = [];
+      rowsFound.forEach(function(item) {
+        const row = item.row, colIdx = item.colIdx;
+        const year = get(row, colIdx, ['Manuf Year','Manuf. Year']);
+        if (!year) { noYear++; return; }
+
+        const sap     = normKey(get(row, colIdx, ['Code Sap','Code SAP']));
+        const chassis = normKey(get(row, colIdx, ['Chassis No.']));
+        const code    = normKey(get(row, colIdx, ['Code / Board No.','Code/Board No.']));
+
+        let doc = null;
+        if (sap && bySap[sap]) doc = bySap[sap];
+        else if (chassis && byChassis[chassis]) doc = byChassis[chassis];
+        else if (code && byCode[code]) doc = byCode[code];
+
+        if (doc === null) { ambiguous++; return; }
+        if (!doc) { unmatched++; return; }
+
+        matched++;
+        if (String(doc.year||'').trim() !== year) {
+          updates.push({ id: doc.id, year: year });
+        }
+      });
+
+      if (!updates.length) {
+        alert('مفيش سنة صنع جديدة تحتاج تحديث.\n'
+          +'شيتات فيها عمود السنة: '+sheetsWithYearCol+' · صفوف اتقرت: '+rowsFound.length+'\n'
+          +'مطابق: '+matched+' · هيتحدث: 0 · بدون سنة في الإكسل: '+noYear+' · مش لاقيلها مطابقة: '+unmatched
+          +(ambiguous?(' · متكررة (اتجاهلت): '+ambiguous):''));
+        input.value=''; return;
+      }
+
+      if (!confirm('هيتحدث سنة الصنع بس لـ '+updates.length+' معدة (من أصل '+matched+' متطابقة، '+unmatched+' مش لاقيلها مطابقة'+(ambiguous?('، '+ambiguous+' متكررة اتجاهلت'):'')+').\nمفيش أي حاجة تانية هتتغير أو تتمسح أو تتكرر. نكمل؟')) {
+        input.value=''; return;
+      }
+
+      toast('⏳ Updating years for ' + updates.length + ' equipment…');
+      const BATCH_SIZE = 400;
+      const batches = [];
+      for (let i = 0; i < updates.length; i += BATCH_SIZE) batches.push(updates.slice(i, i+BATCH_SIZE));
+
+      let chain = Promise.resolve();
+      batches.forEach(function(chunk) {
+        chain = chain.then(function() {
+          const b = db.batch();
+          chunk.forEach(function(u) { b.update(db.collection('equipment').doc(u.id), {year: u.year}); });
+          return b.commit();
+        });
+      });
+      chain.then(function(){
+        toast('✓ ' + updates.length + ' equipment years updated');
+        loadData();
+        input.value = '';
+      }).catch(function(err){ toast('Update error: ' + err.message, 'error'); });
+
+    } catch (err) {
+      toast('Parse error: ' + err.message, 'error');
+      input.value = '';
+    }
+  };
+  reader.readAsBinaryString(file);
+}
 function guessCat(eq) {
   if(!eq) return '';
   const e = eq.toLowerCase();
