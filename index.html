@@ -1888,6 +1888,7 @@ function loadData() {
     db.collection('followup').orderBy('sn', 'asc').get()
   ]).then(function(results) {
     allEquipment = results[0].docs.map(function(d){ return Object.assign({id: d.id}, d.data()); });
+    allEquipment.forEach(function(e){ if(isCentralWorkshop(e.project)) e.od = ''; });
     allTransfers = results[1].docs.map(function(d){ return Object.assign({id: d.id}, d.data()); });
 
     if(!results[2].empty) {
@@ -3211,6 +3212,7 @@ function saveEquipment() {
         toast('Updated ✓'); closeModal('eq-modal');
         var idx = allEquipment.findIndex(function(e){ return e.id === editingId; });
         if(idx !== -1) allEquipment[idx] = Object.assign(allEquipment[idx], data);
+        if(idx !== -1 && isCentralWorkshop(allEquipment[idx].project)) allEquipment[idx].od = '';
         renderTable(); renderDashboard(); updateFleetCounts(); populateFilters();
       });
   } else {
@@ -3220,6 +3222,7 @@ function saveEquipment() {
       .then(function(docRef){
         toast('Added ✓'); closeModal('eq-modal');
         allEquipment.push(Object.assign({ id: docRef.id }, data));
+        if(isCentralWorkshop(data.project)) allEquipment[allEquipment.length-1].od = '';
         renderTable(); renderDashboard(); updateFleetCounts(); populateFilters();
       });
   }
@@ -3312,7 +3315,7 @@ function saveTransfer() {
     toast('Transfer recorded ✓');
     closeModal('transfer-modal');
     var eq2 = allEquipment.find(function(e){ return e.id === id; });
-    if(eq2){ eq2.project = to; if(newOd) eq2.od = newOd; }
+    if(eq2){ eq2.project = to; if(newOd) eq2.od = newOd; if(isCentralWorkshop(eq2.project)) eq2.od = ''; }
     renderTable(); renderTransfers(); renderDashboard();
   });
 }
