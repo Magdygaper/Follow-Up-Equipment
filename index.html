@@ -377,9 +377,13 @@ tr.selected-row td:nth-child(2){
           <span class="fleet-flag">🇦🇪</span> UAE
           <span class="fleet-count" id="fleet-count-uae">—</span>
         </button>
-        <button class="fleet-btn" id="fleet-btn-jv" onclick="switchFleet('jv',this)">
-          <span class="fleet-flag">🤝</span> JV Projects
-          <span class="fleet-count" id="fleet-count-jv">—</span>
+        <button class="fleet-btn" id="fleet-btn-foundation" onclick="switchFleet('foundation',this)">
+          <span class="fleet-flag">🏗</span> Foundation
+          <span class="fleet-count" id="fleet-count-foundation">—</span>
+        </button>
+        <button class="fleet-btn" id="fleet-btn-tunnelling" onclick="switchFleet('tunnelling',this)">
+          <span class="fleet-flag">⛏</span> Tunnelling
+          <span class="fleet-count" id="fleet-count-tunnelling">—</span>
         </button>
                 <button class="fleet-btn" id="fleet-btn-all" onclick="switchFleet('all',this)">
           <span class="fleet-flag">🌍</span> All Countries
@@ -1085,8 +1089,11 @@ tr.selected-row td:nth-child(2){
 <div class="modal-overlay" id="fleet-import-modal">
   <div class="modal" style="width:480px;max-width:95vw;">
     <div class="modal-title">📥 Import Excel — اختار الـ Fleet</div>
-    <div style="font-size:13px;color:var(--text-muted);margin-bottom:20px;">هيتم import الشيت المناسب تلقائياً حسب اختيارك</div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:20px;">بيقرأ من شيت <strong>All_Data</strong> ويفلتر بالـ Country column تلقائياً</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;">
+      <button onclick="confirmFleetImport('all')" style="background:rgba(240,165,0,.12);border:1px solid var(--accent);color:var(--accent);padding:14px;border-radius:var(--radius);cursor:pointer;font-size:13px;font-weight:700;text-align:center;transition:all .2s;" onmouseover="this.style.background='rgba(240,165,0,.22)'" onmouseout="this.style.background='rgba(240,165,0,.12)'">
+        🌍<br><span style="font-size:12px;">All Countries</span>
+      </button>
       <button onclick="confirmFleetImport('egypt')" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:14px;border-radius:var(--radius);cursor:pointer;font-size:13px;font-weight:600;text-align:center;transition:all .2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
         🇪🇬<br><span style="font-size:12px;color:var(--text-muted);">Egypt Fleet</span>
       </button>
@@ -1100,10 +1107,7 @@ tr.selected-row td:nth-child(2){
         🇦🇪<br><span style="font-size:12px;color:var(--text-muted);">UAE</span>
       </button>
       <button onclick="confirmFleetImport('jv')" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:14px;border-radius:var(--radius);cursor:pointer;font-size:13px;font-weight:600;text-align:center;transition:all .2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
-        🤝<br><span style="font-size:12px;color:var(--text-muted);">JV Projects</span>
-      </button>
-      <button onclick="confirmFleetImport('archive')" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:14px;border-radius:var(--radius);cursor:pointer;font-size:13px;font-weight:600;text-align:center;transition:all .2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
-        📦<br><span style="font-size:12px;color:var(--text-muted);">Archive</span>
+        🤝<br><span style="font-size:12px;color:var(--text-muted);">JV / Special</span>
       </button>
     </div>
     <div class="modal-actions">
@@ -1195,7 +1199,7 @@ function switchFleet(fleet, btn) {
   renderTransfers();
   renderCatBreakdown();
   // Update page labels
-  const labels = {egypt:'🇪🇬 Egypt',ksa:'🇸🇦 Saudi Arabia',algeria:'🇩🇿 Algeria',uae:'🇦🇪 UAE',jv:'🤝 JV Projects',archive:'📦 Archive',all:'🌍 All Countries'};
+  const labels = {egypt:'🇪🇬 Egypt',ksa:'🇸🇦 Saudi Arabia',algeria:'🇩🇿 Algeria',uae:'🇦🇪 UAE',foundation:'🏗 Foundation',tunnelling:'⛏ Tunnelling',archive:'📦 Archive',all:'🌍 All Countries'};
   const label = labels[fleet] || fleet;
   const suffix = fleet === 'all' ? '' : ' Fleet';
   const execTitle = document.getElementById('exec-fleet-title');
@@ -1215,14 +1219,19 @@ function switchFleet(fleet, btn) {
 
 function openFleetPicker(){
   const counts = {};
-  allEquipment.forEach(function(e){ const f = e.fleet || 'egypt'; counts[f] = (counts[f]||0) + 1; });
+  allEquipment.forEach(function(e){
+    if(_isTunnelling(e)) { counts.tunnelling = (counts.tunnelling||0)+1; return; }
+    if(_isFoundation(e)) { counts.foundation = (counts.foundation||0)+1; return; }
+    const f = e.fleet || 'egypt'; counts[f] = (counts[f]||0) + 1;
+  });
   const items = [
-    {key:'egypt',  flag:'🇪🇬', name:'Egypt',        c:(counts.egypt||0) + (counts.archive||0)},
-    {key:'ksa',    flag:'🇸🇦', name:'Saudi Arabia', c:(counts.ksa||0)},
-    {key:'algeria',flag:'🇩🇿', name:'Algeria',      c:(counts.algeria||0)},
-    {key:'uae',    flag:'🇦🇪', name:'UAE',          c:(counts.uae||0)},
-    {key:'jv',     flag:'🤝', name:'JV Projects',   c:(counts.jv||0)},
-    {key:'all',    flag:'🌍', name:'All Countries', c:allEquipment.length}
+    {key:'egypt',      flag:'🇪🇬', name:'Egypt',        c:(counts.egypt||0)},
+    {key:'ksa',        flag:'🇸🇦', name:'Saudi Arabia', c:(counts.ksa||0)},
+    {key:'algeria',    flag:'🇩🇿', name:'Algeria',      c:(counts.algeria||0)},
+    {key:'uae',        flag:'🇦🇪', name:'UAE',          c:(counts.uae||0)},
+    {key:'foundation', flag:'🏗',          name:'Foundation',   c:(counts.foundation||0)},
+    {key:'tunnelling', flag:'⛏',            name:'Tunnelling',   c:(counts.tunnelling||0)},
+    {key:'all',        flag:'🌍',          name:'All Countries',c:allEquipment.length}
   ];
   const list = document.getElementById('fleet-picker-list');
   if(list){
@@ -1244,12 +1253,35 @@ function pickFleet(f){
   closeModal('fleet-picker-modal');
 }
 
+function _isFoundation(e) {
+  if((e.fleet||'') === 'foundation') return true;
+  var cat = (e.category||'').toLowerCase();
+  return cat.indexOf('foundation') !== -1 && cat.indexOf('tunnel') === -1;
+}
+
+function _isTunnelling(e) {
+  if((e.fleet||'') === 'tunnelling') return true;
+  var cat = (e.category||'').toLowerCase();
+  return cat.indexOf('tunnel') !== -1;
+}
+
 function getFleetEquipment() {
-  if(currentFleet === 'all') return allEquipment; // وضع كل الدول = كل المعدات
+  if(currentFleet === 'all') return allEquipment;
+  if(currentFleet === 'egypt') return allEquipment.filter(function(e){
+    return (e.fleet||'egypt') === 'egypt' && !_isFoundation(e) && !_isTunnelling(e);
+  });
+  if(currentFleet === 'foundation') return allEquipment.filter(function(e){ return _isFoundation(e); });
+  if(currentFleet === 'tunnelling') return allEquipment.filter(function(e){ return _isTunnelling(e); });
   return allEquipment.filter(function(e){ return (e.fleet || 'egypt') === currentFleet; });
 }
 
-function inFleet(e){ return currentFleet === 'all' || (e.fleet || 'egypt') === currentFleet; }
+function inFleet(e){
+  if(currentFleet === 'all') return true;
+  if(currentFleet === 'egypt') return (e.fleet||'egypt') === 'egypt' && !_isFoundation(e) && !_isTunnelling(e);
+  if(currentFleet === 'foundation') return _isFoundation(e);
+  if(currentFleet === 'tunnelling') return _isTunnelling(e);
+  return (e.fleet || 'egypt') === currentFleet;
+}
 
 function renderCountryCards() {
   const targets = [];
@@ -1261,13 +1293,18 @@ function renderCountryCards() {
   if(currentFleet !== 'all'){ targets.forEach(function(w){ w.style.display = 'none'; }); return; }
 
   const counts = {};
-  allEquipment.forEach(function(e){ const f = (e.fleet || 'egypt'); counts[f] = (counts[f]||0) + 1; });
+  allEquipment.forEach(function(e){
+    if(_isTunnelling(e)){ counts.tunnelling = (counts.tunnelling||0)+1; return; }
+    if(_isFoundation(e)){ counts.foundation = (counts.foundation||0)+1; return; }
+    const f = (e.fleet || 'egypt'); counts[f] = (counts[f]||0) + 1;
+  });
   const cards = [
-    {key:'egypt',   flag:'🇪🇬', name:'Egypt',        c:(counts.egypt||0) + (counts.archive||0)},
-    {key:'ksa',     flag:'🇸🇦', name:'Saudi Arabia', c:(counts.ksa||0)},
-    {key:'algeria', flag:'🇩🇿', name:'Algeria',      c:(counts.algeria||0)},
-    {key:'uae',     flag:'🇦🇪', name:'UAE',          c:(counts.uae||0)},
-    {key:'jv',      flag:'🤝', name:'JV Projects',   c:(counts.jv||0)}
+    {key:'egypt',      flag:'🇪🇬', name:'Egypt',        c:(counts.egypt||0)},
+    {key:'ksa',        flag:'🇸🇦', name:'Saudi Arabia', c:(counts.ksa||0)},
+    {key:'algeria',    flag:'🇩🇿', name:'Algeria',      c:(counts.algeria||0)},
+    {key:'uae',        flag:'🇦🇪', name:'UAE',          c:(counts.uae||0)},
+    {key:'foundation', flag:'🏗',          name:'Foundation',   c:(counts.foundation||0)},
+    {key:'tunnelling', flag:'⛏',            name:'Tunnelling',   c:(counts.tunnelling||0)}
   ];
   const total = cards.reduce(function(s,x){ return s + x.c; }, 0) || 1;
   const colors = ['#3fb950','#f0a500','#58a6ff','#bc8cff','#f85149'];
@@ -1339,12 +1376,16 @@ function jumpFleet(f) {
 
 
 function updateFleetCounts() {
-  const counts = {egypt:0,ksa:0,algeria:0,uae:0,jv:0,archive:0};
-  allEquipment.forEach(function(e){ const f = e.fleet || 'egypt'; if(counts[f] !== undefined) counts[f]++; });
-  ['egypt','ksa','algeria','uae','jv'].forEach(function(f){
-    const c = (f === 'egypt') ? counts.egypt + counts.archive : counts[f]; // الأرشيف = مصر
+  const counts = {egypt:0,ksa:0,algeria:0,uae:0,foundation:0,tunnelling:0,archive:0};
+  allEquipment.forEach(function(e){
+    if(_isTunnelling(e))  { counts.tunnelling++; return; }
+    if(_isFoundation(e))  { counts.foundation++; return; }
+    const f = e.fleet || 'egypt';
+    if(counts[f] !== undefined) counts[f]++;
+  });
+  ['egypt','ksa','algeria','uae','foundation','tunnelling'].forEach(function(f){
     const el = document.getElementById('fleet-count-' + f);
-    if(el) el.textContent = c || '—';
+    if(el) el.textContent = counts[f] || '—';
   });
   const allEl = document.getElementById('fleet-count-all');
   if(allEl) allEl.textContent = allEquipment.length || '—';
@@ -1791,7 +1832,7 @@ function watchForKick() {
       cleanupViewerPresence();
       db.collection('kicked_viewers').doc(viewerSessionId).delete().catch(function(e){});
       sessionStorage.removeItem('viewer_name');
-      alert('⚠️ تم إنهاء جلستك بواسطة الأدمن. هيتم تسجيل خروجك الآن.');
+      alert('⚠\ufe0f تم إنهاء جلستك بواسطة الأدمن. هيتم تسجيل خروجك الآن.');
       location.reload();
     }
   }, function(err) {
@@ -1843,18 +1884,20 @@ function loadData() {
     console.error(err);
     document.getElementById('table-loading').style.display = 'none';
     if(err.code === 'resource-exhausted') {
-      toast('⚠️ Firebase Daily Quota Exceeded. Reading local cache.', 'error');
+      toast('⚠\ufe0f Firebase Daily Quota Exceeded. Reading local cache.', 'error');
       setupFollowUpUI();
     }
   });
 }
+
+function catKey(e){ var c = e && e.category; return (c && String(c).trim()) ? c : 'Uncategorized'; }
 
 function getFiltered(){
   return allEquipment.filter(function(e){
     if(currentFleet !== 'all' && (e.fleet || 'egypt') !== currentFleet) return false;
 
     if(multiFilter.od && e.od!==multiFilter.od) return false;
-    if(multiFilter.cat && e.category!==multiFilter.cat) return false;
+    if(multiFilter.cat && catKey(e)!==multiFilter.cat) return false;
     if(multiFilter.proj && e.project!==multiFilter.proj) return false;
     return true;
   });
@@ -1895,7 +1938,7 @@ function renderDashboard(){
     if(multiFilter.proj && e.project!==multiFilter.proj) return false;
     return true;
   });
-  forCat.forEach(function(e){ if(e.category) catCount[e.category]=(catCount[e.category]||0)+1; });
+  forCat.forEach(function(e){ var ck=catKey(e); catCount[ck]=(catCount[ck]||0)+1; });
 
   document.getElementById('cat-cards').innerHTML = Object.entries(catCount).sort(function(a,b){return b[1]-a[1];}).map(function(pair){
     const cat = pair[0], cnt = pair[1];
@@ -1909,7 +1952,7 @@ function renderDashboard(){
   const projCount={};
   const forProj = fleetData.filter(function(e){
     if(multiFilter.od && e.od!==multiFilter.od) return false;
-    if(multiFilter.cat && e.category!==multiFilter.cat) return false;
+    if(multiFilter.cat && catKey(e)!==multiFilter.cat) return false;
     return true;
   });
   forProj.forEach(function(e){ if(e.project) projCount[e.project]=(projCount[e.project]||0)+1; });
@@ -1929,7 +1972,7 @@ function renderDashboard(){
 
     const total = odData.length;
     const catBreak = {};
-    odData.forEach(function(e){ if(e.category) catBreak[e.category] = (catBreak[e.category]||0)+1; });
+    odData.forEach(function(e){ var ck=catKey(e); catBreak[ck] = (catBreak[ck]||0)+1; });
     const sorted = Object.entries(catBreak).sort(function(a,b){ return b[1]-a[1]; });
     const maxVal = sorted[0] ? sorted[0][1] : 1;
     const COLORS = ['#f0a500','#58a6ff','#3fb950','#f85149','#bc8cff','#ff7b72','#79c0ff','#d2a8ff'];
@@ -1971,7 +2014,7 @@ function renderCatBreakdown(){
     if((e.fleet || 'egypt') !== currentFleet) return false;   // ← الدولة بس
     if(multiFilter.od && e.od!==multiFilter.od) return false;
     if(multiFilter.proj && e.project!==multiFilter.proj) return false;
-    return e.category===cat;
+    return catKey(e)===cat;
   });
 
 
@@ -1995,10 +2038,10 @@ function renderCatBreakdown(){
   document.getElementById('cat-bd-types').innerHTML = typesSorted.map(function(pair){
     return '<div style="margin-bottom:8px;cursor:pointer;border-radius:6px;padding:4px;" onclick="showTypeDetail(\''+pair[0].replace(/'/g,"\\'")+'\',\''+cat.replace(/'/g,"\\'")+'\')">'
       +'<div style="display:flex;justify-content:space-between;margin-bottom:3px;font-size:12px;">'
-        +'<span>'+pair[0]+'</span><span style="color:'+CAT_COLORS[cat]+';font-family:\'JetBrains Mono\'">'+pair[1].count+' ›</span>'
+        +'<span>'+pair[0]+'</span><span style="color:'+(CAT_COLORS[cat]||'var(--accent)')+';font-family:\'JetBrains Mono\'">'+pair[1].count+' ›</span>'
       +'</div>'
       +'<div style="height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;">'
-        +'<div style="height:100%;width:'+Math.round(pair[1].count/maxT*100)+'%;background:'+CAT_COLORS[cat]+'"></div>'
+        +'<div style="height:100%;width:'+Math.round(pair[1].count/maxT*100)+'%;background:'+(CAT_COLORS[cat]||'var(--accent)')+'"></div>'
       +'</div>'
     +'</div>';
   }).join('');
@@ -2022,7 +2065,7 @@ function showTypeDetail(type, cat) {
     if((e.fleet || 'egypt') !== currentFleet) return false;   // ← الدولة المختارة بس
     if(multiFilter.od && e.od!==multiFilter.od) return false;
     if(multiFilter.proj && e.project!==multiFilter.proj) return false;
-    return e.category===cat && e.equipment===type;
+    return catKey(e)===cat && e.equipment===type;
   });
   const color = CAT_COLORS[cat]||'var(--accent)';
   const powerGroups={};
@@ -2127,7 +2170,7 @@ function renderTable() {
     const mType = !type || e.equipment === type;
     const mProj = !proj || e.project === proj;
     if(multiFilter.od && e.od !== multiFilter.od) return false;
-    if(multiFilter.cat && e.category !== multiFilter.cat) return false;
+    if(multiFilter.cat && catKey(e) !== multiFilter.cat) return false;
     if(multiFilter.proj && e.project !== multiFilter.proj) return false;
     return mQ && mCat && mType && mProj;
   });
@@ -2390,7 +2433,7 @@ window.changeFuStatus = function(docId, newStatus) {
     })
     .catch(function(err){
       if(err.code === 'resource-exhausted') {
-        toast('⚠️ Firebase quota reached. Saved in local memory.', 'error');
+        toast('⚠\ufe0f Firebase quota reached. Saved in local memory.', 'error');
       } else {
         item.provision = oldStatus;
         fuStatusHistory.pop();
@@ -2573,7 +2616,7 @@ function renderFollowUpTable() {
 
 function clearFollowUpData() {
   if(!isAdmin) return;
-  if(!confirm('⚠️ This will DELETE all Follow-Up records.\nAre you sure?')) return;
+  if(!confirm('⚠\ufe0f This will DELETE all Follow-Up records.\nAre you sure?')) return;
 
   toast('⏳ Deleting records...');
   
@@ -2608,7 +2651,7 @@ function clearFollowUpData() {
       if(err.code === 'resource-exhausted') {
         FU_DATA = [];
         setupFollowUpUI();
-        toast('⚠️ Cleared locally (Firebase free daily quota is full, resets at 10 AM Cairo)', 'error');
+        toast('⚠\ufe0f Cleared locally (Firebase free daily quota is full, resets at 10 AM Cairo)', 'error');
       } else {
         toast('Error: ' + err.message, 'error');
       }
@@ -2617,7 +2660,7 @@ function clearFollowUpData() {
     if(err.code === 'resource-exhausted') {
       FU_DATA = [];
       setupFollowUpUI();
-      toast('⚠️ Cleared locally (Firebase quota full, resets at 10 AM Cairo)');
+      toast('⚠\ufe0f Cleared locally (Firebase quota full, resets at 10 AM Cairo)');
     } else {
       toast('Error: ' + err.message, 'error');
     }
@@ -2641,7 +2684,7 @@ function calcFuDays() {
       daysEl.value = days;
     } else {
       daysEl.value = 0;
-      toast('⚠️ Date To must be after Date From', 'error');
+      toast('⚠\ufe0f Date To must be after Date From', 'error');
     }
   }
 }
@@ -2896,7 +2939,7 @@ function updateFuFromExcel(input) {
           newData.forEach(function(item, idx){ item.id = 'local_' + idx; });
           FU_DATA = newData;
           setupFollowUpUI();
-          toast('⚠️ Cloud quota exceeded: Loaded locally (resets 10 AM Cairo)', 'error');
+          toast('⚠\ufe0f Cloud quota exceeded: Loaded locally (resets 10 AM Cairo)', 'error');
         } else {
           alert('Error: ' + err.message);
         }
@@ -2928,7 +2971,7 @@ function _mgmtTitle(t){
 }
 function _ageData(){
   if(currentFleet === 'all') return allEquipment;
-  if(currentFleet === 'egypt') return allEquipment.filter(function(e){ var f = (e.fleet || 'egypt'); return f === 'egypt' || f === 'archive'; });
+  if(currentFleet === 'egypt') return allEquipment.filter(function(e){ return (e.fleet||'egypt') === 'egypt' && !_isFoundation(e); });
   return allEquipment.filter(function(e){ return (e.fleet || 'egypt') === currentFleet; });
 }
 
@@ -2976,7 +3019,7 @@ function renderMgmtRow(){
   var avgRep = done.length ? (done.reduce(function(s,i){ return s + _mgmtDays(i); }, 0) / done.length).toFixed(1) : '—';
   var repMo = (wsMonthly && wsMonthly.length) ? (wsMonthly[wsMonthly.length - 1].repaired || '—') : '—';
 
-  var wsh = _mgmtTitle('🛠️ Workshop Productivity');
+  var wsh = _mgmtTitle('🛠\ufe0f Workshop Productivity');
   wsh += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px;">'
     +'<div><div style="font-size:10px;color:var(--text-muted);">In Workshop Now</div><div style="font-size:24px;font-weight:700;color:var(--accent);font-family:\'JetBrains Mono\',monospace;">'+inNow+'</div></div>'
     +'<div><div style="font-size:10px;color:var(--text-muted);">Avg Repair</div><div style="font-size:24px;font-weight:700;color:#58a6ff;font-family:\'JetBrains Mono\',monospace;">'+avgRep+'<span style="font-size:11px;"> d</span></div></div>'
@@ -3150,29 +3193,28 @@ function deleteEquipment(id) {
   });
 }
 function clearCurrentFleet() {
-  const labels = {egypt:'🇪🇬 Egypt',ksa:'🇸🇦 Saudi Arabia',algeria:'🇩🇿 Algeria',uae:'🇦🇪 UAE',jv:'🤝 JV Projects',archive:'📦 Archive'};
+  const labels = {egypt:'🇪🇬 Egypt',ksa:'🇸🇦 Saudi Arabia',algeria:'🇩🇿 Algeria',uae:'🇦🇪 UAE',foundation:'🏗 Foundation',tunnelling:'⛏ Tunnelling',archive:'📦 Archive'};
   const label = labels[currentFleet] || currentFleet;
-  const count = getFleetEquipment().length;
+  const toDelete = getFleetEquipment();
+  const count = toDelete.length;
   if(!count){ toast('مفيش معدات في ' + label + ' عشان تتمسح'); return; }
 
-  const ok = prompt('⚠️ هتتمسح كل معدات ' + label + ' (' + count + ' معدة) نهائياً من قاعدة البيانات!\nاكتب DELETE بالظبط للتأكيد:');
+  const ok = prompt('⚠\ufe0f هتتمسح كل معدات ' + label + ' (' + count + ' معدة) نهائياً من قاعدة البيانات!\nاكتب DELETE بالظبط للتأكيد:');
   if(ok !== 'DELETE'){ toast('اتلغى — مفيش حاجة اتشالت'); return; }
 
-  db.collection('equipment').where('fleet','==',currentFleet).get().then(function(snap){
-    if(snap.empty){ toast('مفيش معدات للمسح'); loadData(); return; }
-    const docs = snap.docs;
-    let chain = Promise.resolve();
-    for(let i = 0; i < docs.length; i += 400){
-      const chunk = docs.slice(i, i + 400);
+  const ids = toDelete.map(function(e){ return e.id; }).filter(Boolean);
+  let chain = Promise.resolve();
+  for(let i = 0; i < ids.length; i += 400){
+    (function(chunk){
       chain = chain.then(function(){
         const b = db.batch();
-        chunk.forEach(function(d){ b.delete(d.ref); });
+        chunk.forEach(function(id){ b.delete(db.collection('equipment').doc(id)); });
         return b.commit();
       });
-    }
-    return chain;
-  }).then(function(){
-    toast('🗑️ اتشال كل معدات ' + label + ' ✓');
+    })(ids.slice(i, i + 400));
+  }
+  chain.then(function(){
+    toast('&#128465;&#65039; اتشال كل معدات ' + label + ' ✓');
     loadData();
   }).catch(function(err){
     toast('خطأ في المسح: ' + err.message, 'error');
@@ -3335,7 +3377,19 @@ window.confirmFleetImport = function(fleetValue) {
   const input = _pendingImportInput;
   if (!input || !input.files[0]) return;
 
-  const fleetLabel = {egypt:'Egypt',ksa:'Saudi Arabia',algeria:'Algeria',uae:'UAE',jv:'JV Projects',archive:'Archive'}[fleetValue] || fleetValue;
+  const fleetLabel = {egypt:'Egypt',ksa:'Saudi Arabia',algeria:'Algeria',uae:'UAE',foundation:'Foundation',tunnelling:'Tunnelling',archive:'Archive',all:'All Countries'}[fleetValue] || fleetValue;
+
+  // Country values in All_Data that map to each fleet
+  const fleetCountryMap = {
+    egypt:      ['egypt','eg'],
+    ksa:        ['ksa','saudi','saudi arabia','sa'],
+    algeria:    ['algeria','dz'],
+    uae:        ['uae','ae'],
+    foundation: ['foundation'],
+    tunnelling: ['tunneling','tunnelling'],
+    archive:    ['sold','scrap','archive'],
+    all:        null
+  };
 
   const doImport = function() {
     const file = input.files[0];
@@ -3343,19 +3397,11 @@ window.confirmFleetImport = function(fleetValue) {
     reader.onload = function(e) {
       const wb = XLSX.read(e.target.result, {type:'binary'});
 
-      // Map fleet to sheet name
-      const sheetMap = {
-        egypt:   'Equipment List',
-        ksa:     'KSA Equipment',
-        uae:     'UAE Equipment',
-        algeria: 'Algeria Equipment',
-        jv:      'JV Equipment',
-        archive: wb.SheetNames[0]
-      };
-      const sheetName = sheetMap[fleetValue] || wb.SheetNames[0];
-      const ws = wb.Sheets[sheetName] || wb.Sheets[wb.SheetNames[0]];
+      // Try All_Data first, fallback to first sheet
+      const sheetName = wb.SheetNames.find(function(s){ return s.trim() === 'All_Data'; }) || wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
 
-      // Find header row (row with 'S.n' or 'Equipment' in first few cols)
+      // Find header row
       const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
       let headerIdx = -1;
       for(let i = 0; i < Math.min(raw.length, 12); i++) {
@@ -3364,15 +3410,9 @@ window.confirmFleetImport = function(fleetValue) {
           headerIdx = i; break;
         }
       }
-      if(headerIdx < 0) { toast('لم يتم العثور على هيدر الشيت ✗', 'error'); return; }
+      if(headerIdx < 0) { toast('Header row not found ✗', 'error'); return; }
 
       const headers = raw[headerIdx];
-      const dataRows = raw.slice(headerIdx + 1).filter(function(r){
-        // Row must have a numeric serial number in first col
-        const sn = r[0];
-        return sn !== '' && sn !== null && !isNaN(Number(sn)) && Number(sn) > 0;
-      });
-
       const colIdx = {};
       headers.forEach(function(h, i){ if(h) colIdx[String(h).trim()] = i; });
 
@@ -3384,33 +3424,61 @@ window.confirmFleetImport = function(fleetValue) {
         return '';
       };
 
+      // Filter rows by fleet/country
+      const allowedCountries = fleetCountryMap[fleetValue];
+      const dataRows = raw.slice(headerIdx + 1).filter(function(r){
+        const sn = r[0];
+        if(sn === '' || sn === null || isNaN(Number(sn)) || Number(sn) <= 0) return false;
+        if(allowedCountries === null) return true; // all
+        const country = get(r, ['Country']).toLowerCase();
+        return allowedCountries.some(function(c){ return country.indexOf(c) !== -1; });
+      });
+
       const records = dataRows.map(function(row, i) {
-        const eq = get(row, ['Equipment']);
-        const cat = get(row, ['Eq Category']);
-        const code = get(row, ['Code / Board No.', 'Code/Board No.']);
-        const brand = get(row, ['Brand / Model', 'Brand', 'Model']);
-        const project = get(row, ['Project']);
-        const chassis = get(row, ['Chassis No.']);
-        const year = get(row, ['Manuf Year', 'Manuf. Year']);
-        const power = get(row, ['Power']);
-        const sapCode = get(row, ['Code Sap', 'Code SAP']);
-        const owner = get(row, [' Owner ', 'Owner']);
-        const od = getOd(project);
+        const eq       = get(row, ['Equipment']);
+        const cat      = get(row, ['Eq Category','Category']);
+        const code     = get(row, ['Code / Board No.','Code/Board No.']);
+        const brand    = get(row, ['Brand / Model','Brand','Model']);
+        const project  = get(row, ['Project']);
+        const country  = get(row, ['Country']);
+        const mv       = get(row, ['Market Value(EGP)','Market Value','MarketValue']);
+        const chassis  = get(row, ['Chassis No.']);
+        const year     = get(row, ['Manuf Year','Manuf. Year']);
+        const power    = get(row, ['Power']);
+        const sapCode  = get(row, ['Code Sap','Code SAP']);
+        const owner    = get(row, [' Owner ','Owner']);
+        const od       = get(row, ['O.D']) || getOd(project);
+
+        // Derive fleet from Country column + category
+        const cLow = country.toLowerCase();
+        const catLow = (cat||'').toLowerCase();
+        let fleet = fleetValue;
+        if(fleetValue === 'all') {
+          if(cLow.indexOf('ksa') !== -1 || cLow.indexOf('saudi') !== -1) fleet = 'ksa';
+          else if(cLow.indexOf('alger') !== -1) fleet = 'algeria';
+          else if(cLow.indexOf('uae') !== -1) fleet = 'uae';
+          else if(cLow.indexOf('tunnel') !== -1 || catLow.indexOf('tunnel') !== -1) fleet = 'tunnelling';
+          else if(cLow.indexOf('foundation') !== -1 || catLow.indexOf('foundation') !== -1) fleet = 'foundation';
+          else fleet = 'egypt';
+        }
+
         return {
-          sn: Number(row[0]) || (i + 1),
-          equipment: eq,
-          category: cat || guessCat(eq),
-          code: code,
-          brand: brand,
-          project: project,
-          od: od,
-          year: year,
-          power: power,
-          sapCode: sapCode,
-          chassis: chassis,
-          owner: owner || 'HAC',
-          fleet: fleetValue,
-          importedAt: new Date().toISOString()
+          sn:          Number(row[0]) || (i + 1),
+          equipment:   eq,
+          category:    cat || guessCat(eq),
+          code:        code,
+          brand:       brand,
+          project:     project,
+          od:          od,
+          country:     country,
+          marketValue: mv && mv !== '-' ? mv : '',
+          year:        year,
+          power:       power,
+          sapCode:     sapCode,
+          chassis:     chassis,
+          owner:       owner || 'HAC',
+          fleet:       fleet,
+          importedAt:  new Date().toISOString()
         };
       }).filter(function(r){ return r.equipment; });
 
@@ -3843,7 +3911,7 @@ function moLoadDataset(force){
       });
   }).catch(function(err){
     moBusy=false;
-    if(typeof toast==='function') toast(err.code==='resource-exhausted'?'⚠️ Quota — none cached':'Load error: '+err.message,'error');
+    if(typeof toast==='function') toast(err.code==='resource-exhausted'?'⚠\ufe0f Quota — none cached':'Load error: '+err.message,'error');
     moRender();
   });
 }
@@ -4568,7 +4636,7 @@ function moHandleImport(input){
       Object.keys(oldK).forEach(function(k){ if(!newK[k]) removed++; });
       var msg='الملف: '+full(data.length)+' صف · '+full(uSum(data))+' معدة\n'
         +'الموجود حالياً: '+full(moData.length)+' صف · '+full(uSum(moData))+' معدة\n\n'
-        +'➕ جديد: '+full(added)+'\n✏️ متغيّر: '+full(changed)+'\n🔁 مكرر (لن يتكرر): '+full(same)+'\n❌ هيتشال: '+full(removed)+'\n\n'
+        +'➕ جديد: '+full(added)+'\n✏\ufe0f متغيّر: '+full(changed)+'\n🔁 مكرر (لن يتكرر): '+full(same)+'\n❌ هيتشال: '+full(removed)+'\n\n'
         +'هيتم استبدال الداتا بالنسخة الجديدة بدون تكرار. نكمل؟';
       if(!confirm(msg)){ input.value=''; return; }
       moWriteDataset(data);
@@ -4623,7 +4691,7 @@ function moWriteDataset(data){
     moFilter={month:[],od:null,cat:null,proj:null,status:null,q:''};
     moLoadDataset(true);
   }).catch(function(err){
-    if(typeof toast==='function') toast(err.code==='resource-exhausted'?'⚠️ Quota reached':'Import error: '+err.message,'error');
+    if(typeof toast==='function') toast(err.code==='resource-exhausted'?'⚠\ufe0f Quota reached':'Import error: '+err.message,'error');
     ptxt.textContent='✕ Failed: '+err.message;
   });
 }
@@ -4640,7 +4708,7 @@ function moCleanupLegacy(){
 }
 function moWipeAll(){
   if(!moIsAdmin) return;
-  if(prompt('⚠️ سيتم مسح كل داتا Master Owned.\nاكتب DELETE للتأكيد:')!=='DELETE') return;
+  if(prompt('⚠\ufe0f سيتم مسح كل داتا Master Owned.\nاكتب DELETE للتأكيد:')!=='DELETE') return;
   if(typeof toast==='function') toast('⏳ Deleting...');
   var chain=db.collection(MO_COL).doc(DS).collection('chunks').get().then(function(snap){
     var docs=snap.docs, c=Promise.resolve();
@@ -5098,7 +5166,7 @@ function parseWB(wb){
       var row=raw[ri]||[];
       if(!row.join('').trim()) continue;
 
-      // ⚠️ فحص الكمية: القيمة بتتقرأ زي ما هي (ممكن تبقى 0). الفلوس (Total Price / Deduct / Fuel / OT) بتتجمع دايمًا لكل الصفوف، وعداد المعدات (Units) بس هو اللي بيستبعد أي صف كميته صفر أو أقل
+      // ⚠\ufe0f فحص الكمية: القيمة بتتقرأ زي ما هي (ممكن تبقى 0). الفلوس (Total Price / Deduct / Fuel / OT) بتتجمع دايمًا لكل الصفوف، وعداد المعدات (Units) بس هو اللي بيستبعد أي صف كميته صفر أو أقل
       var qVal = (ix.qty >= 0) ? N(row[ix.qty]) : 1;
 
       audit.rows++;
@@ -5795,8 +5863,8 @@ function cmpRender(){
     +'</div>';
 
   body.innerHTML=mbar+((!owned.length&&!rental.length)
-    ?'<div class="cmp-no-data" style="margin-top:60px;font-size:15px;">⚠️ No data loaded yet.<br><br><span style="font-size:12px;color:var(--text-dim);">Import data in Master Owned then Master Rental.</span></div>'
-    :kpis+saving+'<div class="cmp-section"><div class="cmp-section-title">📅 Month-by-Month Breakdown</div>'+monthBars+'</div><div class="cmp-section"><div class="cmp-section-title">🏗️ Project-Level Comparison</div>'+projSearchBar+table+'</div>');
+    ?'<div class="cmp-no-data" style="margin-top:60px;font-size:15px;">⚠\ufe0f No data loaded yet.<br><br><span style="font-size:12px;color:var(--text-dim);">Import data in Master Owned then Master Rental.</span></div>'
+    :kpis+saving+'<div class="cmp-section"><div class="cmp-section-title">📅 Month-by-Month Breakdown</div>'+monthBars+'</div><div class="cmp-section"><div class="cmp-section-title">🏗\ufe0f Project-Level Comparison</div>'+projSearchBar+table+'</div>');
 }
 
 window.cmpSetMonth=function(m){CMP.month=(CMP.month===m?'all':m);cmpRender();};
@@ -5815,7 +5883,7 @@ window.cmpRefresh=function(){
     if(typeof toast==='function') toast('✓ Fleet data refreshed','success');
   }).catch(function(){
     cmpRender();
-    if(typeof toast==='function') toast('⚠️ Refresh had errors — showing latest available data','error');
+    if(typeof toast==='function') toast('⚠\ufe0f Refresh had errors — showing latest available data','error');
   }).then(function(){
     if(btn){ btn.disabled=false; btn.textContent='↻ Refresh'; }
   });
@@ -5891,7 +5959,7 @@ function initComparison(){
     var p=document.createElement('div');
     p.className='page';p.id='page-comparison';
     p.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:18px;">'
-      +'<div><div class="section-title">⚖️ Rental vs Owned</div></div>'
+      +'<div><div class="section-title">⚖\ufe0f Rental vs Owned</div></div>'
       +'<button class="btn-sm" id="cmp-btn-refresh" onclick="cmpRefresh()" style="border-color:rgba(63,185,80,.4);color:#3fb950;">↻ Refresh</button>'
       +'</div><div id="cmp-body" style="padding-bottom:40px;"></div>';
     content.appendChild(p);
