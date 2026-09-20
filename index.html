@@ -309,9 +309,12 @@ tr.selected-row td:nth-child(2){
     width: auto !important;
   }
 }
+
+/* viewer: hide admin-only sidebar tools */
+body.is-viewer #hac-btn, body.is-viewer #nav-pm { display:none !important; }
 </style>
 </head>
-<body>
+<body class="is-viewer">
 
 <!-- NOTIFICATION BANNER FOR WORKSHOP REQUESTS -->
 <div id="ws-notification-banner">
@@ -1798,6 +1801,7 @@ auth.onAuthStateChanged(function(user) {
     isAdmin = ADMINS.includes(user.email);
     document.getElementById('auth-screen').style.display = 'none';
     document.getElementById('app').style.display = 'block';
+    document.body.classList.toggle('is-viewer', !isAdmin);
     document.getElementById('role-badge').textContent = isAdmin ? 'Admin' : 'Viewer';
     document.getElementById('role-badge').className = 'badge-role' + (isAdmin ? ' admin' : '');
 
@@ -1823,6 +1827,7 @@ auth.onAuthStateChanged(function(user) {
     }
   } else {
     currentUser = null;
+    document.body.classList.add('is-viewer');
     cleanupViewerPresence();
     document.getElementById('auth-screen').style.display = 'flex';
     document.getElementById('app').style.display = 'none';
@@ -6238,28 +6243,104 @@ function mrDirectorReport(){
   w.document.write(h); w.document.close();
 }
 
-/* ═════ Export PDF (raw table) — Master Rental ═════ */
+/* ═════ Export PDF (table) — Master Rental ═════ */
+/* الصفحة دي بتتفتح في نافذة جديدة: أرقام متقرّبة + فلتر لكل عمود + تلوين الصف بالأصفر */
+function mrPdfPageScript(){
+  var tb=document.getElementById('tb'), rows=[].slice.call(tb.rows);
+  var inputs=[].slice.call(document.querySelectorAll('.flt input'));
+  var g=document.getElementById('gq'), cnt=document.getElementById('cnt');
+  var sumCols=[].slice.call(document.querySelectorAll('#tf td[data-sum]'));
+  function fmt(n){ return Math.round(n).toLocaleString('en-US'); }
+  function test(q,txt,num,isNum){
+    q=q.trim().toLowerCase(); if(!q) return true;
+    if(isNum){
+      var m=q.match(/^(>=|<=|>|<|=)\s*(-?[\d.,]+)$/);
+      if(m){ var v=parseFloat(m[2].replace(/,/g,'')); if(isNaN(v)) return true;
+        return m[1]==='>'?num>v:m[1]==='<'?num<v:m[1]==='>='?num>=v:m[1]==='<='?num<=v:num===v; }
+    }
+    return txt.indexOf(q)>=0;
+  }
+  function apply(){
+    var gq=g.value.trim().toLowerCase(), shown=0, sums={};
+    rows.forEach(function(tr){
+      var ok=!gq||tr.getAttribute('data-t').indexOf(gq)>=0;
+      if(ok) inputs.forEach(function(inp){
+        if(!ok) return; var c=+inp.getAttribute('data-c'), td=tr.cells[c];
+        ok=test(inp.value, td.textContent.toLowerCase(), parseFloat(td.getAttribute('data-v')), inp.hasAttribute('data-n'));
+      });
+      tr.style.display=ok?'':'none';
+      if(ok){ shown++; sumCols.forEach(function(t){ var c=+t.getAttribute('data-c'); sums[c]=(sums[c]||0)+(parseFloat(tr.cells[c].getAttribute('data-v'))||0); }); }
+    });
+    cnt.textContent=shown+' / '+rows.length+' rows';
+    sumCols.forEach(function(t){ t.textContent=fmt(sums[+t.getAttribute('data-c')]||0); });
+  }
+  g.addEventListener('input',apply);
+  inputs.forEach(function(i){ i.addEventListener('input',apply); });
+  document.getElementById('clr').addEventListener('click',function(){ g.value=''; inputs.forEach(function(i){i.value='';}); apply(); });
+  var pinned=null;
+  tb.addEventListener('click',function(e){
+    var tr=e.target; while(tr&&tr!==tb&&tr.tagName!=='TR') tr=tr.parentNode;
+    if(!tr||tr===tb) return;
+    if(pinned&&pinned!==tr) pinned.classList.remove('hl');
+    tr.classList.toggle('hl'); pinned=tr.classList.contains('hl')?tr:null;
+  });
+  apply();
+}
 function mrExportPDF(){
   var rows=view();
   if(!rows.length){ tt('Nothing to export','error'); return; }
-  var cols=[['#','#'],['Month','month'],['Hiring Date','hiringDate'],['SAP','sap'],['O.D','od'],['Project','project'],
-    ['Category','category'],['Equipment','equipment'],['Model/Cap','model'],['Subcon','subcon'],
-    ['Qty','qty'],['Days','days'],['Unit Price','unitPrice'],['Total Value','totalPrice'],
-    ['OT/Day','otPerDay'],['OT Cost','otCost'],['Deduct','totalDeduct'],['Fuel L','fuel'],['Util%','util']];
+  /* [label, field, type]  type: t=text, i=integer, d=1 decimal, m=money(0 dec), z=money zero→dash, p=percent */
+  var cols=[['#','#','t'],['Month','month','t'],['Hiring Date','hiringDate','t'],['SAP','sap','t'],['O.D','od','t'],['Project','project','t'],
+    ['Category','category','t'],['Equipment','equipment','t'],['Model/Cap','model','t'],['Subcon','subcon','t'],
+    ['Qty','qty','i'],['Days','days','d'],['Unit Price','unitPrice','m'],['Total Value','totalPrice','m'],
+    ['OT/Day','otPerDay','dz'],['OT Cost','otCost','z'],['Deduct','totalDeduct','z'],['Fuel L','fuel','i'],['Util%','util','p']];
+  function two(n){ return n<10?'0'+n:''+n; }
+  function cell(r,c,i){
+    var f=c[1], t=c[2], v=f==='#'?(i+1):r[f];
+    if(t==='t'){
+      if(v instanceof Date) v=v.getFullYear()+'-'+two(v.getMonth()+1)+'-'+two(v.getDate());
+      return {txt:v==null?'':String(v), num:NaN, cls:''};
+    }
+    var n=Number(v); if(!isFinite(n)) n=0;
+    if(t==='i') return {txt:Math.round(n).toLocaleString('en-US'), num:Math.round(n), cls:'n'};
+    if(t==='d') return {txt:n.toLocaleString('en-US',{minimumFractionDigits:1,maximumFractionDigits:1}), num:+n.toFixed(1), cls:'n'};
+    if(t==='dz'){ return n? {txt:n.toLocaleString('en-US',{minimumFractionDigits:1,maximumFractionDigits:1}), num:+n.toFixed(1), cls:'n'} : {txt:'–', num:0, cls:'n z'}; }
+    if(t==='m') return {txt:Math.round(n).toLocaleString('en-US'), num:Math.round(n), cls:'n'};
+    if(t==='z') return Math.round(n)? {txt:Math.round(n).toLocaleString('en-US'), num:Math.round(n), cls:'n'} : {txt:'–', num:0, cls:'n z'};
+    if(t==='p') return {txt:Math.round(n)+'%', num:Math.round(n), cls:'n'+(n<75?' lo':'')};
+    return {txt:'', num:NaN, cls:''};
+  }
+  var sumIdx={}; ['qty','totalPrice','otCost','totalDeduct','fuel'].forEach(function(k){ sumIdx[k]=1; });
+
   var h='<!DOCTYPE html><html><head><meta charset="utf-8"><title>Master Rental — Export</title><style>';
   h+='*{box-sizing:border-box;margin:0;padding:0}body{font-family:Segoe UI,Arial,sans-serif;color:#1a1a1a;background:#fff;padding:16px 18px;font-size:10px}';
-  h+='h1{font-size:15px;margin-bottom:2px}.sub{font-size:10px;color:#666;margin-bottom:10px}';
-  h+='table{width:100%;border-collapse:collapse}th{background:#f4f4f4;font-size:8.5px;text-transform:uppercase;color:#555;text-align:left;padding:4px 6px;border-bottom:1px solid #ddd}';
-  h+='td{padding:3px 6px;border-bottom:1px solid #eee;font-size:9px;white-space:nowrap}';
-  h+='.btn{position:fixed;top:10px;right:12px;background:#f0a500;color:#000;border:0;padding:8px 14px;border-radius:6px;font-weight:700;cursor:pointer}';
-  h+='@media print{.btn{display:none}body{padding:6px 8px}@page{size:A4 landscape;margin:7mm}}';
-  h+='</style></head><body><button class="btn" onclick="window.print()">🖨 Print / Save PDF</button>';
-  h+='<h1>HAC · PMV — Master Rental Equipment Export</h1><div class="sub">'+fmtInt(rows.length)+' rows · Generated '+new Date().toLocaleString()+'</div>';
-  h+='<table><thead><tr>'+cols.map(function(c){return '<th>'+esc(c[0])+'</th>';}).join('')+'</tr></thead><tbody>';
+  h+='h1{font-size:16px;margin-bottom:2px}.sub{font-size:10px;color:#666;margin-bottom:10px;border-bottom:3px solid #f0a500;padding-bottom:8px}';
+  h+='.bar{display:flex;gap:8px;align-items:center;margin-bottom:10px;position:sticky;top:0;background:#fff;padding:6px 0;z-index:5}';
+  h+='.bar input{border:1px solid #ccc;border-radius:6px;padding:6px 10px;font-size:12px;width:280px}#cnt{font-size:11px;color:#555}';
+  h+='.bar button{background:#f0a500;color:#000;border:0;padding:7px 14px;border-radius:6px;font-weight:700;cursor:pointer}.bar .g{background:#eee}.bar .sp{flex:1}';
+  h+='table{width:100%;border-collapse:collapse}th{background:#f4f4f4;font-size:8.5px;text-transform:uppercase;color:#555;text-align:left;padding:5px 6px;border-bottom:1px solid #ddd;white-space:nowrap}';
+  h+='th.n,td.n{text-align:right;font-variant-numeric:tabular-nums}';
+  h+='.flt th{padding:2px 3px;background:#fff}.flt input{width:100%;min-width:34px;border:1px solid #ddd;border-radius:4px;padding:2px 4px;font-size:9px}';
+  h+='td{padding:4px 6px;border-bottom:1px solid #eee;font-size:9.5px;white-space:nowrap}tbody tr:nth-child(even) td{background:#fafafa}';
+  h+='td.z{color:#bbb}td.lo{color:#d93025;font-weight:600}';
+  h+='tbody tr{cursor:pointer}tbody tr:hover td{background:#fff3b0}tbody tr.hl td{background:#ffe94d !important;font-weight:600}';
+  h+='tfoot td{background:#f4f4f4;font-weight:700;border-top:2px solid #f0a500;font-size:10px}';
+  h+='@media print{.bar,.flt{display:none}body{padding:6px 8px}tbody tr:hover td{background:inherit}tbody tr:nth-child(even):hover td{background:#fafafa}';
+  h+='*{-webkit-print-color-adjust:exact;print-color-adjust:exact}thead{display:table-header-group}tr{page-break-inside:avoid}@page{size:A4 landscape;margin:7mm}}';
+  h+='</style></head><body>';
+  h+='<h1>HAC · PMV — Master Rental Equipment Export</h1><div class="sub">'+fmtInt(rows.length)+' rows · Generated '+esc(new Date().toLocaleString())+'</div>';
+  h+='<div class="bar"><input id="gq" placeholder="Search all columns…"><button class="g" id="clr">Clear</button><span id="cnt"></span><span class="sp"></span><button onclick="window.print()">🖨 Print / Save PDF</button></div>';
+  h+='<table><thead><tr>'+cols.map(function(c){ return '<th'+(c[2]==='t'?'':' class="n"')+'>'+esc(c[0])+'</th>'; }).join('')+'</tr>';
+  h+='<tr class="flt">'+cols.map(function(c,j){ return '<th><input data-c="'+j+'"'+(c[2]==='t'?'':' data-n="1" placeholder="&gt;100"')+'></th>'; }).join('')+'</tr></thead><tbody id="tb">';
   rows.forEach(function(r,i){
-    h+='<tr>'+cols.map(function(c){ var v=c[1]==='#'?(i+1):(r[c[1]]==null?'':r[c[1]]); return '<td>'+esc(v)+'</td>'; }).join('')+'</tr>';
+    var cs=cols.map(function(c){ return cell(r,c,i); });
+    h+='<tr data-t="'+esc(cs.map(function(x){return x.txt;}).join(' ').toLowerCase())+'">'+cs.map(function(x){ return '<td'+(x.cls?' class="'+x.cls+'"':'')+(isNaN(x.num)?'':' data-v="'+x.num+'"')+'>'+esc(x.txt)+'</td>'; }).join('')+'</tr>';
   });
-  h+='</tbody></table></body></html>';
+  h+='</tbody><tfoot><tr id="tf">'+cols.map(function(c,j){
+    if(j===0) return '<td>Total</td>';
+    return sumIdx[c[1]]?'<td class="n" data-sum="1" data-c="'+j+'"></td>':'<td></td>';
+  }).join('')+'</tr></tfoot></table>';
+  h+='<scr'+'ipt>('+mrPdfPageScript.toString()+')();</scr'+'ipt></body></html>';
   var w=window.open('','_blank');
   if(!w){ tt('Popup blocked','error'); return; }
   w.document.write(h); w.document.close();
