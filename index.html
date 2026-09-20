@@ -4180,8 +4180,11 @@ page.innerHTML=`<div style="display:flex;align-items:center;justify-content:spac
     <button class="btn-sm" id="mo-btn-audit">🗓 Months Audit</button>
     <button class="btn-sm" id="mo-btn-refresh">⟳ Refresh</button>
     <button class="btn-sm" id="mo-btn-export">⬇ Export XLSX</button>
+    <button class="btn-sm" id="mo-btn-export-pdf">📄 Export PDF</button>
     <button class="btn-sm accent" id="mo-btn-director">📄 Director Report</button>
     <button class="btn-sm accent mo-hide" id="mo-btn-import">📥 Import XLSX</button>
+    <button class="btn-sm mo-hide" id="mo-btn-smart-update" style="border-color:rgba(88,166,255,.4);color:#58a6ff;">🔄 تحديث الموجود بس</button>
+    <button class="btn-sm mo-hide" id="mo-btn-smart-add" style="border-color:rgba(63,185,80,.4);color:#3fb950;">➕ إضافة جديد بس</button>
     <button class="btn-sm danger mo-hide" id="mo-btn-wipe">🗑 Delete All</button>
   </div>
 </div>
@@ -4191,6 +4194,7 @@ page.innerHTML=`<div style="display:flex;align-items:center;justify-content:spac
   <div class="mo-progress" id="mo-progress"><div id="mo-progress-text">—</div><div class="mo-progress-track"><div class="mo-progress-fill" id="mo-progress-fill"></div></div></div>
 </div>
 <input type="file" id="mo-file-input" accept=".xlsx,.xls" style="display:none">
+<input type="file" id="mo-file-input-smart" accept=".xlsx,.xls" style="display:none">
 
 <div class="mo-slider">
   <button class="mo-nav" id="mo-sl-prev">‹</button>
@@ -4284,7 +4288,7 @@ auth.onAuthStateChanged(function(u){
   if(!moLoaded){ moLoaded=true; moLoadDataset(false); }
 });
 function setAdminUI(on){
-  ['mo-btn-import','mo-btn-wipe','mo-import-row'].forEach(function(id){
+  ['mo-btn-import','mo-btn-smart-update','mo-btn-smart-add','mo-btn-wipe','mo-import-row'].forEach(function(id){
     var el=document.getElementById(id); if(el) el.classList.toggle('mo-hide',!on);
   });
 }
@@ -4873,11 +4877,16 @@ document.getElementById('mo-btn-table').addEventListener('click',function(){ moT
 document.getElementById('mo-btn-audit').addEventListener('click',function(){ moAuditOpen=!moAuditOpen; document.getElementById('mo-audit').style.display=moAuditOpen?'block':'none'; this.classList.toggle('accent',moAuditOpen); if(moAuditOpen) moRenderAudit(); });
 document.getElementById('mo-btn-refresh').addEventListener('click',function(){ moLoadDataset(true); });
 document.getElementById('mo-btn-export').addEventListener('click',moExport);
+document.getElementById('mo-btn-export-pdf').addEventListener('click',moExportPDF);
 document.getElementById('mo-btn-director').addEventListener('click',moDirectorReport);
 document.getElementById('mo-btn-import').addEventListener('click',function(){ document.getElementById('mo-file-input').click(); });
 document.getElementById('mo-btn-file').addEventListener('click',function(){ document.getElementById('mo-file-input').click(); });
 document.getElementById('mo-btn-wipe').addEventListener('click',moWipeAll);
 document.getElementById('mo-file-input').addEventListener('change',function(){ moHandleImport(this); });
+var MO_SMART_MODE=null;
+document.getElementById('mo-btn-smart-update').addEventListener('click',function(){ MO_SMART_MODE='update'; document.getElementById('mo-file-input-smart').click(); });
+document.getElementById('mo-btn-smart-add').addEventListener('click',function(){ MO_SMART_MODE='add'; document.getElementById('mo-file-input-smart').click(); });
+document.getElementById('mo-file-input-smart').addEventListener('change',function(){ moSmartHandleImport(this, MO_SMART_MODE); });
 document.querySelectorAll('.mo-kpi').forEach(function(el){
   el.addEventListener('click',function(){ var k=this.getAttribute('data-kpi'); moDrill=(moDrill===k)?null:k; moRenderDrill(); moRenderKpis(); });
 });
@@ -4909,6 +4918,39 @@ function moExport(){
 }
 
 /* ═════ 13) Director Report ═════ */
+function moExportPDF(){
+  var rows=searchRows(moBase(null));
+  if(!rows.length){ if(typeof toast==='function') toast('Nothing to export','error'); return; }
+  var cols=[['#','#'],['Month','month'],['Hiring Date','hiring'],['Profit Center','pc'],['O.D','od'],['Project','project'],
+    ['Category','cat'],['Code','code'],['Equipment','equipment'],['Model/Cap','model'],
+    ['Worked','worked'],['Standby','standby'],['Repair','repair'],['Unit Price','unitPrice'],
+    ['Standby Cost','__lost'],['Money Made','totalCost'],['OT/Day','otPerDay'],['OT Cost','costOt'],
+    ['Qty','__units'],['Avail','avail'],['Fuel L','totalFuel'],['Util%','utl'],['Status','status']];
+  var h='<!DOCTYPE html><html><head><meta charset="utf-8"><title>Master Owned — Export</title><style>';
+  h+='*{box-sizing:border-box;margin:0;padding:0}body{font-family:Segoe UI,Arial,sans-serif;color:#1a1a1a;background:#fff;padding:16px 18px;font-size:10px}';
+  h+='h1{font-size:15px;margin-bottom:2px}.sub{font-size:10px;color:#666;margin-bottom:10px}';
+  h+='table{width:100%;border-collapse:collapse}th{background:#f4f4f4;font-size:8.5px;text-transform:uppercase;color:#555;text-align:left;padding:4px 6px;border-bottom:1px solid #ddd}';
+  h+='td{padding:3px 6px;border-bottom:1px solid #eee;font-size:9px;white-space:nowrap}';
+  h+='.btn{position:fixed;top:10px;right:12px;background:#f0a500;color:#000;border:0;padding:8px 14px;border-radius:6px;font-weight:700;cursor:pointer}';
+  h+='@media print{.btn{display:none}body{padding:6px 8px}@page{size:A4 landscape;margin:7mm}}';
+  h+='</style></head><body><button class="btn" onclick="window.print()">🖨 Print / Save PDF</button>';
+  h+='<h1>HAC · PMV — Master Owned Equipment Export</h1><div class="sub">'+full(rows.length)+' rows · Generated '+new Date().toLocaleString()+'</div>';
+  h+='<table><thead><tr>'+cols.map(function(c){return '<th>'+esc(c[0])+'</th>';}).join('')+'</tr></thead><tbody>';
+  rows.forEach(function(r,i){
+    h+='<tr>'+cols.map(function(c){
+      var v;
+      if(c[1]==='#') v=i+1;
+      else if(c[1]==='__lost') v=full(lostOf(r));
+      else if(c[1]==='__units') v=full(units(r));
+      else v=(r[c[1]]==null?'':r[c[1]]);
+      return '<td>'+esc(v)+'</td>';
+    }).join('')+'</tr>';
+  });
+  h+='</tbody></table></body></html>';
+  var w=window.open('','_blank');
+  if(!w){ if(typeof toast==='function') toast('Popup blocked','error'); return; }
+  w.document.write(h); w.document.close();
+}
 function moDirectorReport(){
   var rows=moBase(null);
   if(!rows.length){ if(typeof toast==='function') toast('No data','error'); return; }
@@ -5458,7 +5500,7 @@ var n=0, iv=setInterval(function(){ n++; if($('fu-btn-upload')||n>40){ clearInte
 'use strict';
 
 var COL='master_rental', LS='mr_cache_v12';
-var DATA=[], EXIST={}, AUDIT=null, FILE_IN=null;
+var DATA=[], EXIST={}, AUDIT=null, FILE_IN=null, SMART_FILE_IN=null, SMART_MODE=null;
 var F={cat:null,od:null,month:null,proj:null,q:''};
 
 function $(id){ return document.getElementById(id); }
@@ -5684,6 +5726,31 @@ function doImport(file){
   });
 }
 
+function doImportMode(file,mode){
+  if(!isAdminNow()){ tt('Admins only','error'); return; }
+  tt('Reading file...');
+  readWB(file,function(err,wb){
+    if(err){ tt('File read error: '+err.message,'error'); return; }
+    var out=parseWB(wb); AUDIT=out.audit; var recs=out.recs;
+    if(!recs.length){ tt('No rows were read (Check Quantity / Headers)','error'); showAudit(); return; }
+    var toWrite=[], nNew=0, nChg=0;
+    recs.forEach(function(r){
+      var prev=EXIST[r.id], h=rowHash(r);
+      if(!prev){ if(mode==='add'){ nNew++; r._h=h; toWrite.push(r); } }
+      else if(prev._h!==h){ if(mode==='update'){ nChg++; r._h=h; toWrite.push(r); } }
+    });
+    if(!toWrite.length){ tt(mode==='update'?'مفيش صفوف موجودة اتغيّرت':'مفيش معدات جديدة في الملف','error'); showAudit(); return; }
+    var msg=mode==='update'
+      ? ('هيتم تحديث '+fmtInt(nChg)+' صف موجود بس — من غير أي إضافة. نكمل؟')
+      : ('هيتم إضافة '+fmtInt(nNew)+' صف جديد بس — من غير تعديل أي حاجة موجودة. نكمل؟');
+    if(!confirm(msg)) return;
+    tt('Uploading '+fmtInt(toWrite.length)+' rows...');
+    writeBatches(toWrite,3,function(done,total){},function(failed){
+      load().then(function(){ render(); });
+      tt('✓ '+fmtInt(toWrite.length)+' rows uploaded ('+(mode==='update'?'update-only':'add-only')+')');
+    });
+  });
+}
 function doWipe(){
   if(!isAdminNow()){ tt('Admins only','error'); return; }
   var ok=prompt('Delete all Master Rental data ('+DATA.length+' records)?\nType DELETE to confirm:');
@@ -5886,7 +5953,10 @@ function render(){
   var rows=view(), m=metrics(rows), h='';
   h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">';
   if(isAdminNow()) h+='<button class="btn-sm" style="background:var(--accent);color:#000;font-weight:700;" data-act="import">📥 Import Rental Excel</button>';
+  if(isAdminNow()) h+='<button class="btn-sm" style="border-color:rgba(88,166,255,.4);color:#58a6ff;" data-act="smart">🔄 تحديث / إضافة</button>';
   h+='<button class="btn-sm" data-act="refresh">⟳ Refresh</button>';
+  h+='<button class="btn-sm accent" data-act="director">📄 Director Report</button>';
+  h+='<button class="btn-sm" data-act="exportpdf">📄 Export PDF</button>';
   if(isAdminNow()) h+='<button class="btn-sm" data-act="wipe" style="border-color:rgba(248,81,73,.5);color:var(--red);">🗑 Delete Rental Data</button>';
   h+='<span style="font-size:11px;color:var(--text-dim);margin-left:auto;">'+fmtInt(DATA.length)+' records stored | '+fmtInt(rows.length)+' shown</span></div>';
   h+='<div class="mr-grid">'
@@ -6031,7 +6101,23 @@ function closeOv(){ var ov=$('mr-ov'); if(ov) ov.classList.remove('on'); }
 function onAct(act,v){
   if(act==='import'){ if(!isAdminNow()){tt('Admins only','error');return;} if(!FILE_IN){ FILE_IN=document.createElement('input'); FILE_IN.type='file'; FILE_IN.accept='.xlsx,.xls,.csv'; FILE_IN.style.display='none'; document.body.appendChild(FILE_IN);
       FILE_IN.addEventListener('change',function(){ if(FILE_IN.files&&FILE_IN.files[0]) doImport(FILE_IN.files[0]); FILE_IN.value=''; }); } FILE_IN.click(); return; }
+  if(act==='smart'){
+    if(!isAdminNow()){ tt('Admins only','error'); return; }
+    openOv('<div class="mr-modal"><div style="font-size:16px;font-weight:700;margin-bottom:12px;">اختار نوع الرفع</div>'
+      +'<div class="mr-row" data-act="smart-pick" data-v="update" style="cursor:pointer;">🔄 <b>تحديث</b> — يعدّل بيانات الصفوف الموجودة اللي اتغيّرت بس (من غير إضافة صفوف جديدة)</div>'
+      +'<div class="mr-row" data-act="smart-pick" data-v="add" style="cursor:pointer;">➕ <b>إضافة</b> — يضيف الصفوف الجديدة بس (من غير لمس الموجود)</div>'
+      +'<button class="btn-sm" data-act="closeov" style="margin-top:10px;">إلغاء</button></div>');
+    return;
+  }
+  if(act==='smart-pick'){
+    closeOv(); SMART_MODE=v;
+    if(!SMART_FILE_IN){ SMART_FILE_IN=document.createElement('input'); SMART_FILE_IN.type='file'; SMART_FILE_IN.accept='.xlsx,.xls,.csv'; SMART_FILE_IN.style.display='none'; document.body.appendChild(SMART_FILE_IN);
+      SMART_FILE_IN.addEventListener('change',function(){ if(SMART_FILE_IN.files&&SMART_FILE_IN.files[0]) doImportMode(SMART_FILE_IN.files[0],SMART_MODE); SMART_FILE_IN.value=''; }); }
+    SMART_FILE_IN.click(); return;
+  }
   if(act==='refresh'){ tt('Refreshing...'); load().then(function(){ render(); }); return; }
+  if(act==='director'){ mrDirectorReport(); return; }
+  if(act==='exportpdf'){ mrExportPDF(); return; }
   if(act==='wipe'){ doWipe(); return; }
   if(act==='month'){ F.month=(F.month===v?null:(v||null)); render(); return; }
   if(act==='cat'){ F.cat=(F.cat===v?null:v); closeOv(); render(); return; }
@@ -6084,7 +6170,102 @@ function initStandaloneRental(){
   }
 }
 
-window.MR={ import:doImport, wipe:doWipe, load:load, render:render, data:function(){return DATA;} };
+/* ═════ Director Report — Master Rental ═════ */
+function mrGrp(rows,field){
+  var g={};
+  rows.forEach(function(r){
+    var k=S(r[field])||'(Unknown)';
+    if(!g[k]) g[k]={units:0,value:0,deduct:0,fuel:0,ot:0,cnt:0};
+    var q=N(r.qty); if(q>0) g[k].units+=q;
+    g[k].value+=N(r.totalPrice); g[k].deduct+=N(r.totalDeduct); g[k].fuel+=N(r.fuel); g[k].ot+=N(r.otCost); g[k].cnt++;
+  });
+  return g;
+}
+function mrTop(g,key,n){ return Object.keys(g).sort(function(a,b){ return g[b][key]-g[a][key]; }).slice(0,n||10); }
+function mrDk(t,v,red){ return '<div class="k'+(red?' red':'')+'"><div class="t">'+esc(t)+'</div><div class="v">'+v+'</div></div>'; }
+function mrDirectorReport(){
+  var rows=view();
+  if(!rows.length){ tt('No data','error'); return; }
+  var m=metrics(rows);
+  var mg=mrGrp(rows,'month'), og=mrGrp(rows,'od'), pg=mrGrp(rows,'project'), cg=mrGrp(rows,'category');
+  var mk=Object.keys(mg).sort();
+  var ods=mrTop(og,'units',12), projs=mrTop(pg,'value',10), cats=mrTop(cg,'units',10), deducts=mrTop(pg,'deduct',8);
+
+  var h='<!DOCTYPE html><html><head><meta charset="utf-8"><title>Master Rental — Director Report</title><style>';
+  h+='*{box-sizing:border-box;margin:0;padding:0}body{font-family:Segoe UI,Arial,sans-serif;color:#1a1a1a;background:#fff;padding:22px 26px;font-size:12px}';
+  h+='.hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #f0a500;padding-bottom:9px;margin-bottom:14px}';
+  h+='.hd h1{font-size:18px}.hd .sub{font-size:11px;color:#666;margin-top:3px}.meta{text-align:right;font-size:11px;color:#555}';
+  h+='.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:9px;margin-bottom:14px}';
+  h+='.k{border:1px solid #e0e0e0;border-left:3px solid #f0a500;border-radius:5px;padding:8px 10px;background:#fafafa}';
+  h+='.k .t{font-size:9px;text-transform:uppercase;color:#777;margin-bottom:3px}.k .v{font-size:14px;font-weight:700;font-family:Consolas,monospace}';
+  h+='.k.red{border-left-color:#d93025}.notes{background:#fff4f4;border:1px solid #f0c0c0;border-left:4px solid #d93025;border-radius:5px;padding:10px 13px;margin-top:8px}';
+  h+='h2{font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin:15px 0 7px;border-left:3px solid #f0a500;padding-left:8px}';
+  h+='table{width:100%;border-collapse:collapse}th{background:#f4f4f4;font-size:9.5px;text-transform:uppercase;color:#555;text-align:left;padding:5px 7px;border-bottom:1px solid #ddd}';
+  h+='td{padding:4px 7px;border-bottom:1px solid #eee;font-size:10.5px}td.n{text-align:right;font-family:Consolas,monospace}';
+  h+='ul li{margin:3px 0 3px 15px;font-size:11.5px;line-height:1.5}.bar{display:inline-block;height:6px;border-radius:3px;vertical-align:middle;margin-right:5px}';
+  h+='.btn{position:fixed;top:12px;right:14px;background:#f0a500;color:#000;border:0;padding:9px 16px;border-radius:6px;font-weight:700;cursor:pointer}';
+  h+='@media print{.btn{display:none}body{padding:10px 12px}@page{size:A4;margin:9mm}}';
+  h+='</style></head><body><button class="btn" onclick="window.print()">🖨 Print / Save PDF</button>';
+  h+='<div class="hd"><div><h1>HAC · PMV — Master Rental Equipment Report</h1><div class="sub">Rental Value · Deductions · Overtime · Fuel</div></div>';
+  h+='<div class="meta"><b>Months:</b> '+esc(F.month?F.month:(mk.length?mk[0]+' → '+mk[mk.length-1]:'—'))+'<br><b>Generated:</b> '+new Date().toLocaleString()+'<br><b>Filters:</b> '+esc([F.od?'O.D: '+F.od:'',F.cat?'Cat: '+F.cat:'',F.proj?'Project: '+F.proj:''].filter(Boolean).join(' · ')||'None')+'</div></div>';
+  h+='<div class="kpis">'+mrDk('Fleet Equipment',fmtInt(m.units))+mrDk('Projects',fmtInt(m.projects))+mrDk('Total Value','EGP '+fmtMoney(m.totalValue))+mrDk('Deductions','EGP '+fmtMoney(m.deduct),true)+mrDk('Overtime Cost','EGP '+fmtMoney(m.otCost))+mrDk('Fuel',fmtInt(m.fuel)+' L')+'</div>';
+  h+='<div class="notes"><b style="color:#d93025">Bottom Line</b><ul>';
+  h+='<li>الأسطول المؤجر <b>'+fmtInt(m.units)+' معدة</b> على <b>'+m.projects+' مشروع</b> و <b>'+m.ods+' O.D</b> خلال '+mk.length+' شهر.</li>';
+  h+='<li>قيمة العقود <b>EGP '+fmtInt(m.totalValue)+'</b>، اتخصم منها <b>EGP '+fmtInt(m.deduct)+'</b> ('+((m.totalValue?(m.deduct/m.totalValue*100):0).toFixed(1))+'%) جزاءات/توفير.</li>';
+  if(deducts.length) h+='<li>أعلى خصومات: '+deducts.slice(0,3).map(function(p){return '<b>'+esc(p)+'</b> (EGP '+fmtInt(pg[p].deduct)+')';}).join(' · ')+'.</li>';
+  h+='<li>تكلفة الأوفرتايم <b>EGP '+fmtInt(m.otCost)+'</b>، واستهلاك الوقود <b>'+fmtInt(m.fuel)+' لتر</b>.</li>';
+  h+='</ul></div>';
+  h+='<h2>1) By Hiring Month</h2><table><tr><th>Month</th><th class="n">Units</th><th class="n">Total Value</th><th class="n">Deduct</th><th class="n">Fuel L</th></tr>';
+  mk.forEach(function(k){ var d=mg[k]; h+='<tr><td>'+esc(k)+'</td><td class="n">'+fmtInt(d.units)+'</td><td class="n">'+fmtInt(d.value)+'</td><td class="n">'+fmtInt(d.deduct)+'</td><td class="n">'+fmtInt(d.fuel)+'</td></tr>'; });
+  h+='</table>';
+  h+='<h2>2) By O.D — Scorecard</h2><table><tr><th>O.D</th><th class="n">Units</th><th class="n">Total Value</th><th class="n">Deduct</th><th class="n">Fuel L</th></tr>';
+  ods.forEach(function(o){ var d=og[o]; h+='<tr><td>'+esc(o)+'</td><td class="n">'+fmtInt(d.units)+'</td><td class="n">'+fmtInt(d.value)+'</td><td class="n">'+fmtInt(d.deduct)+'</td><td class="n">'+fmtInt(d.fuel)+'</td></tr>'; });
+  h+='</table>';
+  h+='<h2>3) Top 10 Projects — Total Value</h2><table><tr><th>Project</th><th class="n">Units</th><th class="n">Total Value</th><th class="n">Deduct</th><th>Share</th></tr>';
+  var safe=m.totalValue||1;
+  projs.forEach(function(p){ var d=pg[p]; h+='<tr><td>'+esc(p)+'</td><td class="n">'+fmtInt(d.units)+'</td><td class="n">'+fmtInt(d.value)+'</td><td class="n">'+fmtInt(d.deduct)+'</td><td><span class="bar" style="width:'+Math.max(2,Math.round(d.value/safe*220))+'px;background:#f0a500"></span>'+(d.value/safe*100).toFixed(1)+'%</td></tr>'; });
+  h+='</table>';
+  h+='<h2>4) Top 8 Deductions — Priority Review</h2><table><tr><th>Project</th><th class="n">Deduct</th><th>Share</th></tr>';
+  var dsafe=m.deduct||1;
+  deducts.forEach(function(p){ var d=pg[p]; h+='<tr><td>'+esc(p)+'</td><td class="n">'+fmtInt(d.deduct)+'</td><td><span class="bar" style="width:'+Math.max(2,Math.round(d.deduct/dsafe*200))+'px;background:#d93025"></span>'+(d.deduct/dsafe*100).toFixed(1)+'%</td></tr>'; });
+  h+='</table>';
+  h+='<h2>5) Categories</h2><table><tr><th>Category</th><th class="n">Units</th><th class="n">Total Value</th><th class="n">Deduct</th><th class="n">Fuel L</th></tr>';
+  cats.forEach(function(c){ var d=cg[c]; h+='<tr><td>'+esc(c)+'</td><td class="n">'+fmtInt(d.units)+'</td><td class="n">'+fmtInt(d.value)+'</td><td class="n">'+fmtInt(d.deduct)+'</td><td class="n">'+fmtInt(d.fuel)+'</td></tr>'; });
+  h+='</table></body></html>';
+
+  var w=window.open('','_blank');
+  if(!w){ tt('Popup blocked','error'); return; }
+  w.document.write(h); w.document.close();
+}
+
+/* ═════ Export PDF (raw table) — Master Rental ═════ */
+function mrExportPDF(){
+  var rows=view();
+  if(!rows.length){ tt('Nothing to export','error'); return; }
+  var cols=[['#','#'],['Month','month'],['Hiring Date','hiringDate'],['SAP','sap'],['O.D','od'],['Project','project'],
+    ['Category','category'],['Equipment','equipment'],['Model/Cap','model'],['Subcon','subcon'],
+    ['Qty','qty'],['Days','days'],['Unit Price','unitPrice'],['Total Value','totalPrice'],
+    ['OT/Day','otPerDay'],['OT Cost','otCost'],['Deduct','totalDeduct'],['Fuel L','fuel'],['Util%','util']];
+  var h='<!DOCTYPE html><html><head><meta charset="utf-8"><title>Master Rental — Export</title><style>';
+  h+='*{box-sizing:border-box;margin:0;padding:0}body{font-family:Segoe UI,Arial,sans-serif;color:#1a1a1a;background:#fff;padding:16px 18px;font-size:10px}';
+  h+='h1{font-size:15px;margin-bottom:2px}.sub{font-size:10px;color:#666;margin-bottom:10px}';
+  h+='table{width:100%;border-collapse:collapse}th{background:#f4f4f4;font-size:8.5px;text-transform:uppercase;color:#555;text-align:left;padding:4px 6px;border-bottom:1px solid #ddd}';
+  h+='td{padding:3px 6px;border-bottom:1px solid #eee;font-size:9px;white-space:nowrap}';
+  h+='.btn{position:fixed;top:10px;right:12px;background:#f0a500;color:#000;border:0;padding:8px 14px;border-radius:6px;font-weight:700;cursor:pointer}';
+  h+='@media print{.btn{display:none}body{padding:6px 8px}@page{size:A4 landscape;margin:7mm}}';
+  h+='</style></head><body><button class="btn" onclick="window.print()">🖨 Print / Save PDF</button>';
+  h+='<h1>HAC · PMV — Master Rental Equipment Export</h1><div class="sub">'+fmtInt(rows.length)+' rows · Generated '+new Date().toLocaleString()+'</div>';
+  h+='<table><thead><tr>'+cols.map(function(c){return '<th>'+esc(c[0])+'</th>';}).join('')+'</tr></thead><tbody>';
+  rows.forEach(function(r,i){
+    h+='<tr>'+cols.map(function(c){ var v=c[1]==='#'?(i+1):(r[c[1]]==null?'':r[c[1]]); return '<td>'+esc(v)+'</td>'; }).join('')+'</tr>';
+  });
+  h+='</tbody></table></body></html>';
+  var w=window.open('','_blank');
+  if(!w){ tt('Popup blocked','error'); return; }
+  w.document.write(h); w.document.close();
+}
+
+window.MR={ import:doImport, importMode:doImportMode, wipe:doWipe, load:load, render:render, data:function(){return DATA;} };
 
 if(document.readyState!=='loading') initStandaloneRental(); else document.addEventListener('DOMContentLoaded',initStandaloneRental);
 var tries=0, iv=setInterval(function(){ tries++; initStandaloneRental(); if($('nav-masterrental')&&$('page-masterrental')) clearInterval(iv); if(tries>30) clearInterval(iv); },500);
@@ -6482,6 +6663,297 @@ function initComparison(){
 if(document.readyState!=='loading')initComparison();
 else document.addEventListener('DOMContentLoaded',initComparison);
 var _ci=0,_civ=setInterval(function(){_ci++;initComparison();if(document.getElementById('nav-comparison')&&document.getElementById('page-comparison'))clearInterval(_civ);if(_ci>30)clearInterval(_civ);},500);
+})();
+</script>
+<!-- ═══════════════════════════════════════════════════════════
+     PROJECT MANAGER — O.D Map (Firestore) + Rename/Move O.D
+     + Smart Upload (Update-only / Add-only) for Master Owned
+     ═══════════════════════════════════════════════════════════ -->
+<style>
+.pm-ov{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:10000;padding:20px;}
+.pm-ov.on{display:flex;}
+.pm-modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:min(720px,96vw);max-height:88vh;overflow:auto;padding:18px 20px;}
+.pm-row{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;padding:9px 0;border-bottom:1px solid var(--surface3);}
+.pm-row:last-child{border-bottom:none;}
+.pm-name{font-weight:600;}
+.pm-od{font-size:11px;color:var(--text-muted);margin-top:2px;}
+.pm-actions{display:flex;gap:6px;flex-shrink:0;}
+.pm-btn{font-size:11px;padding:4px 9px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);cursor:pointer;}
+.pm-btn:hover{border-color:var(--accent);color:var(--accent);}
+.pm-search{width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:13px;margin-bottom:12px;box-sizing:border-box;}
+</style>
+<script>
+(function(){
+'use strict';
+
+/* ===== 1) O.D Map persistence (Firestore: settings/odMap) ===== */
+function pmSaveOdMap(){
+  if(typeof db==='undefined'||typeof OD_MAP==='undefined') return Promise.resolve();
+  return db.collection('settings').doc('odMap').set({
+    map: OD_MAP, updatedAtMs: Date.now(),
+    updatedBy:(typeof currentUser!=='undefined'&&currentUser)?currentUser.email:''
+  });
+}
+function pmLoadOdMap(){
+  if(typeof db==='undefined') return;
+  db.collection('settings').doc('odMap').get().then(function(snap){
+    if(snap.exists){
+      var d=(snap.data()||{}).map||{};
+      Object.keys(d).forEach(function(k){ if(typeof OD_MAP!=='undefined') OD_MAP[k]=d[k]; });
+    } else {
+      pmSaveOdMap();
+    }
+  }).catch(function(){});
+}
+
+/* ===== 2) Helpers ===== */
+function pmIsAdmin(){ try{ return (typeof isAdmin!=='undefined')&&!!isAdmin; }catch(e){ return false; } }
+function pmEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function pmChunksArr(arr,n){ var out=[]; for(var i=0;i<arr.length;i+=n) out.push(arr.slice(i,i+n)); return out; }
+function pmBatchUpdateWhere(col,field,value,patch){
+  if(typeof db==='undefined') return Promise.resolve(0);
+  return db.collection(col).where(field,'==',value).get().then(function(snap){
+    var docs=snap.docs; if(!docs.length) return 0;
+    var groups=pmChunksArr(docs,400), chain=Promise.resolve();
+    groups.forEach(function(g){
+      chain=chain.then(function(){ var b=db.batch(); g.forEach(function(d){ b.update(d.ref,patch); }); return b.commit(); });
+    });
+    return chain.then(function(){ return docs.length; });
+  });
+}
+
+/* ===== 3) لستة المشاريع من كل المصادر ===== */
+function pmProjectList(){
+  var set={};
+  try{ if(typeof OD_MAP!=='undefined') Object.keys(OD_MAP).forEach(function(k){ set[k]=1; }); }catch(e){}
+  try{ if(typeof moData!=='undefined') moData.forEach(function(r){ if(r.project) set[r.project]=1; }); }catch(e){}
+  try{ if(window.MR&&typeof window.MR.data==='function') window.MR.data().forEach(function(r){ if(r.project) set[r.project]=1; }); }catch(e){}
+  try{ if(typeof allEquipment!=='undefined') allEquipment.forEach(function(e){ if(e.project) set[e.project]=1; }); }catch(e){}
+  return Object.keys(set).sort(function(a,b){ return a.localeCompare(b); });
+}
+function pmOdOf(p){
+  try{ if(typeof OD_MAP!=='undefined'&&OD_MAP[p]) return OD_MAP[p]; }catch(e){}
+  try{ if(typeof moData!=='undefined'){ var r=moData.filter(function(x){return x.project===p;})[0]; if(r&&r.od) return r.od; } }catch(e){}
+  try{ if(window.MR){ var arr=window.MR.data().filter(function(x){return x.project===p;}); if(arr[0]&&arr[0].od) return arr[0].od; } }catch(e){}
+  return '—';
+}
+
+/* ===== 4) المودال ===== */
+var PM_Q='';
+function pmOpen(){
+  if(!pmIsAdmin()){ if(typeof toast==='function') toast('Admins only','error'); return; }
+  var ov=document.getElementById('pm-ov');
+  if(!ov){ ov=document.createElement('div'); ov.id='pm-ov'; ov.className='pm-ov';
+    ov.addEventListener('click',function(e){ if(e.target===ov) pmClose(); });
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML='<div class="pm-modal">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">'
+    +'<div style="font-size:16px;font-weight:700;">🗂️ إدارة المشاريع (الاسم و الـ O.D)</div>'
+    +'<button class="pm-btn" id="pm-close-btn">✕ إغلاق</button></div>'
+    +'<input class="pm-search" id="pm-search" placeholder="دوّر على مشروع...">'
+    +'<div style="font-size:11px;color:var(--text-dim);margin:-6px 0 10px;">تعديل الاسم أو نقل الـ O.D هنا بيتحدّث تلقائي في Master Owned و Master Rental و Fleet و O.D Map مع بعض.</div>'
+    +'<div id="pm-list"></div></div>';
+  ov.classList.add('on');
+  document.getElementById('pm-close-btn').addEventListener('click',pmClose);
+  document.getElementById('pm-search').addEventListener('input',function(e){ PM_Q=e.target.value; pmRenderList(); });
+  pmRenderList();
+}
+function pmClose(){ var ov=document.getElementById('pm-ov'); if(ov) ov.classList.remove('on'); }
+function pmRenderList(){
+  var list=document.getElementById('pm-list'); if(!list) return;
+  var q=PM_Q.trim().toLowerCase();
+  var projects=pmProjectList().filter(function(p){ return !q || p.toLowerCase().indexOf(q)!==-1; });
+  if(!projects.length){ list.innerHTML='<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:12px;">مفيش مشاريع مطابقة</div>'; return; }
+  var h='';
+  projects.forEach(function(p,idx){
+    h+='<div class="pm-row">'
+      +'<div><div class="pm-name">'+pmEsc(p)+'</div><div class="pm-od">O.D: '+pmEsc(pmOdOf(p))+'</div></div>'
+      +'<div class="pm-actions">'
+      +'<button class="pm-btn" data-pm-act="rename" data-pm-idx="'+idx+'">✏️ Rename</button>'
+      +'<button class="pm-btn" data-pm-act="move" data-pm-idx="'+idx+'">📍 Move O.D</button>'
+      +'</div></div>';
+  });
+  list.innerHTML=h;
+  list.querySelectorAll('[data-pm-act]').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var p=projects[parseInt(btn.getAttribute('data-pm-idx'),10)];
+      if(btn.getAttribute('data-pm-act')==='rename') pmRename(p); else pmMove(p);
+    });
+  });
+}
+
+/* ===== 4.5) اكتشاف فين المشروع موجود فعلاً ===== */
+function pmWhereExists(project){
+  var res={mo:0, mr:0, eq:0, inMap:false};
+  try{ if(typeof OD_MAP!=='undefined') res.inMap=OD_MAP.hasOwnProperty(project); }catch(e){}
+  try{ if(typeof moData!=='undefined') res.mo=moData.filter(function(r){return r.project===project;}).length; }catch(e){}
+  try{ if(window.MR&&typeof window.MR.data==='function') res.mr=window.MR.data().filter(function(r){return r.project===project;}).length; }catch(e){}
+  return res;
+}
+function pmWherePromise(project){
+  if(typeof db==='undefined') return Promise.resolve(pmWhereExists(project));
+  return db.collection('equipment').where('project','==',project).get().then(function(snap){
+    var r=pmWhereExists(project); r.eq=snap.size; return r;
+  }).catch(function(){ return pmWhereExists(project); });
+}
+function pmPlacesLine(w){
+  var parts=[];
+  if(w.mo) parts.push('Master Owned ('+w.mo+' صف)');
+  if(w.mr) parts.push('Master Rental ('+w.mr+' صف)');
+  if(w.eq) parts.push('Fleet ('+w.eq+' معدة)');
+  if(w.inMap) parts.push('O.D Map');
+  return parts.length?parts.join(' + '):'(المشروع ده مش موجود بيانات فعلية في أي مكان، غير O.D Map لو كان مسجل فيه)';
+}
+
+/* ===== 5) Rename ===== */
+function pmRename(oldName){
+  var newName=prompt('الاسم الجديد للمشروع:',oldName);
+  if(!newName) return;
+  newName=newName.trim();
+  if(!newName||newName===oldName) return;
+  if(typeof toast==='function') toast('⏳ بفحص فين المشروع موجود...');
+  pmWherePromise(oldName).then(function(w){
+    if(!w.mo && !w.mr && !w.eq && !w.inMap){ if(typeof toast==='function') toast('المشروع ده مش موجود في أي بيانات','error'); return; }
+    if(!confirm('هيتم تغيير اسم "'+oldName+'" إلى "'+newName+'" في: '+pmPlacesLine(w)+'. متأكد؟')) return;
+    pmDoRename(oldName,newName,w);
+  });
+}
+function pmDoRename(oldName,newName,w){
+  if(typeof toast==='function') toast('⏳ جاري التعديل...');
+  var jobs=[];
+  if(w.inMap){
+    try{
+      if(typeof OD_MAP!=='undefined'){
+        if(OD_MAP.hasOwnProperty(oldName)){ OD_MAP[newName]=OD_MAP[oldName]; delete OD_MAP[oldName]; }
+        jobs.push(pmSaveOdMap());
+      }
+    }catch(e){}
+  }
+  if(w.mo){
+    try{
+      if(typeof moData!=='undefined'){
+        var moChanged=false;
+        moData.forEach(function(r){ if(r.project===oldName){ r.project=newName; moChanged=true; } });
+        if(moChanged && typeof moWriteDataset==='function') moWriteDataset(moData);
+      }
+    }catch(e){}
+  }
+  if(w.mr) jobs.push(pmBatchUpdateWhere('master_rental','project',oldName,{project:newName}));
+  if(w.eq) jobs.push(pmBatchUpdateWhere('equipment','project',oldName,{project:newName}));
+  Promise.all(jobs).then(function(){
+    if(window.MR&&typeof window.MR.load==='function') window.MR.load().then(function(){ if(typeof window.MR.render==='function') window.MR.render(); });
+    if(typeof loadData==='function') loadData();
+    if(typeof toast==='function') toast('✅ اتغيّر الاسم في: '+pmPlacesLine({mo:w.mo,mr:w.mr,eq:w.eq,inMap:w.inMap}),'success');
+    pmRenderList();
+  }).catch(function(err){ if(typeof toast==='function') toast('خطأ: '+(err&&err.message||err),'error'); });
+}
+
+/* ===== 6) Move O.D ===== */
+function pmMove(project){
+  var current=pmOdOf(project);
+  var newOd=prompt('الـ O.D الجديد لمشروع "'+project+'":', current==='—'?'':current);
+  if(newOd==null) return;
+  newOd=newOd.trim();
+  if(!newOd) return;
+  if(typeof toast==='function') toast('⏳ بفحص فين المشروع موجود...');
+  pmWherePromise(project).then(function(w){
+    if(!w.mo && !w.mr && !w.eq && !w.inMap){ if(typeof toast==='function') toast('المشروع ده مش موجود في أي بيانات','error'); return; }
+    w.inMap=true; // هنضيفه/نحدثه في الماب على أي حال
+    if(!confirm('هيتم نقل "'+project+'" إلى O.D: "'+newOd+'" في: '+pmPlacesLine(w)+'. متأكد؟')) return;
+    pmDoMove(project,newOd,w);
+  });
+}
+function pmDoMove(project,newOd,w){
+  if(typeof toast==='function') toast('⏳ جاري النقل...');
+  var jobs=[];
+  try{ if(typeof OD_MAP!=='undefined'){ OD_MAP[project]=newOd; jobs.push(pmSaveOdMap()); } }catch(e){}
+  if(w.mo){
+    try{
+      if(typeof moData!=='undefined'){
+        var moChanged=false;
+        moData.forEach(function(r){ if(r.project===project){ r.od=newOd; moChanged=true; } });
+        if(moChanged && typeof moWriteDataset==='function') moWriteDataset(moData);
+      }
+    }catch(e){}
+  }
+  if(w.mr) jobs.push(pmBatchUpdateWhere('master_rental','project',project,{od:newOd}));
+  if(w.eq) jobs.push(pmBatchUpdateWhere('equipment','project',project,{od:newOd}));
+  Promise.all(jobs).then(function(){
+    if(window.MR&&typeof window.MR.load==='function') window.MR.load().then(function(){ if(typeof window.MR.render==='function') window.MR.render(); });
+    if(typeof loadData==='function') loadData();
+    if(typeof toast==='function') toast('✅ الـ O.D اتحدّث في: '+pmPlacesLine(w),'success');
+    pmRenderList();
+  }).catch(function(err){ if(typeof toast==='function') toast('خطأ: '+(err&&err.message||err),'error'); });
+}
+
+/* ===== 7) نافبار زرار ===== */
+function pmInjectNav(){
+  if(!pmIsAdmin()) return;
+  var side=document.querySelector('.sidebar');
+  if(!side || document.getElementById('nav-pm')) return;
+  var btn=document.createElement('button');
+  btn.className='nav-item'; btn.id='nav-pm';
+  btn.innerHTML='🗂️ إدارة المشاريع';
+  btn.addEventListener('click',pmOpen);
+  side.appendChild(btn);
+}
+
+/* ===== 8) Smart Import — Master Owned (Update-only / Add-only) ===== */
+function moSmartHandleImport(input, mode){
+  if(typeof moIsAdmin!=='undefined' && !moIsAdmin){ input.value=''; return; }
+  var file=input.files[0]; if(!file) return;
+  if(typeof toast==='function') toast('⏳ Reading Excel...');
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      var wb=XLSX.read(e.target.result,{type:'binary',cellDates:true});
+      var raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+      var hi=moFindHeader(raw);
+      if(hi<0){ if(typeof toast==='function') toast('مش لاقي صف العناوين','error'); input.value=''; return; }
+      var map=moMapHeaders(raw[hi]);
+      if(map.equipment===undefined){ if(typeof toast==='function') toast('مفيش عمود Equipment','error'); input.value=''; return; }
+      var data=[];
+      for(var i=hi+1;i<raw.length;i++){
+        var r=raw[i];
+        if(!r||!r.some(function(c){ return String(c).trim()!==''; })) continue;
+        data.push(moNormalizeRow(r,map));
+      }
+      if(!data.length){ if(typeof toast==='function') toast('مفيش صفوف','error'); input.value=''; return; }
+      assignKeys(data);
+      var oldK={}; moData.forEach(function(x){ oldK[x.key]=x; });
+      var newK={}; data.forEach(function(x){ newK[x.key]=x; });
+      var merged=moData.slice(), added=0, updated=0;
+      if(mode==='update'){
+        merged=merged.map(function(old){
+          var nw=newK[old.key];
+          if(nw && JSON.stringify(old)!==JSON.stringify(nw)){ updated++; return nw; }
+          return old;
+        });
+      } else {
+        Object.keys(newK).forEach(function(k){ if(!oldK[k]){ merged.push(newK[k]); added++; } });
+      }
+      if((mode==='update'&&!updated)||(mode==='add'&&!added)){
+        if(typeof toast==='function') toast(mode==='update'?'مفيش صفوف موجودة اتغيّرت':'مفيش معدات جديدة في الملف','error');
+        input.value=''; return;
+      }
+      var msg=mode==='update'
+        ? ('هيتم تحديث '+full(updated)+' صف موجود بس — من غير أي إضافة أو حذف. نكمل؟')
+        : ('هيتم إضافة '+full(added)+' معدة جديدة بس — من غير تعديل أي حاجة موجودة. نكمل؟');
+      if(!confirm(msg)){ input.value=''; return; }
+      moWriteDataset(merged);
+    }catch(err){ if(typeof toast==='function') toast('Parse error: '+err.message,'error'); }
+    input.value='';
+  };
+  reader.readAsBinaryString(file);
+}
+window.moSmartHandleImport=moSmartHandleImport;
+
+/* ===== 9) Boot ===== */
+pmLoadOdMap();
+if(document.readyState!=='loading') pmInjectNav(); else document.addEventListener('DOMContentLoaded',pmInjectNav);
+var pmN=0, pmIv=setInterval(function(){ pmN++; pmInjectNav(); if(document.getElementById('nav-pm')||pmN>40) clearInterval(pmIv); },500);
+
 })();
 </script>
 </body>
