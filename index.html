@@ -798,6 +798,10 @@ body.is-viewer #hac-btn, body.is-viewer #nav-pm { display:none !important; }
               📂 Update Excel
               <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="updateFuFromExcel(this)"/>
             </label>
+            <label id="fu-btn-addnew" class="btn-sm" style="display:none;background:rgba(63,185,80,.15);border-color:rgba(63,185,80,.4);color:var(--green);cursor:pointer;" title="Add only the new rows (SN greater than the last registered SN) — nothing existing is changed or deleted">
+              ➕ Add New Only
+              <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="addNewFuFromExcel(this)"/>
+            </label>
             <button id="fu-btn-clear" class="btn-sm" style="display:none;background:rgba(248,81,73,.1);border-color:rgba(248,81,73,.3);color:var(--red);" onclick="clearFollowUpData()">🗑 Clear Data</button>
           </div>
         </div>
@@ -1813,6 +1817,7 @@ auth.onAuthStateChanged(function(user) {
     document.getElementById('actions-col').style.display = isAdmin ? '' : 'none';
     document.getElementById('fu-actions-col').style.display = isAdmin ? '' : 'none';
     document.getElementById('fu-btn-upload').style.display = isAdmin ? 'inline-flex' : 'none';
+    document.getElementById('fu-btn-addnew').style.display = isAdmin ? 'inline-flex' : 'none';
     document.getElementById('fu-btn-clear').style.display  = isAdmin ? 'inline-flex' : 'none';
     document.getElementById('fu-btn-add').style.display    = isAdmin ? 'inline-flex' : 'none';
     document.getElementById('btn-viewers-log').style.display = isAdmin ? 'inline-flex' : 'none';
@@ -3086,6 +3091,123 @@ function exportFuCSV() {
   a.href = 'data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csv);
   a.download = 'HAC_FollowUp_Export.csv';
   a.click();
+}
+
+/* ➕ Add New Only — يقرا من الشيت الصفوف الجديدة بس (SN أكبر من آخر SN متسجل) ومايلمسش الموجود */
+function addNewFuFromExcel(input) {
+  const file = input.files[0];
+  if(!file) return;
+  if(!isAdmin){ input.value=''; return; }
+
+  toast('⏳ Reading Excel...');
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'binary'});
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {defval:'', header:1});
+
+      let headerIdx = -1;
+      for(let i=0; i<Math.min(rows.length,10); i++){
+        const row = rows[i].map(function(c){ return String(c).trim().toLowerCase(); });
+        if(row.some(function(c){ return c.indexOf('equipment')!==-1; }) && row.some(function(c){ return c.indexOf('project')!==-1; })){ headerIdx = i; break; }
+      }
+      if(headerIdx < 0){ toast('Header row not found','error'); input.value=''; return; }
+
+      const headers = rows[headerIdx].map(function(c){ return String(c).trim().toLowerCase(); });
+      const find = function() {
+        const terms = Array.prototype.slice.call(arguments);
+        return headers.findIndex(function(h){
+          return terms.some(function(t){ return h.replace(/[^a-z0-9]/g,'').indexOf(t.replace(/[^a-z0-9]/g,''))!==-1; });
+        });
+      };
+      const iSn=0, iEquip=find('equipment'), iCap=find('capacity'), iQty=find('qty','quantity');
+      const iSap=find('sap'), iProj=find('project','desc'), iEng=find('eng','engineer');
+      const iContact=find('contact');
+      let iSub=find('submission'); if(iSub<0) iSub=find('date');
+      const iProv=find('provision','method'), iFrom=find('from'), iTo=find('to'), iDays=find('days'), iNotes=find('notes');
+
+      // آخر SN متسجل عندي
+      const existingSn = {};
+      let maxSn = 0;
+      FU_DATA.forEach(function(r){ const n = Number(r.sn)||0; if(n>0){ existingSn[n]=1; if(n>maxSn) maxSn=n; } });
+
+      const fresh = [];
+      let sheetMax = 0;
+      for(let i=headerIdx+1; i<rows.length; i++){
+        const r = rows[i];
+        const equip = String(r[iEquip]||'').trim();
+        if(!equip) continue;
+        const sn = Number(r[iSn]) || (i - headerIdx);
+        if(sn > sheetMax) sheetMax = sn;
+        if(sn <= maxSn || existingSn[sn]) continue;   // موجود قبل كده → تجاهل
+
+        const prov = String(r[iProv]||'').trim();
+        const provNorm = prov.charAt(0).toUpperCase() + prov.slice(1).toLowerCase();
+        const provFinal = ({'Rental':'Rental','Transfer':'Transfer','Hold':'Hold','Cancel':'Cancel','Pending':'Pending'}[provNorm]) || provNorm || 'Pending';
+        const subRaw = r[iSub];
+        fresh.push({
+          sn: sn,
+          equipment: equip,
+          capacity: String(r[iCap]||'').trim(),
+          qty: Number(r[iQty]) || 1,
+          sap: String(r[iSap]||'').trim(),
+          project: String(r[iProj]||'').trim(),
+          engineer: String(r[iEng]||'').trim(),
+          contact: String(r[iContact]||'').trim(),
+          submission_date: (Number(subRaw) > 30000 && Number(subRaw) < 70000) ? formatExcelDate(subRaw) : String(subRaw||'').trim(),
+          provision: provFinal,
+          date_from: formatExcelDate(r[iFrom]),
+          date_to: formatExcelDate(r[iTo]),
+          days: Number(r[iDays]) || 0,
+          notes: String(r[iNotes]||'').trim()
+        });
+      }
+
+      input.value = '';
+      if(!fresh.length){
+        toast('مفيش معدات جديدة — آخر SN عندك '+maxSn+' وآخر SN في الشيت '+sheetMax);
+        return;
+      }
+      fresh.sort(function(a,b){ return a.sn-b.sn; });
+
+      const preview = fresh.slice(0,12).map(function(x){ return x.sn+' · '+x.equipment+(x.project?' — '+x.project:''); }).join('\n')
+                    + (fresh.length>12 ? '\n… +'+(fresh.length-12)+' more' : '');
+      if(!confirm('آخر SN متسجل: '+maxSn+'\nالشيت لحد SN: '+sheetMax+'\n\nهيتضاف '+fresh.length+' معدة جديدة بس (من غير تعديل أو حذف أي حاجة موجودة):\n\n'+preview+'\n\nنكمل؟')) return;
+
+      toast('⏳ Adding '+fresh.length+' new record(s)...');
+      let p = Promise.resolve();
+      for(let i=0; i<fresh.length; i+=400){
+        (function(chunk){
+          p = p.then(function(){
+            const batch = db.batch();
+            chunk.forEach(function(item){
+              const ref = db.collection('followup').doc();
+              item.id = ref.id;
+              batch.set(ref, Object.assign({}, item, {createdAt: firebase.firestore.FieldValue.serverTimestamp()}));
+            });
+            return batch.commit();
+          });
+        })(fresh.slice(i,i+400));
+      }
+      p.then(function(){
+        fresh.forEach(function(x){ FU_DATA.push(x); });
+        setupFollowUpUI();
+        toast('✅ اتضاف '+fresh.length+' معدة جديدة (SN '+fresh[0].sn+(fresh.length>1?' → '+fresh[fresh.length-1].sn:'')+')');
+      }).catch(function(err){
+        if(err.code === 'resource-exhausted'){
+          fresh.forEach(function(x,idx){ x.id = 'local_'+Date.now()+'_'+idx; FU_DATA.push(x); });
+          setupFollowUpUI();
+          toast('⚠️ Cloud quota full: added locally only (resets 10 AM Cairo)', 'error');
+        } else {
+          toast('Error: '+err.message, 'error');
+        }
+      });
+    } catch(err){
+      input.value = '';
+      toast('Error: '+err.message, 'error');
+    }
+  };
+  reader.readAsBinaryString(file);
 }
 
 function updateFuFromExcel(input) {
