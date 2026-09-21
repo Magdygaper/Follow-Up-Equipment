@@ -1942,6 +1942,7 @@ auth.onAuthStateChanged(function(user) {
 
     document.getElementById('btn-add-eq').style.display = isAdmin ? 'flex' : 'none';
     document.getElementById('btn-import-eq').style.display = isAdmin ? 'inline-flex' : 'none';
+        document.getElementById('btn-clear-import').style.display = isAdmin ? 'inline-flex' : 'none';
         document.getElementById('btn-clear-fleet').style.display = isAdmin ? 'inline-flex' : 'none';
         document.getElementById('btn-update-years').style.display = isAdmin ? 'inline-flex' : 'none';
 
@@ -2614,7 +2615,7 @@ function renderTable() {
   
   document.getElementById('table-body').innerHTML = data.map(function(e, i){
     return '<tr style="cursor:pointer;" onclick="showEquipHistory(\''+e.id+'\')">'
-      +'<td style="color:var(--text-muted)">'+(e.sn || (i+1))+'</td>'
+      +'<td style="color:var(--text-muted)">'+(i+1)+'</td>'
       +'<td style="font-weight:600">'+(e.equipment||'')+'</td>'
       +'<td><span class="cat-badge">'+(e.category||'')+'</span></td>'
       +'<td style="color:var(--text-muted)">'+(e.brand||'')+'</td>'
@@ -4062,7 +4063,7 @@ function exportEquipPDF() {
   });
   function f(k){ return function(r){ return r[k]; }; }
   const cols = [
-    {h:'#',g:function(r,i){return r.sn || (i+1);},t:'t'},{h:'Equipment',g:f('equipment'),t:'t'},{h:'Category',g:f('category'),t:'t'},
+    {h:'#',g:function(r,i){return i+1;},t:'t'},{h:'Equipment',g:f('equipment'),t:'t'},{h:'Category',g:f('category'),t:'t'},
     {h:'Brand / Model',g:f('brand'),t:'t'},{h:'Capacity',g:function(r){return eqCapacity(r).v;},t:'t'},{h:'Code',g:f('code'),t:'t'},
     {h:'Project',g:f('project'),t:'t'},{h:'O.D',g:function(r){return isCentralWorkshop(r.project) ? '\u2014' : (r.od||'');},t:'t'},{h:'Year',g:f('year'),t:'t'}];
   window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 Equipment List Export',cols:cols,rows:data});
@@ -4103,11 +4104,38 @@ window.confirmFleetImport = function(fleetValue) {
     reader.onload = function(e) {
       const wb = XLSX.read(e.target.result, {type:'binary'});
 
-      // Egypt has its own master sheet ("HAC Egypt" = the official 1,034 units, with Power / Code Sap / Chassis).
-      // Every other fleet: All_Data first (filtered by its Country column), fallback to the first sheet.
-      const FLEET_OWN_SHEET = { egypt: 'HAC Egypt' };
-      const sheetName = (FLEET_OWN_SHEET[fleetValue] && wb.SheetNames.find(function(s){ return s.trim() === FLEET_OWN_SHEET[fleetValue]; }))
-        || wb.SheetNames.find(function(s){ return s.trim() === 'All_Data'; }) || wb.SheetNames[0];
+      // Every fleet gets a chance to use its OWN named tab first (real tab names in this workbook,
+      // e.g. "Algeria Equipment", "KSA Equipment", "UAE Equipment"), so edits made in that tab are
+      // actually picked up. Only if no matching tab exists do we fall back to "All_Data"
+      // (filtered by its Country column), then the first sheet.
+      const FLEET_OWN_SHEET = {
+        egypt:      ['HAC Egypt', 'Egypt Equipment', 'Egypt'],
+        ksa:        ['KSA Equipment', 'Saudi Arabia', 'Saudi', 'KSA'],
+        algeria:    ['Algeria Equipment', 'Algeria'],
+        uae:        ['UAE Equipment', 'UAE'],
+        foundation: ['Foundation'],
+        tunnelling: ['Tunnelling', 'Tunneling'],
+        jv:         ['JV Equipment', 'JV']
+      };
+      const ownNames = FLEET_OWN_SHEET[fleetValue] || [];
+      let sheetName = null;
+      // Pass 1: exact name match (case-insensitive)
+      for (let k = 0; k < ownNames.length; k++) {
+        const found = wb.SheetNames.find(function(s){ return s.trim().toLowerCase() === ownNames[k].toLowerCase(); });
+        if (found) { sheetName = found; break; }
+      }
+      // Pass 2: fuzzy match — sheet name starts with / contains the keyword, skipping
+      // dashboards, summaries and sub-sheets (STCC, distribute, index, report, scrap, sold...)
+      if (!sheetName && ownNames.length) {
+        const EXCLUDE = /dashboard|distribute|index|report|stcc|categor|scrap|sold|workshop/i;
+        sheetName = wb.SheetNames.find(function(s){
+          if (EXCLUDE.test(s)) return false;
+          const t = s.trim().toLowerCase();
+          return ownNames.some(function(k){ return t.indexOf(k.toLowerCase()) !== -1; });
+        });
+      }
+      if (!sheetName) sheetName = wb.SheetNames.find(function(s){ return s.trim() === 'All_Data'; }) || wb.SheetNames[0];
+      toast('📄 Reading sheet: "' + sheetName + '"');
       const ws = wb.Sheets[sheetName];
 
       // Find header row
@@ -5999,7 +6027,7 @@ var n=0, iv=setInterval(function(){ n++; if($('fu-btn-upload')||n>40){ clearInte
 'use strict';
 
 var COL='master_rental', LS='mr_cache_v12';
-var DATA=[], EXIST={}, AUDIT=null, FILE_IN=null, SMART_FILE_IN=null, SMART_MODE=null;
+var DATA=[], EXIST={}, AUDIT=null, FILE_IN=null, SMART_FILE_IN=null, SMART_MODE=null, CLEAR_FILE_IN=null;
 var F={cat:null,od:null,month:null,proj:null,q:''};
 
 function $(id){ return document.getElementById(id); }
@@ -6250,6 +6278,31 @@ function doImportMode(file,mode){
     });
   });
 }
+function doClearAndImport(file){
+  if(!isAdminNow()){ tt('Admins only','error'); return; }
+  tt('Reading file...');
+  readWB(file,function(err,wb){
+    if(err){ tt('File read error: '+err.message,'error'); return; }
+    var out=parseWB(wb); AUDIT=out.audit; var recs=out.recs;
+    if(!recs.length){ tt('No rows were read (Check Quantity / Headers)','error'); showAudit(); return; }
+    if(!confirm('هيتم حذف كل بيانات Master Rental الحالية ('+fmtInt(DATA.length)+' صف) واستبدالها بالكامل بـ '+fmtInt(recs.length)+' صف من الملف — بالظبط زي ما هما في الشيت. نكمل؟')) return;
+    tt('⏳ Deleting old data...');
+    db.collection(COL).get().then(function(snap){
+      var docs=snap.docs, chunks=[], i;
+      for(i=0;i<docs.length;i+=400) chunks.push(docs.slice(i,i+400));
+      var chain=Promise.resolve();
+      chunks.forEach(function(ch){ chain=chain.then(function(){ var b=db.batch(); ch.forEach(function(d){ b.delete(d.ref); }); return b.commit(); }); });
+      return chain;
+    }).then(function(){
+      recs.forEach(function(r){ r._h=rowHash(r); });
+      tt('⏳ Uploading '+fmtInt(recs.length)+' rows...');
+      writeBatches(recs,3,function(done,total){},function(failed){
+        load().then(function(){ render(); });
+        tt('✓ Replaced with '+fmtInt(recs.length)+' rows'+(failed&&failed.length?' (some batches failed — check console)':''));
+      });
+    }).catch(function(e){ tt('Delete failed: '+e.message,'error'); });
+  });
+}
 function doWipe(){
   if(!isAdminNow()){ tt('Admins only','error'); return; }
   var ok=prompt('Delete all Master Rental data ('+DATA.length+' records)?\nType DELETE to confirm:');
@@ -6453,6 +6506,7 @@ function render(){
   h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">';
   if(isAdminNow()) h+='<button class="btn-sm" style="background:var(--accent);color:#000;font-weight:700;" data-act="import">📥 Import Rental Excel</button>';
   if(isAdminNow()) h+='<button class="btn-sm" style="border-color:rgba(63,185,80,.4);color:#3fb950;" data-act="smart-pick" data-v="add">➕ Add New Only</button>';
+  if(isAdminNow()) h+='<button class="btn-sm" style="border-color:rgba(248,81,73,.4);color:#f85149;" data-act="clear-import" title="Deletes ALL existing Master Rental data and replaces it with exactly what is in the uploaded sheet">🗑️ Clear & Import</button>';
   h+='<button class="btn-sm" data-act="refresh">⟳ Refresh</button>';
   h+='<button class="btn-sm accent" data-act="director">📄 Director Report</button>';
   h+='<button class="btn-sm" data-act="exportpdf">📄 Export PDF</button>';
@@ -6617,6 +6671,12 @@ function onAct(act,v){
   if(act==='refresh'){ tt('Refreshing...'); load().then(function(){ render(); }); return; }
   if(act==='director'){ mrDirectorReport(); return; }
   if(act==='exportpdf'){ mrExportPDF(); return; }
+  if(act==='clear-import'){
+    if(!isAdminNow()){ tt('Admins only','error'); return; }
+    if(!CLEAR_FILE_IN){ CLEAR_FILE_IN=document.createElement('input'); CLEAR_FILE_IN.type='file'; CLEAR_FILE_IN.accept='.xlsx,.xls,.csv'; CLEAR_FILE_IN.style.display='none'; document.body.appendChild(CLEAR_FILE_IN);
+      CLEAR_FILE_IN.addEventListener('change',function(){ if(CLEAR_FILE_IN.files&&CLEAR_FILE_IN.files[0]) doClearAndImport(CLEAR_FILE_IN.files[0]); CLEAR_FILE_IN.value=''; }); }
+    CLEAR_FILE_IN.click(); return;
+  }
   if(act==='wipe'){ doWipe(); return; }
   if(act==='month'){ F.month=(F.month===v?null:(v||null)); render(); return; }
   if(act==='cat'){ F.cat=(F.cat===v?null:v); closeOv(); render(); return; }
