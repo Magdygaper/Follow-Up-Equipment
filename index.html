@@ -312,6 +312,75 @@ tr.selected-row td:nth-child(2){
 
 /* viewer: hide admin-only sidebar tools */
 body.is-viewer #hac-btn, body.is-viewer #nav-pm { display:none !important; }
+
+/* ===== RENTAL DATABASE PAGE ===== */
+.rd-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.rd-head-r{display:flex;align-items:center;gap:10px;}
+.rd-admin{display:none !important;}
+body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
+#rd-status{font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;}
+.rd-msg{background:var(--surface);border:1px dashed var(--border);border-radius:var(--radius-lg);padding:40px 24px;text-align:center;color:var(--text-muted);font-size:13px;line-height:1.7;}
+.rd-msg b{color:var(--text);}
+.rd-msg.err{border-color:rgba(248,81,73,.5);color:var(--red);}
+.rd-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:6px 0 16px;}
+.rd-cards .dash-card.rd-static{cursor:default;}
+.rd-cards .dash-card.rd-static:hover{border-color:var(--border);transform:none;}
+.rd-cards .dash-card-val{font-size:24px;}
+.rd-cards .dash-card-sub{opacity:.85;white-space:normal;line-height:1.5;}
+.rd-cards .dash-card.warn .dash-card-val{color:var(--red);}
+.rd-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(380px,100%),1fr));gap:14px;margin-bottom:8px;}
+.rd-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;min-width:0;}
+.rd-panel.wide{grid-column:1/-1;}
+.rd-ptitle{font-size:13px;font-weight:600;color:var(--text);}
+.rd-psub{font-size:11px;color:var(--text-muted);margin:2px 0 12px;}
+.rd-row{display:grid;grid-template-columns:minmax(80px,40%) 1fr 42px;gap:10px;align-items:center;padding:5px 6px;border-radius:6px;cursor:pointer;}
+.rd-row:hover{background:var(--surface2);}
+.rd-row.on{background:rgba(240,165,0,.1);}
+.rd-row.on .rd-lbl{color:var(--accent);font-weight:600;}
+.rd-lbl{font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rd-bar{height:8px;background:var(--surface3);border-radius:4px;overflow:hidden;}
+.rd-bar i{display:block;height:100%;border-radius:4px;}
+.rd-num{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);text-align:right;white-space:nowrap;}
+.rd-terms{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:18px;}
+.rd-tblock-t{font-size:11px;color:var(--text-muted);margin-bottom:6px;padding:0 6px;}
+.rd-months{display:flex;align-items:stretch;gap:6px;height:190px;}
+.rd-mcol{flex:1;display:flex;flex-direction:column;align-items:center;cursor:pointer;border-radius:6px;padding:4px 2px;min-width:0;}
+.rd-mcol:hover{background:var(--surface2);}
+.rd-mcol.on{background:rgba(240,165,0,.1);}
+.rd-mn{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);height:14px;}
+.rd-mbw{flex:1;width:100%;display:flex;align-items:flex-end;}
+.rd-mb{width:100%;background:var(--blue);border-radius:4px 4px 0 0;min-height:2px;}
+.rd-mcol.on .rd-mb{background:var(--accent);}
+.rd-ml{font-size:10px;color:var(--text-muted);margin-top:4px;white-space:nowrap;}
+.rd-bt{width:100%;}
+.rd-bt th,.rd-bt td{padding:8px 10px;font-size:12px;position:static !important;box-shadow:none !important;text-align:left !important;width:auto !important;min-width:0 !important;background:transparent !important;}
+.rd-bt th.n,.rd-bt td.n{text-align:right !important;font-family:'JetBrains Mono',monospace;}
+.rd-bt tr.rd-btr{cursor:pointer;}
+.rd-bt tr.rd-btr:hover td{background:var(--surface2) !important;}
+.rd-bt tr.rd-btr.on td{background:rgba(240,165,0,.1) !important;color:var(--accent);}
+.rd-link{background:none;border:none;color:var(--blue);cursor:pointer;font-size:12px;padding:8px 0 0;}
+.rd-note{max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rd-tbl th[data-rd="sort"]{cursor:pointer;user-select:none;}
+.rd-tbl th[data-rd="sort"]:hover{color:var(--text);}
+.rd-warn{color:var(--accent);font-weight:600;}
+.rd-muted{color:var(--text-dim);}
+@media (max-width:860px){
+  .rd-cards{grid-template-columns:repeat(2,1fr);gap:8px;}
+  .rd-cards .dash-card-val{font-size:20px;}
+  .rd-months{height:150px;}
+  .rd-lbl{white-space:normal;}
+}
+
+.rd-seg{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 12px;font-size:12px;color:var(--text-muted);}
+.rd-seg button{background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);padding:6px 12px;border-radius:20px;cursor:pointer;font-size:12px;}
+.rd-seg button.on{background:rgba(240,165,0,.15);border-color:var(--accent);color:var(--accent);font-weight:600;}
+.rd-row.money{grid-template-columns:minmax(80px,36%) 1fr 64px;}
+.rd-chk{display:flex;gap:12px;align-items:flex-start;padding:9px 8px;border-radius:6px;cursor:pointer;font-size:12px;line-height:1.5;}
+.rd-chk:hover{background:var(--surface2);}
+.rd-chk.on{background:rgba(240,165,0,.1);}
+.rd-chk-n{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--red);min-width:36px;text-align:right;}
+.rd-chk-h{color:var(--text-muted);font-size:11px;}
+.rd-terms .rd-lbl{white-space:normal;line-height:1.3;}
 </style>
 </head>
 <body class="is-viewer">
@@ -435,6 +504,16 @@ body.is-viewer #hac-btn, body.is-viewer #nav-pm { display:none !important; }
       <button class="nav-item" onclick="showPage('followup',this)">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path></svg>
         Follow-Up System
+      </button>
+
+      <!-- SECTION 4: RENTAL DATABASE -->
+      <div class="nav-divider">
+        <span class="nav-divider-text">Rental Rates</span>
+        <div class="nav-divider-line"></div>
+      </div>
+      <button class="nav-item" id="nav-rentaldb" onclick="showPage('rentaldb',this); rdOpen();">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+        Rental Database
       </button>
 
     </div>
@@ -642,9 +721,10 @@ body.is-viewer #hac-btn, body.is-viewer #nav-pm { display:none !important; }
           <select id="filter-type" onchange="renderTable()"><option value="">All Types</option></select>
           <select id="filter-proj" onchange="renderTable()"><option value="">All Projects</option></select>
           <button class="btn-add" id="btn-add-eq" style="display:none;" onclick="openAddModal()">+ Add Equipment</button>
-          <label id="btn-import-eq" style="display:none; background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 8px 14px; border-radius: var(--radius); cursor: pointer; font-size: 13px; font-weight: 600; white-space: nowrap;">
-            📥 Import Excel
-            <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="importExcel(this)">
+          <button class="btn-sm" onclick="exportEquipPDF()">📄 PDF</button>
+          <label id="btn-import-eq" title="Adds only equipment whose Code is not registered yet in the chosen fleet — nothing existing is changed or deleted" style="display:none; background:rgba(63,185,80,.15); border: 1px solid rgba(63,185,80,.4); color: var(--green); padding: 8px 14px; border-radius: var(--radius); cursor: pointer; font-size: 13px; font-weight: 600; white-space: nowrap;">
+            ➕ Add New Only
+            <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="addNewEquipFromExcel(this)">
           </label>
           <label id="btn-clear-import" style="display:none; background:rgba(248,81,73,.15); border: 1px solid rgba(248,81,73,.4); color: #f85149; padding: 8px 14px; border-radius: var(--radius); cursor: pointer; font-size: 13px; font-weight: 600; white-space: nowrap;">
             🗑️ Clear & Import
@@ -662,7 +742,7 @@ body.is-viewer #hac-btn, body.is-viewer #nav-pm { display:none !important; }
           <table>
             <thead>
               <tr>
-                <th>#</th><th>Equipment</th><th>Category</th><th>Brand / Model</th>
+                <th>#</th><th>Equipment</th><th>Category</th><th>Brand / Model</th><th>Capacity</th>
                 <th>Code</th><th>Project</th><th>O.D</th><th>Year</th>
                 <th id="actions-col" style="display:none;">Actions</th>
               </tr>
@@ -791,7 +871,7 @@ body.is-viewer #hac-btn, body.is-viewer #nav-pm { display:none !important; }
             <div class="section-sub" style="margin-bottom:0;">Live project provision requests · Click cards to filter status</div>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
-            <button class="btn-sm" onclick="exportFuCSV()">⬇ Export CSV</button>
+            <button class="btn-sm" onclick="exportFuPDF()">📄 PDF</button>
             <button id="fu-btn-undo" class="btn-sm" style="display:none;background:rgba(240,165,0,.15);border-color:rgba(240,165,0,.4);color:var(--accent);" onclick="undoLastFuStatus()" title="Undo last status change">↩ Undo</button>
             <button id="fu-btn-add" class="btn-sm" style="display:none;background:rgba(63,185,80,.15);border-color:rgba(63,185,80,.4);color:var(--green);" onclick="openAddFuModal()">+ Add Equipment</button>
             <label id="fu-btn-upload" class="btn-sm" style="display:none;background:rgba(88,166,255,.15);border-color:rgba(88,166,255,.4);color:var(--blue);cursor:pointer;">
@@ -867,6 +947,48 @@ body.is-viewer #hac-btn, body.is-viewer #nav-pm { display:none !important; }
         <div style="padding:10px 14px;background:var(--surface2);border-top:1px solid var(--border);display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);">
           <span id="fu-table-count">0 requests</span>
           <span id="fu-table-days" style="font-family:'JetBrains Mono'">Total: 0 days</span>
+        </div>
+      </div>
+
+      <!-- ================= 6. RENTAL DATABASE PAGE ================= -->
+      <div class="page" id="page-rentaldb">
+        <div class="rd-head">
+          <div>
+            <div class="section-title">Rental Database</div>
+            <div class="section-sub" id="rd-sub">Rental equipment rates · 10th of Ramadan sector</div>
+          </div>
+          <div class="rd-head-r">
+            <span id="rd-status"></span>
+            <label class="btn-sm rd-admin" style="background:rgba(88,166,255,.15);border-color:rgba(88,166,255,.4);color:var(--blue);cursor:pointer;align-items:center;">
+              ⬆ Upload Excel
+              <input type="file" accept=".xlsx,.xlsm,.xls" style="display:none" onchange="rdImport(this)">
+            </label>
+            <button class="btn-sm rd-admin" style="border-color:rgba(248,81,73,.5);color:var(--red);" onclick="rdWipeAll()">🗑 Delete All Data</button>
+          </div>
+        </div>
+
+        <div id="rd-msg"></div>
+
+        <div id="rd-main" style="display:none;">
+          <div class="active-filter-bar" id="rd-filterbar" style="display:none;"></div>
+          <div class="rd-cards" id="rd-cards"></div>
+          <div class="rd-seg" id="rd-seg"><span>Charts show:</span>
+            <button data-rd="metric" data-v="n" class="on">Records</button>
+            <button data-rd="metric" data-v="d">Daily rates total</button>
+            <button data-rd="metric" data-v="m">Monthly rates total</button>
+          </div>
+          <div class="rd-grid" id="rd-panels"></div>
+
+          <div class="dash-section-label">Rate records</div>
+          <div class="toolbar">
+            <input type="text" class="search-box" id="rd-q" placeholder="Search equipment, model, vendor, project, contact, note…">
+            <select id="rd-sel-plant"></select>
+            <select id="rd-sel-cat"></select>
+            <select id="rd-sel-rate"></select>
+            <span id="rd-count" style="font-size:12px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;"></span>
+          </div>
+          <div class="table-wrap rd-tbl" id="rd-table"></div>
+          <div id="rd-more" style="text-align:center;margin-top:12px;"></div>
         </div>
       </div>
 
@@ -1055,6 +1177,15 @@ body.is-viewer #hac-btn, body.is-viewer #nav-pm { display:none !important; }
     <div class="breakdown-sub" id="hist-sub" style="font-size:11px;color:var(--text-muted)"></div>
     <div id="hist-content"></div>
     <button class="breakdown-close" onclick="closeModal('history-modal')">Close</button>
+  </div>
+</div>
+
+<div class="breakdown-overlay" id="fu-price-modal">
+  <div class="breakdown-box" style="width:640px;max-height:85vh;overflow-y:auto;">
+    <div class="breakdown-title" id="fup-title"></div>
+    <div class="breakdown-sub" id="fup-sub" style="font-size:11px;color:var(--text-muted)"></div>
+    <div id="fup-content" style="margin-top:14px;"></div>
+    <button class="breakdown-close" onclick="closeModal('fu-price-modal')">Close</button>
   </div>
 </div>
 
@@ -2307,6 +2438,62 @@ function renderCatBreakdown(){
   wrap.style.display='block';
 }
 
+/* Capacity = number + unit ONLY (model / brand words are dropped), so "Denyo 100 K.V.A",
+   "Cat 100KVA" and "100 kva" all land in one "100 KVA" group.
+   Source order: Equipment name -> imported Power column (Brand / Model is NOT used).
+   Power cells are free text ("42.4KW | 56.9HP | 6950KG", "Capacity 12t HUH 40.9 ...", "55T, 245Kw"),
+   so: an explicit "Capacity <n> <unit>" wins; otherwise units are tried in a priority order
+   (lifting machines look for Ton first, everything else for KVA / kW first). */
+const CAP_NUM = '(\\d{1,3}(?:,\\d{3})+(?:\\.\\d+)?|\\d+(?:[.,]\\d+)?)';
+const CAP_EXPLICIT = new RegExp('capacity\\s*[:=]?\\s*' + CAP_NUM + '\\s*(k\\.?\\s*v\\.?\\s*a|k\\.?\\s*w|tonnes?|tons?|t|kg|m\\s*[3³]|l)(?![a-z])', 'i');
+const CAP_UNIT_RE = {
+  kva: 'k\\.?\\s*v\\.?\\s*a', kw: 'k\\.?\\s*w', ton: 'tonnes?|tons?', hp: 'hp', cfm: 'cfm',
+  m3: 'm\\s*[3³]', t: 't', kg: 'kg', bar: 'bar', l: 'l'
+};
+const CAP_ORDER_DEFAULT = ['kva','kw','ton','hp','cfm','m3','t','kg','bar','l'];
+const CAP_ORDER_LIFT    = ['ton','t','kva','kw','kg','hp','cfm','m3','bar','l'];
+const CAP_RE_CACHE = {};
+function capUnitRe(k){
+  return CAP_RE_CACHE[k] || (CAP_RE_CACHE[k] = new RegExp(CAP_NUM + '\\s*(' + CAP_UNIT_RE[k] + ')(?![a-z])', 'i'));
+}
+function capFmt(m){
+  let n = m[1];
+  n = /^\d{1,3}(,\d{3})+/.test(n) ? n.replace(/,/g,'') : n.replace(',','.');
+  n = String(parseFloat(n));
+  const u = m[2].toLowerCase().replace(/[.\s]/g,'');
+  const unit = u==='kva' ? 'KVA' : (u==='kw' ? 'kW' : (u==='t' || /^ton/.test(u) ? 'Ton' : (/^m[3³]$/.test(u) ? 'M3' : (u==='bar' ? 'Bar' : u.toUpperCase()))));
+  return n + ' ' + unit;
+}
+function capParse(text, equipName){
+  const t = String(text||'').replace(/\s+/g,' ').trim();
+  if(!t) return null;
+  let m = CAP_EXPLICIT.exec(t);
+  if(m) return capFmt(m);
+  const order = /crane|fork\s*lift|forklift|telehandler|lift|hoist/i.test(String(equipName||'')) ? CAP_ORDER_LIFT : CAP_ORDER_DEFAULT;
+  for(let k = 0; k < order.length; k++){
+    m = capUnitRe(order[k]).exec(t);
+    if(m) return capFmt(m);
+  }
+  return null;
+}
+function eqCapacity(e){
+  // 1) the Equipment column itself ("Generator 500 KVA")
+  const fromName = capParse(e.equipment, e.equipment);
+  if(fromName) return {v:fromName};
+  // 2) the Power column
+  const raw = String(e.power||'').replace(/\s+/g,' ').trim();
+  if(!raw || /^[-\u2013\u2014]+$/.test(raw)) return {v:'\u2014'};
+  const fromPower = capParse(raw, e.equipment);
+  if(fromPower) return {v:fromPower};
+  if(/^\d+(\.\d+)?$/.test(raw)){                      // plain number: add the unit that fits the type
+    const t = String(e.equipment||'').toLowerCase();
+    return {v: raw + (/generator/.test(t) ? ' KVA' : (/crane/.test(t) ? ' Ton' : ''))};
+  }
+  const mm = /^(\d+(?:\.\d+)?)\s*m$/i.exec(raw);      // "17 M" (height / reach) only when it is the whole value
+  if(mm) return {v: mm[1] + ' M'};
+  return {v:raw};
+}
+
 function showTypeDetail(type, cat) {
   const base = allEquipment.filter(function(e){
     if((e.fleet || 'egypt') !== currentFleet) return false;   // ← الدولة المختارة بس
@@ -2317,7 +2504,7 @@ function showTypeDetail(type, cat) {
   const color = CAT_COLORS[cat]||'var(--accent)';
   const powerGroups={};
   base.forEach(function(e){
-    const pw = String(e.power||'').trim()||'—';
+    const cap = eqCapacity(e), pw = cap.v;
     if(!powerGroups[pw]) powerGroups[pw]=[];
     powerGroups[pw].push(e);
   });
@@ -2431,6 +2618,7 @@ function renderTable() {
       +'<td style="font-weight:600">'+(e.equipment||'')+'</td>'
       +'<td><span class="cat-badge">'+(e.category||'')+'</span></td>'
       +'<td style="color:var(--text-muted)">'+(e.brand||'')+'</td>'
+      +'<td style="font-family:monospace;font-size:12px;white-space:nowrap">'+eqCapacity(e).v+'</td>'
       +'<td class="code-cell">'+(e.code||'')+'</td>'
       +'<td>'+(e.project||'—')+'</td>'
       +'<td style="color:var(--text-muted);font-size:12px">'+(isCentralWorkshop(e.project) ? '—' : (e.od||'—'))+'</td>'
@@ -2842,7 +3030,9 @@ function renderFollowUpTable() {
 
     return '<tr>'
       +'<td style="color:var(--text-dim);font-family:\'JetBrains Mono\'">'+(i+1)+'</td>'
-      +'<td style="font-weight:600;">'+(r.equipment||'—')+'</td>'
+      +'<td style="font-weight:600;">'+(r.equipment||'—')
+        +(r.equipment?' <button class="btn-edit" title="Last price in Rental Database" style="padding:2px 7px;font-size:10px;margin-left:4px;" onclick="event.stopPropagation();fuShowLastPrice(\''+r.id+'\')">💰</button>':'')
+      +'</td>'
       +'<td style="color:var(--text-muted)">'+(r.capacity||'—')+'</td>'
       +'<td style="font-family:\'JetBrains Mono\'">'+(r.qty||1)+'</td>'
       +'<td class="code-cell">'+(r.sap||'—')+'</td>'
@@ -3078,19 +3268,124 @@ function saveFuEquipment() {
   });
 }
 
-function exportFuCSV() {
+/* ─── Last price lookup: pull from Rental Database, resolving Plant via the
+   project's history there, so the follow-up screen can negotiate on the spot. ─── */
+function fuEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fuFmtInt(n){ return Math.round(Number(n)||0).toLocaleString('en-US'); }
+function fuShowLastPrice(id){
+  var r = FU_DATA.find(function(x){ return x.id === id; });
+  if(!r){ toast('Record not found','error'); return; }
+  if(!r.equipment){ toast('This record has no equipment name','error'); return; }
+  if(typeof window.rdLastPrice !== 'function'){ toast('Rental database module not ready yet','error'); return; }
+
+  document.getElementById('fup-title').textContent = '💰 Last Price — ' + r.equipment;
+  document.getElementById('fup-sub').textContent = 'Project: ' + (r.project||'—') + (r.capacity ? '  ·  Capacity: ' + r.capacity : '');
+  document.getElementById('fup-content').innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted);">⏳ Checking Rental Database…</div>';
+  document.getElementById('fu-price-modal').classList.add('open');
+
+  window.rdLastPrice(r.equipment, r.project, function(res){
+    var box = document.getElementById('fup-content');
+    try { box.innerHTML = renderFuPriceResult(res); }
+    catch(err){ box.innerHTML = '<div class="rd-msg err">Could not display the price: '+fuEsc(err && err.message)+'</div>'; }
+  }, r.capacity);
+}
+
+function renderFuPriceResult(res){
+  if(!res || res.error === 'load')     return '<div class="rd-msg err">Could not load Rental Database. Try again in a moment.</div>';
+  if(res.error === 'timeout')          return '<div class="rd-msg err">Timed out waiting for Rental Database (12s). Check your connection and try again.</div>';
+  if(res.error === 'exception')        return '<div class="rd-msg err">Something went wrong while checking prices'+(res.message?': '+fuEsc(res.message):'.')+'</div>';
+  if(res.error === 'empty')            return '<div class="rd-msg">Rental Database has no records yet.</div>';
+  if(res.error === 'noequip')          return '<div class="rd-msg">This request has no equipment name to look up.</div>';
+  if(res.error === 'noproject')
+    return '<div class="rd-msg">Couldn\'t find a project close enough to "'+fuEsc(res.project||'—')+'" in Rental Database, so there\'s no Plant to match on yet — this looks like a new project, check the price manually.</div>';
+
+  var h = '<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Plant matched from project '
+    + (res.projectFuzzy ? '<b style="color:var(--text);">'+fuEsc(res.matchedProject)+'</b> <span style="color:var(--accent);">(closest match to "'+fuEsc(res.project)+'")</span>' : '<b style="color:var(--text);">'+fuEsc(res.matchedProject)+'</b>')
+    + ' → <b style="color:var(--text);">'+fuEsc(res.plant)+'</b></div>';
+
+  if(res.matchedEquipment && res.equipFuzzy){
+    h += '<div style="font-size:11.5px;color:var(--accent);margin-bottom:10px;">Showing prices for <b>'+fuEsc(res.matchedEquipment)+'</b> — closest match to "'+fuEsc(res.equipment)+'"</div>';
+  }
+
+  if(res.capMode === 'exact'){
+    h += '<div style="font-size:11.5px;color:var(--green);margin-bottom:10px;">✓ Capacity matched: <b>'+fuEsc(res.capLabel)+'</b> (read from the Model column)</div>';
+  } else if(res.capMode === 'miss'){
+    h += '<div style="font-size:11.5px;color:var(--red);margin-bottom:10px;">No record with capacity <b>'+fuEsc(res.capLabel)+'</b> at this Plant — other capacities are NOT used as the price below.</div>';
+  } else if(res.capMode === 'text'){
+    h += '<div style="font-size:11.5px;color:var(--accent);margin-bottom:10px;">Capacity "'+fuEsc(res.capacity)+'" has no number, so it could not be matched — showing the newest record of any capacity.</div>';
+  } else if(res.capMode === 'none'){
+    h += '<div style="font-size:11.5px;color:var(--accent);margin-bottom:10px;">This request has no capacity — showing the newest record of any capacity.</div>';
+  }
+
+  function capRows(list, withPlant){
+    return '<table style="width:100%;font-size:11.5px;border-collapse:collapse;margin-bottom:14px;">'
+      + list.map(function(x){
+        return '<tr style="border-top:1px solid var(--border);"><td style="padding:4px 0;font-weight:600;">'+fuEsc(x.capLabel||x.model||'—')+'</td>'
+          +'<td style="padding:4px 6px;color:var(--text-muted);">'+fuEsc(withPlant?x.plant:x.dateLabel)+'</td>'
+          +'<td style="padding:4px 0;">'+fuEsc(x.vendor||'—')+'</td>'
+          +'<td style="padding:4px 0;text-align:right;font-family:\'JetBrains Mono\',monospace;">'+fuFmtInt(x.cost)+' '+fuEsc(res.ccy)+'/'+fuEsc(x.rateL||x.rate||'')+'</td></tr>';
+      }).join('') + '</table>';
+  }
+
+  if(!res.last){
+    h += '<div class="rd-msg">No previous rate for <b>'+fuEsc(res.equipment)+(res.capMode==='miss'?' '+fuEsc(res.capLabel):'')+'</b> at this Plant yet — this would be a new price, negotiate carefully.</div>';
+    if(res.nearest && res.nearest.length){
+      h += '<div style="font-size:11px;color:var(--text-muted);margin:14px 0 4px;">Closest capacities at this Plant (for reference only)</div>' + capRows(res.nearest,false);
+    }
+    if(res.otherPlants && res.otherPlants.length){
+      h += '<div style="font-size:11px;color:var(--text-muted);margin:6px 0 4px;">Same capacity at other Plants</div>' + capRows(res.otherPlants,true);
+    }
+  } else {
+    var l = res.last;
+    h += '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:14px;">'
+      +'<div style="display:flex;justify-content:space-between;align-items:baseline;">'
+        +'<div style="font-size:22px;font-weight:700;color:var(--accent);font-family:\'JetBrains Mono\',monospace;">'+fuFmtInt(l.cost)+' <span style="font-size:12px;color:var(--text-muted);">'+fuEsc(res.ccy)+' / '+fuEsc(l.rateL||l.rate||'')+'</span></div>'
+        +'<div style="font-size:11px;color:var(--text-muted);">'+fuEsc(l.dateLabel)+'</div>'
+      +'</div>'
+      +'<div style="margin-top:8px;font-size:12.5px;color:var(--text);">Vendor: <b>'+fuEsc(l.vendor||'—')+'</b>'+(l.model?' · '+fuEsc(l.model):'')+(l.fuel?' · Fuel: '+fuEsc(l.fuel):'')+'</div>'
+      +(l.project&&l.project!=='—'?'<div style="margin-top:3px;font-size:11.5px;color:var(--text-muted);">Used at project: <b style="color:var(--text);">'+fuEsc(l.project)+'</b></div>':'')
+      +'<div style="margin-top:4px;font-size:10.5px;color:var(--text-muted);">Vendor = supplier on the newest matching record (same Plant, same equipment'+(res.capMode==='exact'?', same capacity':'')+'; same-day ties go to the requesting project).</div>'
+      +(l.note?'<div style="margin-top:4px;font-size:11px;color:var(--text-muted);">'+fuEsc(l.note)+'</div>':'')
+    +'</div>';
+  }
+
+  if(res.history && res.history.length > 1){
+    h += '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">Recent history at this Plant'+(res.capMode==='exact'?' — same capacity only':'')+'</div>'
+      +'<table style="width:100%;font-size:11.5px;border-collapse:collapse;margin-bottom:14px;">'
+      +res.history.map(function(x){
+        return '<tr style="border-top:1px solid var(--border);"><td style="padding:4px 0;color:var(--text-muted);">'+fuEsc(x.dateLabel)+'</td>'
+          +'<td style="padding:4px 0;">'+fuEsc(x.vendor||'—')+'</td>'
+          +'<td style="padding:4px 8px;font-size:11px;'+(x.project&&x.project===res.matchedProject?'color:var(--accent);':'color:var(--text-muted);')+'" title="'+(x.project&&x.project===res.matchedProject?'Same project as this request':'')+'">'+fuEsc(x.project&&x.project!=='—'?x.project:'—')+'</td>'
+          +'<td style="padding:4px 0;text-align:right;white-space:nowrap;font-family:\'JetBrains Mono\',monospace;">'+fuFmtInt(x.cost)+' '+fuEsc(res.ccy)+'/'+fuEsc(x.rateL||x.rate||'')+'</td></tr>';
+      }).join('')
+    +'</table>';
+  }
+
+  if(res.vendorShares && res.vendorShares.length){
+    h += '<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Vendor share of this Plant (all equipment) — flag ≥ 50%</div>';
+    res.vendorShares.slice(0,6).forEach(function(v){
+      var warn = v.pct >= 50;
+      h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">'
+        +'<div style="width:120px;font-size:11.5px;'+(warn?'color:var(--red);font-weight:700;':'')+'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+fuEsc(v.vendor)+(warn?' ⚠':'')+'</div>'
+        +'<div style="flex:1;height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;"><div style="width:'+v.pct+'%;height:100%;background:'+(warn?'var(--red)':'var(--accent)')+';"></div></div>'
+        +'<div style="width:38px;text-align:right;font-family:\'JetBrains Mono\',monospace;font-size:11px;">'+v.pct+'%</div>'
+      +'</div>';
+    });
+  }
+
+  return h;
+}
+
+function exportFuPDF() {
   const data = getFilteredFuData();
-  const headers = ['#','Equipment','Capacity','Qty','SAP','Project','Engineer','Contact','Submission','Provision','From','To','Days','Notes'];
-  const rows = data.map(function(r,i){
-    return [i+1, r.equipment, r.capacity, r.qty, r.sap, r.project, r.engineer, r.contact, r.submission_date, r.provision, r.date_from, r.date_to, r.days, r.notes];
-  });
-  const csv = [headers].concat(rows).map(function(r){
-    return r.map(function(v){ return '"' + String(v||'').replace(/"/g,'""') + '"'; }).join(',');
-  }).join('\n');
-  const a = document.createElement('a');
-  a.href = 'data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csv);
-  a.download = 'HAC_FollowUp_Export.csv';
-  a.click();
+  function f(k){ return function(r){ return r[k]; }; }
+  const cols = [
+    {h:'#',g:function(r,i){return i+1;},t:'t'},{h:'Equipment',g:f('equipment'),t:'t'},{h:'Capacity',g:f('capacity'),t:'t'},
+    {h:'Qty',g:function(r){return r.qty;},t:'i',s:true},{h:'SAP',g:f('sap'),t:'t'},{h:'Project',g:f('project'),t:'t'},
+    {h:'Engineer',g:f('engineer'),t:'t'},{h:'Contact',g:f('contact'),t:'t'},{h:'Submission',g:f('submission_date'),t:'t'},
+    {h:'Provision',g:f('provision'),t:'t'},{h:'From',g:f('date_from'),t:'t'},{h:'To',g:f('date_to'),t:'t'},
+    {h:'Days',g:function(r){return r.days;},t:'i',s:true},{h:'Notes',g:f('notes'),t:'t'}];
+  window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 Equipment Follow-Up Export',cols:cols,rows:data});
 }
 
 /* ➕ Add New Only — يقرا من الشيت الصفوف الجديدة بس (SN أكبر من آخر SN متسجل) ومايلمسش الموجود */
@@ -3746,6 +4041,33 @@ function importExcel(input) {
   openFleetImportModal();
 }
 
+function addNewEquipFromExcel(input) {
+  _pendingImportInput = input;
+  _pendingImportMode  = 'addnew';
+  openFleetImportModal();
+}
+
+/* Same list the table shows (search + filters + fleet) -> shared PDF (Master Rental settings) */
+function exportEquipPDF() {
+  const q = document.getElementById('search-input').value.toLowerCase();
+  const cat = document.getElementById('filter-cat').value;
+  const type = document.getElementById('filter-type').value;
+  const proj = document.getElementById('filter-proj').value;
+  const data = getFleetEquipment().filter(function(e){
+    const mQ = !q || [e.equipment, e.brand, e.code, e.project, e.od, e.sap].some(function(v){ return v && String(v).toLowerCase().indexOf(q) !== -1; });
+    if(multiFilter.od && e.od !== multiFilter.od) return false;
+    if(multiFilter.cat && catKey(e) !== multiFilter.cat) return false;
+    if(multiFilter.proj && e.project !== multiFilter.proj) return false;
+    return mQ && (!cat || e.category === cat) && (!type || e.equipment === type) && (!proj || e.project === proj);
+  });
+  function f(k){ return function(r){ return r[k]; }; }
+  const cols = [
+    {h:'#',g:function(r,i){return r.sn || (i+1);},t:'t'},{h:'Equipment',g:f('equipment'),t:'t'},{h:'Category',g:f('category'),t:'t'},
+    {h:'Brand / Model',g:f('brand'),t:'t'},{h:'Capacity',g:function(r){return eqCapacity(r).v;},t:'t'},{h:'Code',g:f('code'),t:'t'},
+    {h:'Project',g:f('project'),t:'t'},{h:'O.D',g:function(r){return isCentralWorkshop(r.project) ? '\u2014' : (r.od||'');},t:'t'},{h:'Year',g:f('year'),t:'t'}];
+  window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 Equipment List Export',cols:cols,rows:data});
+}
+
 function clearAndImport(input) {
   _pendingImportInput = input;
   _pendingImportMode  = 'clear';
@@ -3781,8 +4103,11 @@ window.confirmFleetImport = function(fleetValue) {
     reader.onload = function(e) {
       const wb = XLSX.read(e.target.result, {type:'binary'});
 
-      // Try All_Data first, fallback to first sheet
-      const sheetName = wb.SheetNames.find(function(s){ return s.trim() === 'All_Data'; }) || wb.SheetNames[0];
+      // Egypt has its own master sheet ("HAC Egypt" = the official 1,034 units, with Power / Code Sap / Chassis).
+      // Every other fleet: All_Data first (filtered by its Country column), fallback to the first sheet.
+      const FLEET_OWN_SHEET = { egypt: 'HAC Egypt' };
+      const sheetName = (FLEET_OWN_SHEET[fleetValue] && wb.SheetNames.find(function(s){ return s.trim() === FLEET_OWN_SHEET[fleetValue]; }))
+        || wb.SheetNames.find(function(s){ return s.trim() === 'All_Data'; }) || wb.SheetNames[0];
       const ws = wb.Sheets[sheetName];
 
       // Find header row
@@ -3800,14 +4125,47 @@ window.confirmFleetImport = function(fleetValue) {
       const colIdx = {};
       const normHeader = function(s){ return String(s).replace(/\s+/g,' ').trim(); };
       headers.forEach(function(h, i){ if(h) colIdx[normHeader(h)] = i; });
+      // case-insensitive fallback ("POWER" / "power" / "Power " all count)
+      const colIdxLC = {};
+      Object.keys(colIdx).forEach(function(k){ const l = k.toLowerCase(); if(colIdxLC[l] === undefined) colIdxLC[l] = colIdx[k]; });
 
       const get = function(row, keys) {
         for(const k of keys) {
-          const idx = colIdx[normHeader(k)];
+          let idx = colIdx[normHeader(k)];
+          if(idx === undefined) idx = colIdxLC[normHeader(k).toLowerCase()];
           if(idx !== undefined && row[idx] !== '' && row[idx] !== null) return String(row[idx]).trim();
         }
         return '';
       };
+      // Capacity comes from the Power column. All_Data has NO Power column, so when it is missing
+      // we build a Code -> Power lookup from the country sheets (HAC Egypt, KSA, UAE, Algeria, JV, ...).
+      const POWER_KEYS = ['Power','Power (KVA)','Power KVA','Power/Capacity','KVA'];
+      const hasPowerCol = POWER_KEYS.some(function(k){ return colIdxLC[normHeader(k).toLowerCase()] !== undefined; });
+      const powerByCode = {};
+      const codeKey = function(c){ return String(c||'').replace(/\s+/g,' ').trim().toUpperCase(); };
+      if(!hasPowerCol) {
+        const CODE_H = ['code / board no.','code/board no.','code / board no','code'];
+        const POW_H  = ['power','power (kva)','power kva','power/capacity','kva'];
+        wb.SheetNames.forEach(function(sn){
+          if(sn === sheetName || /sold|scrap/i.test(sn)) return;
+          const rr = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header:1, defval:''});
+          for(let i = 0; i < Math.min(rr.length, 12); i++) {
+            const hh = rr[i].map(function(x){ return String(x).replace(/\s+/g,' ').trim().toLowerCase(); });
+            const ci = hh.findIndex(function(x){ return CODE_H.indexOf(x) !== -1; });
+            const pi = hh.findIndex(function(x){ return POW_H.indexOf(x) !== -1; });
+            if(ci < 0 || pi < 0) continue;
+            for(let j = i + 1; j < rr.length; j++) {
+              const key = codeKey(rr[j][ci]);
+              const pw  = String(rr[j][pi] === null ? '' : rr[j][pi]).replace(/\s+/g,' ').trim();
+              if(key && pw && !/^[-\u2013\u2014]+$/.test(pw) && powerByCode[key] === undefined) powerByCode[key] = pw;
+            }
+            break;
+          }
+        });
+        const nLk = Object.keys(powerByCode).length;
+        if(nLk) toast('\u2139\ufe0f "' + sheetName + '" has no Power column \u2014 capacity is filled from the other sheets by Code (' + nLk + ' codes found).');
+        else toast('\u26a0\ufe0f No "Power" column in this sheet and none in the other sheets \u2014 capacity (KVA/Ton) will be empty. Headers found: ' + Object.keys(colIdx).slice(0,14).join(' | '), 'error');
+      }
 
       // Filter rows by fleet/country
       // For "all", filter every row by Country column. For any other explicitly
@@ -3815,9 +4173,17 @@ window.confirmFleetImport = function(fleetValue) {
       // the user has already told us which fleet this whole sheet belongs to —
       // don't require a Country column (Foundation/TBM sheets don't have one).
       const allowedCountries = fleetCountryMap[fleetValue];
+      const hasCountryCol = colIdxLC['country'] !== undefined;
+      const COUNTRY_FLEETS = ['egypt','ksa','algeria','uae','foundation','tunnelling'];
       const dataRows = raw.slice(headerIdx + 1).filter(function(r){
         const sn = r[0];
         if(sn === '' || sn === null || isNaN(Number(sn)) || Number(sn) <= 0) return false;
+        // A country fleet was chosen but the sheet mixes countries (All_Data): keep ONLY that country's rows,
+        // otherwise every KSA / UAE / Algeria row gets imported as Egypt (that is how Egypt became 1,503).
+        if(fleetValue !== 'all' && hasCountryCol && COUNTRY_FLEETS.indexOf(fleetValue) !== -1 && allowedCountries) {
+          const cv = String(r[colIdxLC['country']] || '').trim().toLowerCase();
+          return allowedCountries.indexOf(cv) !== -1;
+        }
         if(fleetValue !== 'all') return true;
         if(allowedCountries === null) return true; // all
         const country = get(r, ['Country']).toLowerCase();
@@ -3834,7 +4200,7 @@ window.confirmFleetImport = function(fleetValue) {
         const mv       = get(row, ['Market Value(EGP)','Market Value','MarketValue']);
         const chassis  = get(row, ['Chassis No.']);
         const year     = get(row, ['Manuf Year','Manuf. Year']);
-        const power    = get(row, ['Power']);
+        const power    = get(row, POWER_KEYS) || powerByCode[codeKey(code)] || '';
         const sapCode  = get(row, ['Code Sap','Code SAP']);
         const owner    = get(row, [' Owner ','Owner']);
         const od       = get(row, ['O.D']) || getOd(project);
@@ -3872,12 +4238,28 @@ window.confirmFleetImport = function(fleetValue) {
         };
       }).filter(function(r){ return r.equipment; });
 
-      toast('⏳ Importing ' + records.length + ' records for ' + fleetLabel + '…');
+      // ➕ Add New Only: keep only rows whose Code is not registered yet in the same fleet
+      // (rows with no Code are matched on equipment + brand + project + chassis). Nothing existing is touched.
+      let writeRecs = records;
+      if(_pendingImportMode === 'addnew') {
+        const keyOf = function(x) {
+          const c = String(x.code || '').replace(/\s+/g,'').toUpperCase();
+          const base = c ? c : ['nocode', x.equipment, x.brand, x.project, x.chassis].map(function(v){ return String(v||'').replace(/\s+/g,' ').trim().toLowerCase(); }).join('|');
+          return (x.fleet || 'egypt') + '|' + base;
+        };
+        const have = {};
+        allEquipment.forEach(function(e){ have[keyOf(e)] = 1; });
+        writeRecs = records.filter(function(r){ return !have[keyOf(r)]; });
+        if(!writeRecs.length) { toast('مفيش معدات جديدة — كل اللي في الشيت (' + records.length + ') متسجل قبل كده'); input.value = ''; return; }
+        if(!confirm('هيتم إضافة ' + writeRecs.length + ' معدة جديدة بس (من ' + records.length + ' في الشيت) → ' + fleetLabel + '\nمن غير تعديل أو مسح أي حاجة موجودة. نكمل؟')) { input.value = ''; return; }
+      }
+
+      toast('⏳ Importing ' + writeRecs.length + ' records for ' + fleetLabel + '…');
 
       const BATCH_SIZE = 400;
       const batches = [];
-      for(let i = 0; i < records.length; i += BATCH_SIZE) {
-        batches.push(records.slice(i, i + BATCH_SIZE));
+      for(let i = 0; i < writeRecs.length; i += BATCH_SIZE) {
+        batches.push(writeRecs.slice(i, i + BATCH_SIZE));
       }
 
       let chain = Promise.resolve();
@@ -3889,7 +4271,7 @@ window.confirmFleetImport = function(fleetValue) {
         });
       });
       chain.then(function(){
-        toast('✓ ' + records.length + ' records imported → ' + fleetLabel);
+        toast('✓ ' + writeRecs.length + ' records imported → ' + fleetLabel);
         loadData();
         input.value = '';
       }).catch(function(err){ toast('Import error: ' + err.message, 'error'); });
@@ -3899,12 +4281,23 @@ window.confirmFleetImport = function(fleetValue) {
 
   if(_pendingImportMode === 'clear') {
     if(!confirm('حذف كل معدات الـ ' + fleetLabel + ' والاستبدال؟')) { _pendingImportInput.value=''; return; }
-    db.collection('equipment').where('fleet','==',fleetValue).get().then(function(snap){
+    // "All Countries" wipes the whole collection; a single fleet wipes only that fleet.
+    // Firestore allows max 500 writes per batch, so delete in chunks (Egypt alone can be 2,000+ docs).
+    const delQuery = (fleetValue === 'all') ? db.collection('equipment') : db.collection('equipment').where('fleet','==',fleetValue);
+    delQuery.get().then(function(snap){
       if(snap.empty) return Promise.resolve();
-      const b = db.batch();
-      snap.docs.forEach(function(d){ b.delete(d.ref); });
-      return b.commit();
-    }).then(doImport);
+      const docs = snap.docs, chunks = [];
+      for(let i = 0; i < docs.length; i += 400) chunks.push(docs.slice(i, i + 400));
+      let chain = Promise.resolve();
+      chunks.forEach(function(chunk){
+        chain = chain.then(function(){
+          const b = db.batch();
+          chunk.forEach(function(d){ b.delete(d.ref); });
+          return b.commit();
+        });
+      });
+      return chain.then(function(){ toast('🗑️ Deleted ' + docs.length + ' old records — importing…'); });
+    }).then(doImport).catch(function(err){ toast('Clear error: ' + err.message, 'error'); });
   } else {
     doImport();
   }
@@ -4306,11 +4699,9 @@ page.innerHTML=`<div style="display:flex;align-items:center;justify-content:spac
     <button class="btn-sm" id="mo-btn-table">📋 Table</button>
     <button class="btn-sm" id="mo-btn-audit">🗓 Months Audit</button>
     <button class="btn-sm" id="mo-btn-refresh">⟳ Refresh</button>
-    <button class="btn-sm" id="mo-btn-export">⬇ Export XLSX</button>
     <button class="btn-sm" id="mo-btn-export-pdf">📄 Export PDF</button>
     <button class="btn-sm accent" id="mo-btn-director">📄 Director Report</button>
     <button class="btn-sm accent mo-hide" id="mo-btn-import">📥 Import XLSX</button>
-    <button class="btn-sm mo-hide" id="mo-btn-smart-update" style="border-color:rgba(88,166,255,.4);color:#58a6ff;">🔄 تحديث الموجود بس</button>
     <button class="btn-sm mo-hide" id="mo-btn-smart-add" style="border-color:rgba(63,185,80,.4);color:#3fb950;">➕ إضافة جديد بس</button>
     <button class="btn-sm danger mo-hide" id="mo-btn-wipe">🗑 Delete All</button>
   </div>
@@ -5003,7 +5394,6 @@ document.getElementById('mo-sl-next').addEventListener('click',function(){ docum
 document.getElementById('mo-btn-table').addEventListener('click',function(){ moTableOpen=!moTableOpen; document.getElementById('mo-table-wrap').classList.toggle('mo-hide',!moTableOpen); this.classList.toggle('accent',moTableOpen); if(moTableOpen) moTableApply(); });
 document.getElementById('mo-btn-audit').addEventListener('click',function(){ moAuditOpen=!moAuditOpen; document.getElementById('mo-audit').style.display=moAuditOpen?'block':'none'; this.classList.toggle('accent',moAuditOpen); if(moAuditOpen) moRenderAudit(); });
 document.getElementById('mo-btn-refresh').addEventListener('click',function(){ moLoadDataset(true); });
-document.getElementById('mo-btn-export').addEventListener('click',moExport);
 document.getElementById('mo-btn-export-pdf').addEventListener('click',moExportPDF);
 document.getElementById('mo-btn-director').addEventListener('click',moDirectorReport);
 document.getElementById('mo-btn-import').addEventListener('click',function(){ document.getElementById('mo-file-input').click(); });
@@ -5011,7 +5401,6 @@ document.getElementById('mo-btn-file').addEventListener('click',function(){ docu
 document.getElementById('mo-btn-wipe').addEventListener('click',moWipeAll);
 document.getElementById('mo-file-input').addEventListener('change',function(){ moHandleImport(this); });
 var MO_SMART_MODE=null;
-document.getElementById('mo-btn-smart-update').addEventListener('click',function(){ MO_SMART_MODE='update'; document.getElementById('mo-file-input-smart').click(); });
 document.getElementById('mo-btn-smart-add').addEventListener('click',function(){ MO_SMART_MODE='add'; document.getElementById('mo-file-input-smart').click(); });
 document.getElementById('mo-file-input-smart').addEventListener('change',function(){ moSmartHandleImport(this, MO_SMART_MODE); });
 document.querySelectorAll('.mo-kpi').forEach(function(el){
@@ -5048,35 +5437,17 @@ function moExport(){
 function moExportPDF(){
   var rows=searchRows(moBase(null));
   if(!rows.length){ if(typeof toast==='function') toast('Nothing to export','error'); return; }
-  var cols=[['#','#'],['Month','month'],['Hiring Date','hiring'],['Profit Center','pc'],['O.D','od'],['Project','project'],
-    ['Category','cat'],['Code','code'],['Equipment','equipment'],['Model/Cap','model'],
-    ['Worked','worked'],['Standby','standby'],['Repair','repair'],['Unit Price','unitPrice'],
-    ['Standby Cost','__lost'],['Money Made','totalCost'],['OT/Day','otPerDay'],['OT Cost','costOt'],
-    ['Qty','__units'],['Avail','avail'],['Fuel L','totalFuel'],['Util%','utl'],['Status','status']];
-  var h='<!DOCTYPE html><html><head><meta charset="utf-8"><title>Master Owned — Export</title><style>';
-  h+='*{box-sizing:border-box;margin:0;padding:0}body{font-family:Segoe UI,Arial,sans-serif;color:#1a1a1a;background:#fff;padding:16px 18px;font-size:10px}';
-  h+='h1{font-size:15px;margin-bottom:2px}.sub{font-size:10px;color:#666;margin-bottom:10px}';
-  h+='table{width:100%;border-collapse:collapse}th{background:#f4f4f4;font-size:8.5px;text-transform:uppercase;color:#555;text-align:left;padding:4px 6px;border-bottom:1px solid #ddd}';
-  h+='td{padding:3px 6px;border-bottom:1px solid #eee;font-size:9px;white-space:nowrap}';
-  h+='.btn{position:fixed;top:10px;right:12px;background:#f0a500;color:#000;border:0;padding:8px 14px;border-radius:6px;font-weight:700;cursor:pointer}';
-  h+='@media print{.btn{display:none}body{padding:6px 8px}@page{size:A4 landscape;margin:7mm}}';
-  h+='</style></head><body><button class="btn" onclick="window.print()">🖨 Print / Save PDF</button>';
-  h+='<h1>HAC · PMV — Master Owned Equipment Export</h1><div class="sub">'+full(rows.length)+' rows · Generated '+new Date().toLocaleString()+'</div>';
-  h+='<table><thead><tr>'+cols.map(function(c){return '<th>'+esc(c[0])+'</th>';}).join('')+'</tr></thead><tbody>';
-  rows.forEach(function(r,i){
-    h+='<tr>'+cols.map(function(c){
-      var v;
-      if(c[1]==='#') v=i+1;
-      else if(c[1]==='__lost') v=full(lostOf(r));
-      else if(c[1]==='__units') v=full(units(r));
-      else v=(r[c[1]]==null?'':r[c[1]]);
-      return '<td>'+esc(v)+'</td>';
-    }).join('')+'</tr>';
-  });
-  h+='</tbody></table></body></html>';
-  var w=window.open('','_blank');
-  if(!w){ if(typeof toast==='function') toast('Popup blocked','error'); return; }
-  w.document.write(h); w.document.close();
+  function f(k){ return function(r){ return r[k]; }; }
+  var cols=[
+    {h:'#',g:function(r,i){return i+1;},t:'t'},{h:'Month',g:f('month'),t:'t'},{h:'Hiring Date',g:f('hiring'),t:'t'},{h:'Profit Center',g:f('pc'),t:'t'},
+    {h:'O.D',g:f('od'),t:'t'},{h:'Project',g:f('project'),t:'t'},{h:'Category',g:f('cat'),t:'t'},{h:'Code',g:f('code'),t:'t'},
+    {h:'Equipment',g:f('equipment'),t:'t'},{h:'Model/Cap',g:f('model'),t:'t'},
+    {h:'Worked',g:function(r){return toNum(r.worked);},t:'i',s:true},{h:'Standby',g:function(r){return toNum(r.standby);},t:'i',s:true},{h:'Repair',g:function(r){return toNum(r.repair);},t:'i',s:true},
+    {h:'Unit Price',g:function(r){return toNum(r.unitPrice);},t:'m'},{h:'Standby Cost',g:function(r){return lostOf(r);},t:'z',s:true},
+    {h:'Money Made',g:function(r){return toNum(r.totalCost);},t:'m',s:true},{h:'OT/Day',g:function(r){return toNum(r.otPerDay);},t:'dz'},{h:'OT Cost',g:function(r){return toNum(r.costOt);},t:'z',s:true},
+    {h:'Qty',g:function(r){return units(r);},t:'i',s:true},{h:'Avail',g:f('avail'),t:'t'},{h:'Fuel L',g:function(r){return toNum(r.totalFuel);},t:'i',s:true},
+    {h:'Util%',g:f('utl'),t:'t'},{h:'Status',g:f('status'),t:'t'}];
+  window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 Master Owned Equipment Export',cols:cols,rows:rows});
 }
 function moDirectorReport(){
   var rows=moBase(null);
@@ -5147,6 +5518,7 @@ function moDirectorReport(){
   h+='<li>التركيز على المشاريع ذات Lost مرتفع + Utilization منخفض = فرصة تحسين فورية.</li>';
   h+='<li>معدل الإيراد الحالي <b>'+abbr(worked?money/worked:0)+' EGP/يوم شغل</b> — كل يوم إضافي تشغيل = إيراد مباشر.</li>';
   h+='</ul></div></body></html>';
+  h=window.hacDirectorPolish(h,'Master Owned');
 
   var w=window.open('','_blank');
   if(!w){ if(typeof toast==='function') toast('Popup blocked','error'); return; }
@@ -6080,7 +6452,7 @@ function render(){
   var rows=view(), m=metrics(rows), h='';
   h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">';
   if(isAdminNow()) h+='<button class="btn-sm" style="background:var(--accent);color:#000;font-weight:700;" data-act="import">📥 Import Rental Excel</button>';
-  if(isAdminNow()) h+='<button class="btn-sm" style="border-color:rgba(88,166,255,.4);color:#58a6ff;" data-act="smart">🔄 تحديث / إضافة</button>';
+  if(isAdminNow()) h+='<button class="btn-sm" style="border-color:rgba(63,185,80,.4);color:#3fb950;" data-act="smart-pick" data-v="add">➕ Add New Only</button>';
   h+='<button class="btn-sm" data-act="refresh">⟳ Refresh</button>';
   h+='<button class="btn-sm accent" data-act="director">📄 Director Report</button>';
   h+='<button class="btn-sm" data-act="exportpdf">📄 Export PDF</button>';
@@ -6359,6 +6731,7 @@ function mrDirectorReport(){
   h+='<h2>5) Categories</h2><table><tr><th>Category</th><th class="n">Units</th><th class="n">Total Value</th><th class="n">Deduct</th><th class="n">Fuel L</th></tr>';
   cats.forEach(function(c){ var d=cg[c]; h+='<tr><td>'+esc(c)+'</td><td class="n">'+fmtInt(d.units)+'</td><td class="n">'+fmtInt(d.value)+'</td><td class="n">'+fmtInt(d.deduct)+'</td><td class="n">'+fmtInt(d.fuel)+'</td></tr>'; });
   h+='</table></body></html>';
+  h=window.hacDirectorPolish(h,'Master Rental');
 
   var w=window.open('','_blank');
   if(!w){ tt('Popup blocked','error'); return; }
@@ -7157,6 +7530,821 @@ pmLoadOdMap();
 if(document.readyState!=='loading') pmInjectNav(); else document.addEventListener('DOMContentLoaded',pmInjectNav);
 var pmN=0, pmIv=setInterval(function(){ pmN++; pmInjectNav(); if(document.getElementById('nav-pm')||pmN>40) clearInterval(pmIv); },500);
 
+})();
+</script>
+
+<!-- ═══════════════════════════════════════════════════════════
+     RENTAL DATABASE — dashboard for "Rental_Database.xlsx" (Master Data + Categories)
+     Data lives in Firestore (rental_database/_dataset + /chunks), uploaded by admin only,
+     same pattern as Master Owned. Nothing is embedded in this file.
+     ═══════════════════════════════════════════════════════════ -->
+<script>
+(function(){
+'use strict';
+
+var COL='rental_database', DSID='_dataset', CHUNK=150, PAGE=150;
+var CCY='EGP', HIGH_DAILY=40000;          /* daily rates at/above this are flagged "verify basis" */
+var rows=[], meta=null, loaded=false;
+var F={plant:null,cat:null,rate:null,fuel:null,trans:null,sb:null,month:null,vendor:null,project:null,item:null,check:null,q:''};
+var sortKey='date', sortDir=-1, limit=PAGE, allTypes=false, metric='n';
+var MN={n:'records',d:'sum of daily rates ('+CCY+'/day)',m:'sum of monthly rates ('+CCY+'/month)'};
+var FUELL={HA:'HA · fuel on HAC',Owner:'Owner · fuel on contractor'};
+function qtyOf(r){ return r.qty==null?1:r.qty; }
+function val(r,mode){
+  if(mode==='d') return (r.rate==='daily'&&r.cost!=null)?r.cost*qtyOf(r):0;
+  if(mode==='m') return (r.rate==='monthly'&&r.cost!=null)?r.cost*qtyOf(r):0;
+  return 1;
+}
+function compact(n){ if(n>=1e6) return (n/1e6).toFixed(2)+'M'; if(n>=1e4) return Math.round(n/1e3)+'K'; return fmt(n); }
+
+function $(id){ return document.getElementById(id); }
+function E(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function enc(s){ return encodeURIComponent(String(s)); }
+function fmt(n,d){ return (n==null||isNaN(n))?'—':Number(n).toLocaleString('en-US',{maximumFractionDigits:d==null?0:d}); }
+function say(m,t){ if(typeof toast==='function') toast(m,t||'success'); }
+var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function monLabel(k){ var p=k.split('-'); return MON[+p[1]-1]+' '+p[0].slice(2); }
+function dateLabel(iso){ if(!iso) return '—'; var p=iso.split('-'); return p[2]+' '+MON[+p[1]-1]+' '+p[0]; }
+
+/* ───────────── 1) NORMALISATION (used on Excel import) ───────────── */
+var ZW=/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF\u00AD\u0640]/g;
+function clean(v){ if(v==null) return ''; return String(v).replace(ZW,'').replace(/\u00A0/g,' ').replace(/\s+/g,' ').trim(); }
+function keyOf(s){ return clean(s).toLowerCase().replace(/&/g,'and').replace(/[^\p{L}\p{N}]+/gu,''); }
+function plantKey(s){ return keyOf(s).replace(/cost$/,'coast'); }
+
+/* one label per spelling-group: the most frequent spelling wins (or the master spelling if given) */
+function canonMap(values,keyFn,master){
+  var cnt={};
+  values.forEach(function(v){ if(!v) return; var k=keyFn(v); (cnt[k]=cnt[k]||{})[v]=((cnt[k]||{})[v]||0)+1; });
+  var out={};
+  Object.keys(cnt).forEach(function(k){
+    if(master&&master[k]){ out[k]=master[k]; return; }
+    var best=null,bn=-1;
+    Object.keys(cnt[k]).forEach(function(v){ var n=cnt[k][v]; if(n>bn||(n===bn&&v.length>best.length)){ best=v; bn=n; } });
+    out[k]=best;
+  });
+  return out;
+}
+function toNum(v){
+  if(v==null||v==='') return null;
+  if(typeof v==='number') return isFinite(v)?v:null;
+  var n=parseFloat(String(v).replace(/,/g,'').replace(/[^\d.\-]/g,''));
+  return isNaN(n)?null:n;
+}
+function toISO(v){
+  if(v==null||v==='') return '';
+  var d=null;
+  if(v instanceof Date){ return v.getFullYear()+'-'+String(v.getMonth()+1).padStart(2,'0')+'-'+String(v.getDate()).padStart(2,'0'); }
+  if(typeof v==='number'){ if(v<20000||v>80000) return ''; d=new Date(Math.round((v-25569)*86400000)); }
+  else {
+    var s=clean(v), m;
+    if((m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
+    if((m=s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/))) return m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
+    return '';
+  }
+  return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0');
+}
+function toSB(v){
+  if(v==null||v==='') return null;
+  var n=toNum(v); if(n==null) return null;
+  if(n>1) n=n/100;                               /* "40/%" → 0.4 */
+  return Math.round(n*1000)/1000;
+}
+function party(v){
+  var s=clean(v), l=s.toLowerCase();
+  if(l==='ha') return 'HA';
+  if(l==='owner') return 'Owner';
+  return /[a-z\u0600-\u06FF]/i.test(s)?s:'';    /* ".." / "….." → unspecified */
+}
+function rateOf(v){
+  var l=clean(v).toLowerCase();
+  if(l==='hourly') return 'hour';
+  return l;
+}
+
+/* matrix = sheet_to_json(header:1) of the Master Data sheet, headerAt = index of header row */
+function parseMaster(matrix,headerAt,catPairs){
+  var head=matrix[headerAt].map(function(h){ return clean(h).toLowerCase(); }), ix={};
+  head.forEach(function(h,i){ if(h&&ix[h]==null) ix[h]=i; });
+  function col(){ for(var i=0;i<arguments.length;i++){ if(ix[arguments[i]]!=null) return ix[arguments[i]]; } return -1; }
+  var C={plant:col('plant'),project:col('project'),vendor:col('vendors','vendor'),contact:col('contacts','contact'),
+         cat:col('eq category','category'),item:col('equipment / item','equipment'),model:col('model / capacity','model'),
+         qty:col('qty'),cost:col('unit cost'),rate:col('rate'),date:col('date'),sb:col('s.b rate','s.b'),
+         fuel:col('fuel cost','fuel'),trans:col('transportation'),note:col('note')};
+  ['item','cost','rate'].forEach(function(k){ if(C[k]<0) throw new Error('Column not found: '+k); });
+  function g(r,k){ return C[k]<0?null:r[C[k]]; }
+
+  var out=[], skipped=0;
+  for(var i=headerAt+1;i<matrix.length;i++){
+    var r=matrix[i]||[];
+    var item=clean(g(r,'item')), cost=toNum(g(r,'cost'));
+    if(!item&&cost==null){ skipped++; continue; }
+    out.push({
+      plant:clean(g(r,'plant')), project:clean(g(r,'project')), vendor:clean(g(r,'vendor')), contact:clean(g(r,'contact')),
+      cat:clean(g(r,'cat')), item:item, model:clean(g(r,'model')), qty:toNum(g(r,'qty')), cost:cost,
+      rate:rateOf(g(r,'rate')), date:toISO(g(r,'date')), sb:toSB(g(r,'sb')),
+      fuel:party(g(r,'fuel')), trans:party(g(r,'trans')), note:clean(g(r,'note'))
+    });
+  }
+
+  /* Categories sheet = master spelling for item names + fallback category when the lookup cell is blank */
+  var itemMaster={}, catOfItem={};
+  catPairs.forEach(function(p){ var c=clean(p[0]), it=clean(p[1]); if(c&&it){ itemMaster[keyOf(it)]=it; catOfItem[keyOf(it)]=c; } });
+
+  var mPlant=canonMap(out.map(function(r){return r.plant;}),plantKey);
+  var mProj =canonMap(out.map(function(r){return r.project;}),keyOf);
+  var mVend =canonMap(out.map(function(r){return r.vendor;}),keyOf);
+  var mItem =canonMap(out.map(function(r){return r.item;}),keyOf,itemMaster);
+  var mCat  =canonMap(out.map(function(r){return r.cat;}).concat(catPairs.map(function(p){return clean(p[0]);})),keyOf);
+  out.forEach(function(r){
+    if(r.plant)   r.plant  =mPlant[plantKey(r.plant)]||r.plant;
+    if(r.project) r.project=mProj[keyOf(r.project)]||r.project;
+    if(r.vendor)  r.vendor =mVend[keyOf(r.vendor)]||r.vendor;
+    var ik=keyOf(r.item);
+    r.item=mItem[ik]||r.item;
+    if(!r.cat&&catOfItem[ik]) r.cat=catOfItem[ik];
+    if(r.cat) r.cat=mCat[keyOf(r.cat)]||r.cat;
+  });
+  return {rows:out,skipped:skipped};
+}
+
+function parseWorkbook(wb){
+  var master=null, cats=[];
+  wb.SheetNames.forEach(function(n){
+    var m=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null});
+    for(var i=0;i<Math.min(m.length,30);i++){
+      var h=(m[i]||[]).map(function(x){ return clean(x).toLowerCase(); });
+      if(!master&&h.indexOf('plant')>=0&&(h.indexOf('vendors')>=0||h.indexOf('vendor')>=0)&&h.indexOf('unit cost')>=0){ master={m:m,at:i}; break; }
+      if(!cats.length&&h.indexOf('category')>=0&&h.indexOf('equipment / item')>=0){
+        var ci=h.indexOf('category'), ei=h.indexOf('equipment / item');
+        for(var j=i+1;j<m.length;j++){ if(m[j]&&(m[j][ci]||m[j][ei])) cats.push([m[j][ci],m[j][ei]]); }
+        break;
+      }
+    }
+  });
+  if(!master) throw new Error('Master Data sheet not found (need Plant / Vendors / Unit cost columns)');
+  return parseMaster(master.m,master.at,cats);
+}
+
+/* ───────────── 2) FIRESTORE ───────────── */
+function ref(){ return db.collection(COL).doc(DSID); }
+
+var loadP=null;
+function load(force){
+  if(loaded&&!force) return Promise.resolve();
+  if(loadP) return loadP;
+  showMsg('<b>Loading rental database…</b>');
+  loadP=ref().get().then(function(m){
+    if(!m.exists){ rows=[]; meta=null; return; }
+    meta=m.data();
+    var ids=[]; for(var i=0;i<(meta.chunkCount||0);i++) ids.push('c'+i);
+    return Promise.all(ids.map(function(id){ return ref().collection('chunks').doc(id).get(); })).then(function(snaps){
+      rows=[]; snaps.forEach(function(s){ if(s.exists) rows=rows.concat(s.data().rows||[]); });
+    });
+  }).then(function(){ if(rows&&rows.length) decorate(); loaded=true; })
+  .catch(function(err){
+    var denied=err&&err.code==='permission-denied';
+    showMsg(denied
+      ? '<b>Firestore denied access to <code>'+COL+'</code>.</b><br>Add the same read/write rule you use for <code>master_owned</code> to this collection, then reopen this page.'
+      : 'Could not load the rental database: '+E(err&&err.message||err), true);
+    if(err&&err.code==='resource-exhausted') say('⚠️ Quota reached','error');
+    rows=null;
+  }).then(function(){ loadP=null; });
+  return loadP;
+}
+
+function writeAll(list,fileName){
+  var st=$('rd-status'); st.textContent='⏳ Uploading…';
+  var chunks=[]; for(var i=0;i<list.length;i+=CHUNK) chunks.push(list.slice(i,i+CHUNK));
+  var chain=Promise.resolve();
+  for(var s=0;s<chunks.length;s+=20){
+    (function(start){
+      chain=chain.then(function(){
+        var b=db.batch();
+        chunks.slice(start,start+20).forEach(function(rs,k){ b.set(ref().collection('chunks').doc('c'+(start+k)),{rows:rs}); });
+        return b.commit().then(function(){ st.textContent='⏳ Uploading '+Math.min(start+20,chunks.length)+'/'+chunks.length; });
+      });
+    })(s);
+  }
+  /* drop leftover chunks from a previous, longer upload */
+  chain=chain.then(function(){ return ref().collection('chunks').get(); }).then(function(snap){
+    var keep={}; chunks.forEach(function(_,i){ keep['c'+i]=1; });
+    var extra=snap.docs.filter(function(d){ return !keep[d.id]; });
+    if(!extra.length) return;
+    var b=db.batch(); extra.forEach(function(d){ b.delete(d.ref); }); return b.commit();
+  });
+  chain=chain.then(function(){
+    var m={schema:1,rowCount:list.length,chunkCount:chunks.length,chunkSize:CHUNK,fileName:fileName||'',
+           updatedAtMs:Date.now(),updatedBy:(typeof currentUser!=='undefined'&&currentUser)?currentUser.email:''};
+    return ref().set(m).then(function(){ meta=m; });
+  });
+  return chain;
+}
+
+function importFile(input){
+  if(typeof isAdmin!=='undefined'&&!isAdmin){ input.value=''; return; }
+  var file=input.files&&input.files[0]; if(!file) return;
+  if(typeof XLSX==='undefined'){ say('Excel library not loaded','error'); input.value=''; return; }
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    var parsed;
+    try{ parsed=parseWorkbook(XLSX.read(ev.target.result,{type:'binary'})); }
+    catch(err){ say('Parse error: '+err.message,'error'); input.value=''; return; }
+    var list=parsed.rows;
+    if(!list.length){ say('No rate rows found in the file','error'); input.value=''; return; }
+    var vend={}; list.forEach(function(r){ vend[r.vendor]=1; });
+    var msg='الملف: '+fmt(list.length)+' سجل سعر · '+fmt(Object.keys(vend).length)+' مورد\n'
+      +(rows&&rows.length?'الموجود حالياً: '+fmt(rows.length)+' سجل\n':'')
+      +'\nهيتم استبدال الداتا الحالية بالنسخة الجديدة. نكمل؟';
+    if(!confirm(msg)){ input.value=''; return; }
+    writeAll(list,file.name).then(function(){
+      rows=list; loaded=true; F=freshF(); limit=PAGE; $('rd-q').value='';
+      $('rd-status').textContent='✓ '+fmt(list.length)+' records uploaded';
+      say('✓ Rental database updated ('+fmt(list.length)+' records)','success');
+      setTimeout(function(){ $('rd-status').textContent=''; },3000);
+      start();
+    }).catch(function(err){
+      $('rd-status').textContent='✕ Upload failed';
+      say(err&&err.code==='permission-denied'?'Firestore denied write on '+COL:(err&&err.code==='resource-exhausted'?'⚠️ Quota reached':'Upload error: '+(err&&err.message)),'error');
+    });
+    input.value='';
+  };
+  reader.readAsBinaryString(file);
+}
+
+/* ───────────── 3) DERIVED FIELDS + FILTERING ───────────── */
+function decorate(){
+  var seen={};
+  rows.forEach(function(r){
+    r.plant=r.plant||'—'; r.vendor=r.vendor||'—'; r.project=r.project||'—';
+    r.catL=r.cat||'Uncategorized';
+    var rl=r.rate; r.rateL=rl?rl.charAt(0).toUpperCase()+rl.slice(1):'Unspecified';
+    r.fuelL=r.fuel||'Unspecified'; r.transL=r.trans||'Unspecified';
+    r.sbL=r.sb==null?'—':Math.round(r.sb*100)+'%';
+    r.month=r.date?r.date.slice(0,7):'';
+    var f=[];
+    if(!r.cat) f.push('nocat');
+    if(r.rate==='daily'&&r.cost!=null&&r.cost>=HIGH_DAILY) f.push('high');
+    if(!r.fuel||!r.trans) f.push('unspec');
+    var dk=[r.plant,r.project,r.vendor,r.item,r.model,r.rate,r.cost,r.date,r.sb,r.fuel,r.trans,r.note].join('|');
+    if(seen[dk]) f.push('dup'); else seen[dk]=1;
+    r.flags=f;
+    r._h=(r.item+' '+r.model+' '+r.vendor+' '+r.project+' '+r.contact+' '+r.plant+' '+r.note).toLowerCase();
+  });
+}
+var FIELD={plant:'plant',cat:'catL',rate:'rateL',fuel:'fuelL',trans:'transL',sb:'sbL',month:'month',vendor:'vendor',project:'project',item:'item'};
+function freshF(){ return {plant:null,cat:null,rate:null,fuel:null,trans:null,sb:null,month:null,vendor:null,project:null,item:null,check:null,q:''}; }
+function pass(r,skip){
+  for(var k in FIELD){ if(k!==skip&&F[k]!==null&&r[FIELD[k]]!==F[k]) return false; }
+  if(skip!=='check'&&F.check){ if(F.check==='any'){ if(!r.flags.length) return false; } else if(r.flags.indexOf(F.check)<0) return false; }
+  if(F.q&&r._h.indexOf(F.q)<0) return false;
+  return true;
+}
+function list(skip){ return rows.filter(function(r){ return pass(r,skip); }); }
+function countBy(L,fn){
+  var o={}; L.forEach(function(r){ var k=fn(r), a=o[k]||(o[k]={n:0,d:0,m:0}); a.n++; a.d+=val(r,'d'); a.m+=val(r,'m'); });
+  return Object.keys(o).map(function(k){ var a=o[k]; return {v:k,n:a.n,d:a.d,m:a.m,x:a[metric]}; })
+    .sort(function(a,b){ return b.x-a.x||b.n-a.n||a.v.localeCompare(b.v); });
+}
+function uniq(L,fn){ var o={}; L.forEach(function(r){ var v=fn(r); if(v&&v!=='—') o[v]=1; }); return Object.keys(o).length; }
+function pctl(sorted,p){ if(!sorted.length) return null; var i=(sorted.length-1)*p, lo=Math.floor(i), hi=Math.ceil(i); return sorted[lo]+(sorted[hi]-sorted[lo])*(i-lo); }
+function dailyCosts(L){ return L.filter(function(r){ return r.rate==='daily'&&r.cost!=null; }).map(function(r){ return r.cost; }).sort(function(a,b){ return a-b; }); }
+
+/* ───────────── 4) RENDER ───────────── */
+function showMsg(html,err){ var m=$('rd-msg'); m.innerHTML='<div class="rd-msg'+(err?' err':'')+'">'+html+'</div>'; $('rd-main').style.display='none'; }
+
+function start(){
+  if(rows===null) return;                                     /* load error already shown */
+  if(!rows.length){
+    var adm=(typeof isAdmin!=='undefined'&&isAdmin);
+    showMsg(adm?'<b>No rental data yet.</b><br>Use <b>⬆ Upload Excel</b> and pick <b>Rental_Database.xlsx</b> (sheets: Master Data + Categories).':'<b>No rental data has been uploaded yet.</b>');
+    return;
+  }
+  decorate();
+  $('rd-msg').innerHTML=''; $('rd-main').style.display='block';
+  var ms=meta&&meta.updatedAtMs?new Date(meta.updatedAtMs).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):'';
+  $('rd-sub').textContent='Rental equipment rates · 10th of Ramadan sector · '+fmt(rows.length)+' records'+(ms?' · uploaded '+ms:'')+(meta&&meta.fileName?' · '+meta.fileName:'');
+  buildSelects(); render();
+}
+
+function buildSelects(){
+  function fill(id,all,key){
+    var vals=countBy(rows,function(r){ return r[key]; }).map(function(x){ return x.v; }).sort(function(a,b){ return a.localeCompare(b); });
+    $(id).innerHTML='<option value="">'+all+'</option>'+vals.map(function(v){ return '<option value="'+E(v)+'">'+E(v)+'</option>'; }).join('');
+  }
+  fill('rd-sel-plant','All plants','plant'); fill('rd-sel-cat','All categories','catL'); fill('rd-sel-rate','All rate types','rateL');
+}
+function syncSelects(){
+  $('rd-sel-plant').value=F.plant||''; $('rd-sel-cat').value=F.cat||''; $('rd-sel-rate').value=F.rate||'';
+}
+
+function syncSeg(){ document.querySelectorAll('#rd-seg [data-rd="metric"]').forEach(function(b){ b.classList.toggle('on',b.getAttribute('data-v')===metric); }); }
+function render(){ renderChips(); renderCards(); renderPanels(); renderTable(); syncSelects(); syncSeg(); }
+
+var CHIP={plant:'Plant',cat:'Category',rate:'Rate',fuel:'Fuel',trans:'Transport',sb:'S.B',month:'Month',vendor:'Vendor',project:'Project',item:'Equipment',check:'Check'};
+var CHECK={any:'Needs review',nocat:'No category',high:'Daily ≥ '+fmt(HIGH_DAILY),unspec:'Fuel/transport unspecified',dup:'Identical rows'};
+function renderChips(){
+  var bar=$('rd-filterbar'), h='', any=false;
+  Object.keys(CHIP).forEach(function(k){
+    if(F[k]===null||F[k]==='') return; any=true;
+    var v=k==='month'?monLabel(F[k]):(k==='check'?CHECK[F[k]]:F[k]);
+    h+='<span class="filter-chip" data-rd="clear" data-v="'+k+'">'+CHIP[k]+': <b>'+E(v)+'</b> <span class="filter-chip-close">✕</span></span>';
+  });
+  if(F.q){ any=true; h+='<span class="filter-chip" data-rd="clear" data-v="q">Search: <b>'+E(F.q)+'</b> <span class="filter-chip-close">✕</span></span>'; }
+  if(any) h+='<button class="btn-clear-all" data-rd="clearall">Clear all</button>';
+  bar.style.display=any?'flex':'none'; bar.innerHTML=h;
+}
+
+function card(val,label,sub,opt){
+  opt=opt||{};
+  var attr=opt.act?' data-rd="'+opt.act+'" data-v="'+enc(opt.v)+'"':'';
+  return '<div class="dash-card'+(opt.act?'':' rd-static')+(opt.warn?' warn':'')+(opt.on?' active':'')+'"'+attr+'>'
+    +'<div class="dash-card-val">'+val+'</div><div class="dash-card-label">'+label+'</div>'+(sub?'<div class="dash-card-sub">'+sub+'</div>':'')+'</div>';
+}
+function renderCards(){
+  var L=list(), T=rows.length, filt=L.length!==T;
+  var dc=dailyCosts(L), med=pctl(dc,.5), q1=pctl(dc,.25), q3=pctl(dc,.75);
+  var nDaily=L.filter(function(r){return r.rate==='daily';}).length, nMonthly=L.filter(function(r){return r.rate==='monthly';}).length;
+  var nOther=L.length-nDaily-nMonthly;
+  var nHA=L.filter(function(r){return r.fuel==='HA';}).length, nOwn=L.filter(function(r){return r.fuel==='Owner';}).length;
+  var sumD=0,sumM=0; L.forEach(function(r){ sumD+=val(r,'d'); sumM+=val(r,'m'); });
+  var review=L.filter(function(r){return r.flags.length;}).length;
+  var c={nocat:0,high:0,unspec:0,dup:0}; L.forEach(function(r){ r.flags.forEach(function(f){ c[f]++; }); });
+  var months=rows.map(function(r){return r.month;}).filter(Boolean).sort();
+  var span=months.length?monLabel(months[0])+' – '+monLabel(months[months.length-1]):'';
+  function ofT(a,b){ return filt?'of '+fmt(b):''; }
+  $('rd-cards').innerHTML=
+     card(fmt(uniq(L,function(r){return r.vendor;})),'Vendors',ofT(0,uniq(rows,function(r){return r.vendor;})))
+    +card(fmt(uniq(L,function(r){return r.project;})),'Projects',ofT(0,uniq(rows,function(r){return r.project;})))
+    +card(fmt(uniq(L,function(r){return r.item;})),'Equipment types',ofT(0,uniq(rows,function(r){return r.item;})))
+    +card(compact(sumD),'Daily rates total ('+CCY+'/day)',fmt(nDaily)+' daily rows · sum of listed rates, not actual spend',{})
+    +card(compact(sumM),'Monthly rates total ('+CCY+'/month)',fmt(nMonthly)+' monthly rows · sum of listed rates, not actual spend',{})
+    +card(fmt(med),'Median daily rate ('+CCY+')',dc.length?'middle half: '+fmt(q1)+' – '+fmt(q3)+' · '+fmt(dc.length)+' daily rows':'no daily-rate rows')
+    +card(L.length?Math.round(nDaily/L.length*100)+'%':'—','Priced per day',fmt(nDaily)+' daily · '+fmt(nMonthly)+' monthly · '+fmt(nOther)+' trip / hour / other',{act:'rate',v:'Daily',on:F.rate==='Daily'})
+    +card(L.length?Math.round(nHA/L.length*100)+'%':'—','Fuel paid by HAC (HA)',fmt(nHA)+' HA · '+fmt(nOwn)+' owner (contractor pays) · '+fmt(L.length-nHA-nOwn)+' blank',{act:'fuel',v:'HA',on:F.fuel==='HA'});
+}
+
+function barRows(items,key,opt){
+  opt=opt||{};
+  if(!items.length) return '<div class="rd-psub" style="margin:8px 6px;">No rows match the other filters.</div>';
+  function X(i){ return opt.count?i.n:(i.x!=null?i.x:i.n); }
+  var max=Math.max.apply(null,items.map(X))||1;
+  var money=!opt.count&&metric!=='n';
+  return items.map(function(i){
+    var on=F[key]===i.v, col=(opt.colors&&opt.colors[i.v])||opt.color||'var(--accent)';
+    var tip=E(i.label||i.v)+(i.d!=null?' — '+fmt(i.n)+' records · daily sum '+fmt(i.d)+' · monthly sum '+fmt(i.m):'');
+    return '<div class="rd-row'+(on?' on':'')+(money?' money':'')+'" data-rd="'+key+'" data-v="'+enc(i.v)+'" title="'+tip+'"><span class="rd-lbl">'+E(i.label||i.v)+'</span>'
+      +'<span class="rd-bar"><i style="width:'+(X(i)?Math.max(2,X(i)/max*100):0)+'%;background:'+col+'"></i></span><span class="rd-num">'+(money?compact(X(i)):fmt(X(i)))+'</span></div>';
+  }).join('');
+}
+function panel(title,sub,body,wide){
+  return '<div class="rd-panel'+(wide?' wide':'')+'"><div class="rd-ptitle">'+title+'</div><div class="rd-psub">'+sub+'</div>'+body+'</div>';
+}
+
+function renderPanels(){
+  var cc=(typeof CAT_COLORS!=='undefined')?CAT_COLORS:{}; var colors={}; Object.keys(cc).forEach(function(k){ colors[k]=cc[k]; }); colors['Uncategorized']='#7d8590';
+  var h='';
+
+  var byCat=countBy(list('cat'),function(r){return r.catL;});
+  h+=panel('Equipment categories','By '+MN[metric]+' — click a bar to filter',barRows(byCat,'cat',{colors:colors}));
+
+  var byPlant=countBy(list('plant'),function(r){return r.plant;});
+  h+=panel('Plants','By '+MN[metric],barRows(byPlant,'plant',{color:'var(--blue)'}));
+
+  var allMonths=Object.keys(rows.reduce(function(o,r){ if(r.month) o[r.month]=1; return o; },{})).sort();
+  var mc={}; list('month').forEach(function(r){ if(r.month) mc[r.month]=(mc[r.month]||0)+val(r,metric); });
+  var mmax=Math.max.apply(null,allMonths.map(function(m){return mc[m]||0;}).concat([1]));
+  h+=panel('By month','Rate date · '+MN[metric],
+    '<div class="rd-months">'+allMonths.map(function(m){
+      var n=mc[m]||0;
+      return '<div class="rd-mcol'+(F.month===m?' on':'')+'" data-rd="month" data-v="'+enc(m)+'"><span class="rd-mn">'+(metric==='n'?fmt(n):compact(n))+'</span><span class="rd-mbw"><span class="rd-mb" style="height:'+(n/mmax*100)+'%"></span></span><span class="rd-ml">'+monLabel(m)+'</span></div>';
+    }).join('')+'</div>');
+
+  var LC=list('check'), cnt={nocat:0,high:0,unspec:0,dup:0}; LC.forEach(function(r){ r.flags.forEach(function(f){ cnt[f]++; }); });
+  var CH=[['nocat','No category','Equipment name is not in the Categories sheet (often a typo), so it cannot be grouped.'],
+          ['high','Daily rate ≥ '+fmt(HIGH_DAILY),'Marked daily but priced like a monthly rate (mostly generators). Confirm the rate basis.'],
+          ['unspec','Fuel or transport blank','Fuel cost or Transportation is empty, so who pays for it is unclear.'],
+          ['dup','Identical rows','Same vendor, item, model, rate, date and terms as an earlier row: extra units or a duplicate entry.']];
+  h+=panel('Data checks','Rows with a possible data problem (a row can have several flags). Click one to list its rows.',
+    CH.map(function(c){
+      return '<div class="rd-chk'+(F.check===c[0]?' on':'')+'" data-rd="check" data-v="'+c[0]+'"><span class="rd-chk-n">'+fmt(cnt[c[0]])+'</span><span><b>'+c[1]+'</b><br><span class="rd-chk-h">'+c[2]+'</span></span></div>';
+    }).join(''));
+
+  var byV=countBy(list('vendor'),function(r){return r.vendor;});
+  h+=panel('Top vendors','Top 10 of '+fmt(byV.length)+' by '+MN[metric],barRows(byV.slice(0,10),'vendor',{color:'#a371f7'}));
+
+  var byP=countBy(list('project'),function(r){return r.project;});
+  h+=panel('Top projects','Top 10 of '+fmt(byP.length)+' by '+MN[metric],barRows(byP.slice(0,10),'project',{color:'var(--green)'}));
+
+  var terms='<div class="rd-terms">'
+    +'<div><div class="rd-tblock-t">Rate basis</div>'+barRows(countBy(list('rate'),function(r){return r.rateL;}),'rate',{color:'var(--accent)'})+'</div>'
+    +'<div><div class="rd-tblock-t">Fuel cost — who pays</div>'+barRows(countBy(list('fuel'),function(r){return r.fuelL;}).map(function(i){ i.label=FUELL[i.v]||i.v; return i; }),'fuel',{color:'var(--blue)'})+'</div>'
+    +'<div><div class="rd-tblock-t">Transportation</div>'+barRows(countBy(list('trans'),function(r){return r.transL;}),'trans',{color:'#ffa657'})+'</div>'
+    +'<div><div class="rd-tblock-t">Stand-By (S.B) rate</div>'+barRows(countBy(list('sb'),function(r){return r.sbL;}).sort(function(a,b){ return (a.v==='—')-(b.v==='—')||b.n-a.n; }),'sb',{color:'#bc8cff'})+'</div></div>';
+  h+=panel('Commercial terms','Owner = rate includes fuel, contractor pays the diesel · HA = rate is equipment only, HAC pays the diesel',terms,true);
+
+  /* daily-rate benchmark per equipment type */
+  var LI=list('item'), g={};
+  LI.forEach(function(r){ var o=g[r.item]||(g[r.item]={n:0,d:[]}); o.n++; if(r.rate==='daily'&&r.cost!=null) o.d.push(r.cost); });
+  var types=Object.keys(g).map(function(k){ var d=g[k].d.sort(function(a,b){return a-b;}); return {v:k,n:g[k].n,min:d.length?d[0]:null,med:pctl(d,.5),max:d.length?d[d.length-1]:null}; })
+    .sort(function(a,b){ return b.n-a.n||a.v.localeCompare(b.v); });
+  var shown=allTypes?types:types.slice(0,12);
+  var tb='<div class="table-wrap" style="border:none;background:transparent;"><table class="rd-bt"><thead><tr><th>Equipment type</th><th class="n">Records</th><th class="n">Min</th><th class="n">Median</th><th class="n">Max</th></tr></thead><tbody>'
+    +shown.map(function(t){
+      return '<tr class="rd-btr'+(F.item===t.v?' on':'')+'" data-rd="item" data-v="'+enc(t.v)+'"><td>'+E(t.v)+'</td><td class="n">'+fmt(t.n)+'</td><td class="n">'+fmt(t.min)+'</td><td class="n">'+fmt(t.med)+'</td><td class="n">'+fmt(t.max)+'</td></tr>';
+    }).join('')+'</tbody></table></div>'
+    +(types.length>12?'<button class="rd-link" data-rd="alltypes">'+(allTypes?'Show top 12 only':'Show all '+fmt(types.length)+' types')+'</button>':'');
+  h+=panel('Daily rate by equipment type','Min / median / max of daily-basis rows only ('+CCY+') · capacity varies inside a type, so use the table below for like-for-like',tb,true);
+
+  $('rd-panels').innerHTML=h;
+}
+
+var COLS=[['item','Equipment'],['model','Model / Capacity'],['catL','Category'],['rateL','Rate'],['cost','Unit cost'],['sb','S.B'],['vendor','Vendor'],
+          ['project','Project'],['plant','Plant'],['date','Date'],['fuelL','Fuel'],['transL','Transport'],['contact','Contact'],['note','Note']];
+function renderTable(){
+  var L=list();
+  L.sort(function(a,b){
+    var x=a[sortKey], y=b[sortKey];
+    if(x==null||x==='') return 1; if(y==null||y==='') return -1;
+    if(typeof x==='number'&&typeof y==='number') return (x-y)*sortDir;
+    return String(x).localeCompare(String(y))*sortDir;
+  });
+  $('rd-count').textContent=fmt(Math.min(limit,L.length))+' of '+fmt(L.length)+' shown';
+  var cc=(typeof CAT_COLORS!=='undefined')?CAT_COLORS:{};
+  var th='<th>#</th>'+COLS.map(function(c){
+    var arrow=sortKey===c[0]?(sortDir>0?' ▲':' ▼'):'';
+    return '<th data-rd="sort" data-v="'+c[0]+'">'+c[1]+arrow+'</th>';
+  }).join('');
+  var body=L.slice(0,limit).map(function(r,i){
+    var flagged=r.flags.indexOf('high')>=0;
+    return '<tr><td class="rd-muted">'+(i+1)+'</td>'
+      +'<td style="font-weight:600;">'+E(r.item)+'</td>'
+      +'<td>'+E(r.model||'—')+'</td>'
+      +'<td><span class="cat-badge"'+(cc[r.catL]?' style="border-left:3px solid '+cc[r.catL]+'"':'')+'>'+(r.cat?E(r.cat):'<span class="rd-muted">Uncategorized</span>')+'</span></td>'
+      +'<td>'+E(r.rateL)+'</td>'
+      +'<td class="code-cell'+(flagged?' rd-warn':'')+'" title="'+(flagged?'Daily rate ≥ '+fmt(HIGH_DAILY)+' — verify basis':'')+'">'+fmt(r.cost,2)+'</td>'
+      +'<td>'+E(r.sbL)+'</td>'
+      +'<td>'+E(r.vendor||'—')+'</td><td>'+E(r.project||'—')+'</td><td>'+E(r.plant||'—')+'</td>'
+      +'<td class="code-cell" style="color:var(--text-muted);">'+dateLabel(r.date)+'</td>'
+      +'<td>'+E(r.fuelL)+'</td><td>'+E(r.transL)+'</td><td>'+E(r.contact||'—')+'</td>'
+      +'<td><div class="rd-note" dir="auto" title="'+E(r.note)+'">'+E(r.note||'—')+'</div></td></tr>';
+  }).join('');
+  $('rd-table').innerHTML='<table><thead><tr>'+th+'</tr></thead><tbody>'+(body||'<tr><td colspan="'+(COLS.length+1)+'" style="text-align:center;color:var(--text-muted);padding:28px;">No records match these filters.</td></tr>')+'</tbody></table>';
+  $('rd-more').innerHTML=L.length>limit?'<button class="btn-sm" data-rd="more">Show '+Math.min(PAGE,L.length-limit)+' more</button>':'';
+}
+
+function rdWipeAll(){
+  if(!rows||!rows.length){ toast('No data to delete','error'); return; }
+  var ok=prompt('Delete ALL rental database records ('+rows.length+')?\nType DELETE to confirm:');
+  if(ok!=='DELETE') return;
+  $('rd-status').textContent='⏳ Deleting…';
+  ref().collection('chunks').get().then(function(snap){
+    var docs=snap.docs, chain=Promise.resolve();
+    for(var i=0;i<docs.length;i+=200){
+      (function(slice){ chain=chain.then(function(){ var b=db.batch(); slice.forEach(function(d){ b.delete(d.ref); }); return b.commit(); }); })(docs.slice(i,i+200));
+    }
+    return chain;
+  }).then(function(){ return ref().delete(); })
+  .then(function(){
+    rows=[]; meta=null; loaded=true;
+    $('rd-status').textContent='';
+    toast('✓ All rental data deleted','success');
+    start();
+  }).catch(function(err){
+    $('rd-status').textContent='';
+    toast('Delete failed: '+(err&&err.message||err),'error');
+  });
+}
+window.rdWipeAll=rdWipeAll;
+
+/* ─── Fuzzy text matching (typo-tolerant): normalized Levenshtein distance,
+   boosted for substring containment (short/partial names vs full names). ─── */
+function lev(a,b){
+  var m=a.length,n=b.length;
+  if(!m) return n; if(!n) return m;
+  var prev=[]; for(var j=0;j<=n;j++) prev[j]=j;
+  for(var i=1;i<=m;i++){
+    var cur=[i];
+    for(var j=1;j<=n;j++) cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1));
+    prev=cur;
+  }
+  return prev[n];
+}
+function fuzzyScore(a,b){
+  if(!a||!b) return 0;
+  if(a===b) return 1;
+  if(a.indexOf(b)>=0||b.indexOf(a)>=0){
+    var shorter=Math.min(a.length,b.length), longer=Math.max(a.length,b.length);
+    return 0.7+0.3*(shorter/longer);
+  }
+  var d=lev(a,b), longer=Math.max(a.length,b.length);
+  return longer?1-(d/longer):0;
+}
+function bestMatch(target,candidates,threshold){
+  var tk=keyOf(target||''); if(!tk) return null;
+  var best=null,bestScore=0;
+  candidates.forEach(function(c){
+    var s=fuzzyScore(tk,keyOf(c));
+    if(s>bestScore){ bestScore=s; best=c; }
+  });
+  return bestScore>=threshold?{value:best,score:bestScore}:null;
+}
+
+/* ─── Capacity parsing: the Model column holds capacity as free text
+   ("Denyo 300 Kva / 50 H", "GROVE TM870/70 TON", "18 : 20 M3", "JLG 120HX/36M").
+   We pull out (number, unit) pairs, ignore frequency (50 Hz), and compare like with like. ─── */
+function capTokens(str){
+  var t=' '+String(str==null?'':str).toLowerCase()
+    .replace(/(\d)\s*k\s*\.?\s*v\s*\.?\s*a(?![a-z])\.?/g,'$1 kva ')
+    .replace(/(^|[^a-z])k\s*\.?\s*v\s*\.?\s*a(?![a-z])\.?/g,'$1 kva ')
+    .replace(/(\d)\s*m\s*[³3](?![a-z0-9])/g,'$1 m3 ')
+    .replace(/(\d)\s*(?:tons?|tonnes?)(?![a-z])/g,'$1 ton ');
+  var out=[], re=/(\d+(?:\.\d+)?)(?:\s*[:\-–]\s*(\d+(?:\.\d+)?))?\s*(kva|ton|m3|hz|h|m)?(?![a-z0-9])/g, m;
+  while((m=re.exec(t))){
+    var unit=m[3]||null; if(unit==='hz'||unit==='h') continue;
+    var lo=parseFloat(m[1]), hi=m[2]!=null?parseFloat(m[2]):lo; if(hi<lo){ var x=lo; lo=hi; hi=x; }
+    out.push({lo:lo,hi:hi,unit:unit});
+  }
+  return out;
+}
+function capHint(itemName){
+  var k=keyOf(itemName||'');
+  if(/generator/.test(k)) return 'kva';
+  if(/crane/.test(k)) return 'ton';
+  if(/tipper|watertank|mixer|dump/.test(k)) return 'm3';
+  if(/manlift|forklift|scissor|telescop|boom/.test(k)) return 'm';
+  return null;
+}
+function capLabel(tok){
+  if(!tok) return '';
+  var v=tok.lo===tok.hi?fmt(tok.lo,2):fmt(tok.lo,2)+'–'+fmt(tok.hi,2);
+  return v+(tok.unit?' '+tok.unit.toUpperCase():'');
+}
+function capTarget(capText,itemName){
+  var toks=capTokens(capText); if(!toks.length) return null;
+  var withUnit=toks.filter(function(t){return t.unit;})[0];
+  var t=withUnit||toks[0]; t={lo:t.lo,hi:t.hi,unit:t.unit};
+  if(!t.unit) t.unit=capHint(itemName);
+  return t;
+}
+function rowCapToks(r){ return r._ct||(r._ct=capTokens(r.model)); }
+function tokHit(rt,tt){ if(tt.unit&&rt.unit!==tt.unit) return false; return Math.max(rt.lo,tt.lo)<=Math.min(rt.hi,tt.hi)+1e-9; }
+function capHit(r,tt){ return rowCapToks(r).some(function(rt){ return tokHit(rt,tt); }); }
+function capDist(r,tt){
+  var best=null;
+  rowCapToks(r).forEach(function(rt){
+    if(tt.unit&&rt.unit!==tt.unit) return;
+    var d=Math.abs((rt.lo+rt.hi)/2-(tt.lo+tt.hi)/2); if(best==null||d<best.d) best={d:d,tok:rt};
+  });
+  return best;
+}
+
+/* ─── Public lookup used by the Follow-Up page: last price for an equipment name.
+   Both the project (to resolve a Plant) and the equipment name are matched
+   fuzzily, since names typed in Follow-Up rarely match Rental Database
+   character-for-character. Once the Plant is resolved, the equipment search
+   spans the WHOLE Plant (every project under it), not just the one project. ─── */
+window.rdLastPrice=function(equipmentName,projectName,cb,capacityText){
+  var done=false;
+  var timer=setTimeout(function(){
+    if(done) return; done=true;
+    cb({error:'timeout'});
+  },12000);
+  function finish(res){ if(done) return; done=true; clearTimeout(timer); cb(res); }
+
+  load().then(function(){
+    try{
+      if(rows===null){ finish({error:'load'}); return; }
+      if(!rows.length){ finish({error:'empty'}); return; }
+      if(!equipmentName){ finish({error:'noequip'}); return; }
+
+      var projSeen={}; rows.forEach(function(r){ if(r.project) projSeen[r.project]=1; });
+      var pm=bestMatch(projectName,Object.keys(projSeen),0.45);
+      var matchedProject=null, plant=null;
+      if(pm){
+        matchedProject=pm.value;
+        var plantCount={};
+        rows.forEach(function(r){ if(r.project===matchedProject&&r.plant&&r.plant!=='—') plantCount[r.plant]=(plantCount[r.plant]||0)+1; });
+        var plants=Object.keys(plantCount).sort(function(a,b){ return plantCount[b]-plantCount[a]; });
+        plant=plants[0]||null;
+      }
+      if(!plant){ finish({error:'noproject',project:projectName,equipment:equipmentName}); return; }
+
+      var plantRows=rows.filter(function(r){ return r.plant===plant; });
+      var itemSeen={}; plantRows.forEach(function(r){ if(r.item) itemSeen[r.item]=1; });
+      var em=bestMatch(equipmentName,Object.keys(itemSeen),0.5);
+
+      var byDate=function(a,b){ return String(b.date||'').localeCompare(String(a.date||''))||((b.project===matchedProject)-(a.project===matchedProject)); };
+      var itemRows=em?plantRows.filter(function(r){ return r.item===em.value; }):[];
+      var target=capTarget(capacityText,em?em.value:equipmentName);
+      var capMode=(capacityText&&String(capacityText).trim())?(target?'pending':'text'):'none';
+      var matches=itemRows, nearest=[], otherPlants=[];
+      if(target){
+        matches=itemRows.filter(function(r){ return capHit(r,target); });
+        capMode=matches.length?'exact':'miss';
+        if(!matches.length&&em){
+          var seenCap={};
+          itemRows.map(function(r){ var d=capDist(r,target); return d?{r:r,d:d}:null; }).filter(Boolean)
+            .sort(function(a,b){ return a.d.d-b.d.d||byDate(a.r,b.r); })
+            .forEach(function(x){ var k=capLabel(x.d.tok); if(seenCap[k]||nearest.length>=4) return; seenCap[k]=1; nearest.push({r:x.r,label:capLabel(x.d.tok)}); });
+          var seenPl={};
+          rows.filter(function(r){ return r.item===em.value&&r.plant!==plant&&capHit(r,target); }).sort(byDate)
+            .forEach(function(r){ if(seenPl[r.plant]||otherPlants.length>=4) return; seenPl[r.plant]=1; otherPlants.push(r); });
+        }
+      }
+      matches=matches.slice().sort(byDate);
+
+      var vendorCounts={}, total=0;
+      plantRows.forEach(function(r){ var v=r.vendor||'—', q=qtyOf(r); vendorCounts[v]=(vendorCounts[v]||0)+q; total+=q; });
+      var vendorShares=Object.keys(vendorCounts).map(function(v){
+        return {vendor:v,n:vendorCounts[v],pct:total?Math.round(vendorCounts[v]/total*100):0};
+      }).sort(function(a,b){ return b.pct-a.pct; });
+
+      function slim(r,cl){ return {capLabel:cl||'',item:r.item,model:r.model,vendor:r.vendor,project:r.project,plant:r.plant,
+        cost:r.cost,rate:r.rate,rateL:r.rateL,date:r.date,dateLabel:dateLabel(r.date),fuel:r.fuelL,note:r.note}; }
+
+      finish({ok:true,plant:plant,ccy:CCY,equipment:equipmentName,project:projectName,
+          matchedProject:matchedProject,projectFuzzy:matchedProject&&keyOf(matchedProject)!==keyOf(projectName||''),
+          matchedEquipment:em?em.value:null,equipFuzzy:!!(em&&keyOf(em.value)!==keyOf(equipmentName)),
+          capacity:capacityText||'',capMode:capMode,capLabel:target?capLabel(target):'',
+          nearest:nearest.map(function(x){ return slim(x.r,x.label); }),
+          otherPlants:otherPlants.map(function(r){ return slim(r,target?capLabel(target):''); }),
+          last:matches.length?slim(matches[0]):null,
+          history:matches.slice(0,5).map(function(r){ return slim(r); }),
+          vendorShares:vendorShares});
+    }catch(err){
+      finish({error:'exception',message:err&&err.message});
+    }
+  }).catch(function(err){
+    finish({error:'exception',message:err&&err.message});
+  });
+};
+
+/* ───────────── 5) EVENTS ───────────── */
+document.addEventListener('click',function(e){
+  var t=e.target.closest?e.target.closest('#page-rentaldb [data-rd]'):null; if(!t||!rows) return;
+  var k=t.getAttribute('data-rd'), v=decodeURIComponent(t.getAttribute('data-v')||'');
+  if(k==='clearall'){ F=freshF(); $('rd-q').value=''; }
+  else if(k==='clear'){ F[v]=(v==='q')?'':null; if(v==='q') $('rd-q').value=''; }
+  else if(k==='sort'){ if(sortKey===v) sortDir=-sortDir; else { sortKey=v; sortDir=(v==='cost'||v==='date')?-1:1; } renderTable(); return; }
+  else if(k==='more'){ limit+=PAGE; renderTable(); return; }
+  else if(k==='metric'){ metric=v; syncSeg(); renderPanels(); return; }
+  else if(k==='alltypes'){ allTypes=!allTypes; renderPanels(); return; }
+  else if(FIELD[k]||k==='check'){ F[k]=(F[k]===v)?null:v; }
+  else return;
+  limit=PAGE; render();
+});
+var qT=null;
+document.addEventListener('input',function(e){
+  if(!e.target||e.target.id!=='rd-q') return;
+  clearTimeout(qT); var val=e.target.value;
+  qT=setTimeout(function(){ F.q=clean(val).toLowerCase(); limit=PAGE; render(); },180);
+});
+document.addEventListener('change',function(e){
+  var id=e.target&&e.target.id, map={'rd-sel-plant':'plant','rd-sel-cat':'cat','rd-sel-rate':'rate'};
+  if(!map[id]) return; F[map[id]]=e.target.value||null; limit=PAGE; render();
+});
+
+/* ───────────── 6) PUBLIC HOOKS ───────────── */
+window.rdOpen=function(){
+  if(loaded){ if(rows&&rows.length&&$('rd-main').style.display==='none') start(); return; }
+  load().then(start);
+};
+window.rdImport=importFile;
+/* exposed for tests only */
+window.__rd={parseWorkbook:parseWorkbook,setRows:function(r,m){ rows=r; meta=m||null; loaded=true; start(); }};
+})();
+</script>
+
+<script>
+/* ═════ Shared PDF engine — SAME settings as Master Rental "Export PDF" ═════
+   A4 landscape · per-column filters (>100, <=5 …) + global search · totals footer that follows the filters ·
+   click a row to highlight it · zebra rows · repeating header · colours kept when printing. */
+(function(){
+  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function two(n){ return n<10?'0'+n:''+n; }
+  function pageScript(){
+    var tb=document.getElementById('tb'), rows=[].slice.call(tb.rows);
+    var inputs=[].slice.call(document.querySelectorAll('.flt input'));
+    var g=document.getElementById('gq'), cnt=document.getElementById('cnt');
+    var sumCols=[].slice.call(document.querySelectorAll('#tf td[data-sum]'));
+    function fmt(n){ return Math.round(n).toLocaleString('en-US'); }
+    function test(q,txt,num,isNum){
+      q=q.trim().toLowerCase(); if(!q) return true;
+      if(isNum){
+        var m=q.match(/^(>=|<=|>|<|=)\s*(-?[\d.,]+)$/);
+        if(m){ var v=parseFloat(m[2].replace(/,/g,'')); if(isNaN(v)) return true;
+          return m[1]==='>'?num>v:m[1]==='<'?num<v:m[1]==='>='?num>=v:m[1]==='<='?num<=v:num===v; }
+      }
+      return txt.indexOf(q)>=0;
+    }
+    function apply(){
+      var gq=g.value.trim().toLowerCase(), shown=0, sums={};
+      rows.forEach(function(tr){
+        var ok=!gq||tr.getAttribute('data-t').indexOf(gq)>=0;
+        if(ok) inputs.forEach(function(inp){
+          if(!ok) return; var c=+inp.getAttribute('data-c'), td=tr.cells[c];
+          ok=test(inp.value, td.textContent.toLowerCase(), parseFloat(td.getAttribute('data-v')), inp.hasAttribute('data-n'));
+        });
+        tr.style.display=ok?'':'none';
+        if(ok){ shown++; sumCols.forEach(function(t){ var c=+t.getAttribute('data-c'); sums[c]=(sums[c]||0)+(parseFloat(tr.cells[c].getAttribute('data-v'))||0); }); }
+      });
+      cnt.textContent=shown+' / '+rows.length+' rows';
+      sumCols.forEach(function(t){ t.textContent=fmt(sums[+t.getAttribute('data-c')]||0); });
+    }
+    g.addEventListener('input',apply);
+    inputs.forEach(function(i){ i.addEventListener('input',apply); });
+    document.getElementById('clr').addEventListener('click',function(){ g.value=''; inputs.forEach(function(i){i.value='';}); apply(); });
+    var pinned=null;
+    tb.addEventListener('click',function(e){
+      var tr=e.target; while(tr&&tr!==tb&&tr.tagName!=='TR') tr=tr.parentNode;
+      if(!tr||tr===tb) return;
+      if(pinned&&pinned!==tr) pinned.classList.remove('hl');
+      tr.classList.toggle('hl'); pinned=tr.classList.contains('hl')?tr:null;
+    });
+    apply();
+  }
+  /* cell types: t=text, i=integer, d=1 decimal, m=money(0 dec), z=money zero->dash, dz=1 decimal zero->dash, p=percent */
+  function cell(v,t){
+    if(t==='t'){
+      if(v instanceof Date) v=v.getFullYear()+'-'+two(v.getMonth()+1)+'-'+two(v.getDate());
+      return {txt:v==null?'':String(v), num:NaN, cls:''};
+    }
+    var n=Number(v); if(!isFinite(n)) n=0;
+    if(t==='i') return {txt:Math.round(n).toLocaleString('en-US'), num:Math.round(n), cls:'n'};
+    if(t==='d') return {txt:n.toLocaleString('en-US',{minimumFractionDigits:1,maximumFractionDigits:1}), num:+n.toFixed(1), cls:'n'};
+    if(t==='dz') return n? {txt:n.toLocaleString('en-US',{minimumFractionDigits:1,maximumFractionDigits:1}), num:+n.toFixed(1), cls:'n'} : {txt:'\u2013', num:0, cls:'n z'};
+    if(t==='m') return {txt:Math.round(n).toLocaleString('en-US'), num:Math.round(n), cls:'n'};
+    if(t==='z') return Math.round(n)? {txt:Math.round(n).toLocaleString('en-US'), num:Math.round(n), cls:'n'} : {txt:'\u2013', num:0, cls:'n z'};
+    if(t==='p') return {txt:Math.round(n)+'%', num:Math.round(n), cls:'n'+(n<75?' lo':'')};
+    return {txt:'', num:NaN, cls:''};
+  }
+  /* opts: {title, sub, cols:[{h:'Header', g:function(row,i){...}, t:'t'|'i'|..., s:true(sum)}], rows:[...]} */
+  window.hacPdfTable=function(o){
+    var rows=o.rows||[], cols=o.cols||[];
+    if(!rows.length){ if(typeof toast==='function') toast('Nothing to export','error'); return; }
+    var h='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+esc(o.title)+'</title><style>';
+    h+='*{box-sizing:border-box;margin:0;padding:0}body{font-family:Segoe UI,Arial,sans-serif;color:#1a1a1a;background:#fff;padding:16px 18px;font-size:10px}';
+    h+='h1{font-size:16px;margin-bottom:2px}.sub{font-size:10px;color:#666;margin-bottom:10px;border-bottom:3px solid #f0a500;padding-bottom:8px}';
+    h+='.bar{display:flex;gap:8px;align-items:center;margin-bottom:10px;position:sticky;top:0;background:#fff;padding:6px 0;z-index:5}';
+    h+='.bar input{border:1px solid #ccc;border-radius:6px;padding:6px 10px;font-size:12px;width:280px}#cnt{font-size:11px;color:#555}';
+    h+='.bar button{background:#f0a500;color:#000;border:0;padding:7px 14px;border-radius:6px;font-weight:700;cursor:pointer}.bar .g{background:#eee}.bar .sp{flex:1}';
+    h+='table{width:100%;border-collapse:collapse}th{background:#f4f4f4;font-size:8.5px;text-transform:uppercase;color:#555;text-align:left;padding:5px 6px;border-bottom:1px solid #ddd;white-space:nowrap}';
+    h+='th.n,td.n{text-align:right;font-variant-numeric:tabular-nums}';
+    h+='.flt th{padding:2px 3px;background:#fff}.flt input{width:100%;min-width:34px;border:1px solid #ddd;border-radius:4px;padding:2px 4px;font-size:9px}';
+    h+='td{padding:4px 6px;border-bottom:1px solid #eee;font-size:9.5px;white-space:nowrap}tbody tr:nth-child(even) td{background:#fafafa}';
+    h+='td.z{color:#bbb}td.lo{color:#d93025;font-weight:600}';
+    h+='tbody tr{cursor:pointer}tbody tr:hover td{background:#fff3b0}tbody tr.hl td{background:#ffe94d !important;font-weight:600}';
+    h+='tfoot td{background:#f4f4f4;font-weight:700;border-top:2px solid #f0a500;font-size:10px}';
+    h+='@media print{.bar,.flt{display:none}body{padding:6px 8px}tbody tr:hover td{background:inherit}tbody tr:nth-child(even):hover td{background:#fafafa}';
+    h+='*{-webkit-print-color-adjust:exact;print-color-adjust:exact}thead{display:table-header-group}tr{page-break-inside:avoid}@page{size:A4 landscape;margin:7mm}}';
+    h+='</style></head><body>';
+    h+='<h1>'+esc(o.title)+'</h1><div class="sub">'+rows.length.toLocaleString('en-US')+' rows \u00b7 Generated '+esc(new Date().toLocaleString())+(o.sub?' \u00b7 '+esc(o.sub):'')+'</div>';
+    h+='<div class="bar"><input id="gq" placeholder="Search all columns\u2026"><button class="g" id="clr">Clear</button><span id="cnt"></span><span class="sp"></span><button onclick="window.print()">\ud83d\udda8 Print / Save PDF</button></div>';
+    h+='<table><thead><tr>'+cols.map(function(c){ return '<th'+(c.t==='t'?'':' class="n"')+'>'+esc(c.h)+'</th>'; }).join('')+'</tr>';
+    h+='<tr class="flt">'+cols.map(function(c,j){ return '<th><input data-c="'+j+'"'+(c.t==='t'?'':' data-n="1" placeholder="&gt;100"')+'></th>'; }).join('')+'</tr></thead><tbody id="tb">';
+    rows.forEach(function(r,i){
+      var cs=cols.map(function(c){ return cell(c.g(r,i),c.t); });
+      h+='<tr data-t="'+esc(cs.map(function(x){return x.txt;}).join(' ').toLowerCase())+'">'+cs.map(function(x){ return '<td'+(x.cls?' class="'+x.cls+'"':'')+(isNaN(x.num)?'':' data-v="'+x.num+'"')+'>'+esc(x.txt)+'</td>'; }).join('')+'</tr>';
+    });
+    h+='</tbody><tfoot><tr id="tf">'+cols.map(function(c,j){
+      if(j===0) return '<td>Total</td>';
+      return c.s?'<td class="n" data-sum="1" data-c="'+j+'"></td>':'<td></td>';
+    }).join('')+'</tr></tfoot></table>';
+    h+='<scr'+'ipt>('+pageScript.toString()+')();</scr'+'ipt></body></html>';
+    var w=window.open('','_blank');
+    if(!w){ if(typeof toast==='function') toast('Popup blocked','error'); return; }
+    w.document.write(h); w.document.close();
+  };
+
+  /* ═════ Director Report polish — applied to Master Owned + Master Rental reports ═════
+     Executive look (navy title band), A4 with running footer + "Page X of Y", tables never split mid-row,
+     headers repeat on every page, sections stay together, colours kept when printing. */
+  window.hacDirectorPolish=function(html,label){
+    var css='<style>'
+      +'body{padding:0 !important;font-size:12px}'
+      +'.hd{background:#0d1b2e;color:#fff;border-bottom:4px solid #f0a500 !important;padding:16px 20px !important;margin:0 0 16px !important;border-radius:0 0 6px 6px;align-items:center !important}'
+      +'.hd h1{color:#fff;font-size:20px !important;letter-spacing:.3px}.hd .sub{color:#f0a500 !important;font-size:11px !important;font-weight:600;letter-spacing:.6px;text-transform:uppercase}'
+      +'.hd .meta{color:#c9d4e3 !important;line-height:1.7}.hd .meta b{color:#fff}'
+      +'.kpis{margin:0 0 16px !important;gap:10px !important}.k{background:#fff !important;border:1px solid #d9dee6 !important;border-top:3px solid #f0a500 !important;border-left:1px solid #d9dee6 !important;box-shadow:0 1px 2px rgba(0,0,0,.06);padding:10px 12px !important}'
+      +'.k.red{border-top-color:#d93025 !important}.k .t{letter-spacing:.5px}.k .v{font-size:16px !important;color:#0d1b2e}.k.red .v{color:#d93025}'
+      +'.notes{background:#fff8e6 !important;border:1px solid #f0d58a !important;border-left:5px solid #f0a500 !important}.notes b{color:#0d1b2e !important}'
+      +'h2{background:#f1f4f8;border-left:4px solid #f0a500 !important;color:#0d1b2e;padding:6px 10px !important;margin:18px 0 8px !important;break-after:avoid;page-break-after:avoid}'
+      +'th{background:#0d1b2e !important;color:#fff !important;border-bottom:0 !important}'
+      +'tbody tr:nth-child(even) td,table tr:nth-child(even) td{background:#f8fafc}'
+      +'tr{break-inside:avoid;page-break-inside:avoid}thead{display:table-header-group}table{break-inside:auto}'
+      +'.notes,.kpis,.k{break-inside:avoid;page-break-inside:avoid}'
+      +'.ft{margin-top:22px;padding-top:8px;border-top:2px solid #f0a500;display:flex;justify-content:space-between;font-size:10px;color:#666}'
+      +'.sig{display:flex;gap:40px;margin-top:26px;font-size:10.5px;color:#444}.sig div{flex:1;border-top:1px solid #999;padding-top:5px}'
+      +'@media print{*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}'
+      +'@page{size:A4;margin:10mm 9mm 14mm;@bottom-left{content:"HAC \u00b7 PMV \u2014 '+label+' \u00b7 Director Report";font-size:8pt;color:#666}@bottom-right{content:"Page " counter(page) " of " counter(pages);font-size:8pt;color:#666}}'
+      +'</style>';
+    var foot='<div class="sig"><div>Prepared by</div><div>Reviewed by</div><div>Approved by</div></div>'
+      +'<div class="ft"><span>HAC \u00b7 PMV Support Division \u2014 '+label+'</span><span>Generated '+new Date().toLocaleString()+'</span></div>';
+    html=html.replace('</head>',css+'</head>');
+    html=html.replace(/<\/body>\s*<\/html>\s*$/,foot+'</body></html>');
+    return html;
+  };
 })();
 </script>
 </body>
