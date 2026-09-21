@@ -382,6 +382,11 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
 .rd-chk-h{color:var(--text-muted);font-size:11px;}
 .rd-terms .rd-lbl{white-space:normal;line-height:1.3;}
 </style>
+<style id="no-descriptions">
+/* explanatory captions removed — layout kept */
+.section-sub:empty,.mr-kpi .s,.rd-psub:not([style]),.rd-chk-h{display:none !important}
+#page-executive>div:first-child,#page-dashboard>div:first-child,#page-equipment>div:first-child,#page-transfers>div:first-child,#page-workshop>div:first-child,#page-followup>div:first-child,#page-rentaldb>div:first-child{margin-bottom:16px !important}
+</style>
 </head>
 <body class="is-viewer">
 
@@ -526,8 +531,7 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
           <div>
             <div class="section-title" id="exec-fleet-title">Egypt Fleet — Executive Summary</div>
-            <div class="section-sub" id="exec-fleet-sub">HAC PMV · Equipment Management Portal</div>
-          </div>
+                      </div>
           <div style="display:flex;gap:8px;align-items:center;">
             <span style="font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;" id="exec-date-label"></span>
                     <span id="exec-fleet-pick" class="fleet-pill" onclick="openFleetPicker()">🇪🇬 Egypt</span>
@@ -540,22 +544,22 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
           <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;">
             <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Total Fleet</div>
             <div style="font-size:32px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--accent);" id="exec-total">—</div>
-            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">units in fleet</div>
+            
           </div>
           <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;">
             <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Active Projects</div>
             <div style="font-size:32px;font-weight:700;font-family:'JetBrains Mono',monospace;color:#58a6ff;" id="exec-projects">—</div>
-            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;" id="exec-projects-sub">across all sites</div>
+            
           </div>
           <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;">
             <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Categories</div>
             <div style="font-size:32px;font-weight:700;font-family:'JetBrains Mono',monospace;color:#3fb950;" id="exec-cats">—</div>
-            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">equipment types</div>
+            
           </div>
           <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;">
             <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">O.D Engineers</div>
             <div style="font-size:32px;font-weight:700;font-family:'JetBrains Mono',monospace;color:#bc8cff;" id="exec-ods">—</div>
-            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">responsible engineers</div>
+            
           </div>
         </div>
 
@@ -625,30 +629,33 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
       <div class="page" id="page-dashboard">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
           <div class="section-title" id="dash-fleet-title">Egypt Fleet — Dashboard</div>
-          <span id="dash-fleet-badge" class="fleet-pill" onclick="openFleetPicker()">🇪🇬 Egypt</span>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button class="btn-sm" onclick="exportDashPDF()">📄 PDF</button>
+            <button class="btn-sm" onclick="exportDashPDF('xlsx')">📊 Excel</button>
+            <span id="dash-fleet-badge" class="fleet-pill" onclick="openFleetPicker()">🇪🇬 Egypt</span>
+          </div>
         </div>
-        <div class="section-sub">Click any card to filter equipment</div>
-
+        
         <div id="kpi-cards" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
           <div class="kpi-card" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;">
             <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Total Equipment</div>
             <div style="font-size:28px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--accent);" id="kpi-total">0</div>
-            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;" id="kpi-total-sub">across all projects</div>
+            
           </div>
           <div class="kpi-card" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;">
             <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Active Projects</div>
             <div style="font-size:28px;font-weight:700;font-family:'JetBrains Mono',monospace;color:#58a6ff;" id="kpi-projects">0</div>
-            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;" id="kpi-projects-sub">active projects</div>
+            
           </div>
           <div class="kpi-card" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;">
             <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">O.D Engineers</div>
             <div style="font-size:28px;font-weight:700;font-family:'JetBrains Mono',monospace;color:#3fb950;" id="kpi-ods">0</div>
-            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;" id="kpi-ods-sub">O.D engineers total</div>
+            
           </div>
           <div class="kpi-card" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;">
             <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Last Updated</div>
             <div style="font-size:18px;font-weight:700;color:#bc8cff;margin-top:4px;" id="kpi-updated">—</div>
-            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;" id="kpi-transfers-sub">0 transfers logged</div>
+            
           </div>
         </div>
 
@@ -662,7 +669,7 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
 
                 <div id="country-cards" style="display:none;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px;"></div>
 
-        <div class="dash-section-label">By Category — click to filter & view breakdown</div>
+        <div class="dash-section-label">By Category</div>
 
         <div class="cards-grid" id="cat-cards"></div>
 
@@ -686,13 +693,13 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
           </div>
         </div>
 
-        <div class="dash-section-label">By Project — click to filter</div>
+        <div class="dash-section-label">By Project</div>
         <div class="proj-filter-wrap">
           <input class="proj-search" type="text" id="proj-search-input" placeholder="🔍 Search project..." oninput="filterProjList()">
           <div class="proj-list" id="proj-list"></div>
         </div>
 
-        <div class="dash-section-label">By O.D — click to filter</div>
+        <div class="dash-section-label">By O.D</div>
         <div class="od-buttons" id="od-buttons"></div>
 
         <div id="od-chart-wrap" style="display: none; margin-top: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 24px;">
@@ -713,8 +720,7 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
           <div class="section-title" id="eq-fleet-title">Egypt Fleet — Equipment List</div>
                 <span id="eq-fleet-badge" class="fleet-pill" onclick="openFleetPicker()">🇪🇬 Egypt</span>
         </div>
-        <div class="section-sub">Master database of all HAC PMV machinery</div>
-
+        
         <div class="toolbar">
           <input class="search-box" type="text" id="search-input" placeholder="🔍 Search by name, code, SAP, brand..." oninput="renderTable()">
           <select id="filter-cat" onchange="renderTable()"><option value="">All Categories</option></select>
@@ -722,6 +728,7 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
           <select id="filter-proj" onchange="renderTable()"><option value="">All Projects</option></select>
           <button class="btn-add" id="btn-add-eq" style="display:none;" onclick="openAddModal()">+ Add Equipment</button>
           <button class="btn-sm" onclick="exportEquipPDF()">📄 PDF</button>
+          <button class="btn-sm" onclick="exportEquipPDF('xlsx')">📊 Excel</button>
           <label id="btn-import-eq" title="Adds only equipment whose Code is not registered yet in the chosen fleet — nothing existing is changed or deleted" style="display:none; background:rgba(63,185,80,.15); border: 1px solid rgba(63,185,80,.4); color: var(--green); padding: 8px 14px; border-radius: var(--radius); cursor: pointer; font-size: 13px; font-weight: 600; white-space: nowrap;">
             ➕ Add New Only
             <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="addNewEquipFromExcel(this)">
@@ -757,8 +764,7 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
       <!-- ================= 3. TRANSFERS LOG PAGE ================= -->
       <div class="page" id="page-transfers">
         <div class="section-title">Transfer Log</div>
-        <div class="section-sub">History of all equipment transfers</div>
-        <div class="toolbar">
+                <div class="toolbar">
           <input class="search-box" type="text" id="transfer-search" placeholder="Search by code or equipment name..." oninput="filterTransfers()">
         </div>
         <div id="transfers-list"></div>
@@ -767,8 +773,7 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
       <!-- ================= 4. CENTRAL WORKSHOP PAGE ================= -->
       <div class="page" id="page-workshop">
         <div class="section-title">PMV Central Workshop Operations</div>
-        <div class="section-sub">Maintenance workflow, stages, and ready equipment requests</div>
-
+        
         <div class="news-ticker-container">
           <div class="ticker-label">⚡ Live Workshop Updates</div>
           <div class="ticker-wrap">
@@ -780,37 +785,30 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
           <div class="dash-card" onclick="setWsStatusFilter('All')">
             <div class="dash-card-label">Active Workshop</div>
             <div class="dash-card-val" id="ws-total-count" style="color:var(--text);">0</div>
-            <div class="dash-card-sub">In queue</div>
           </div>
           <div class="dash-card" onclick="setWsStatusFilter('Ready')">
             <div class="dash-card-label">Ready</div>
             <div class="dash-card-val" id="ws-ready-count" style="color:var(--status-ready);">0</div>
-            <div class="dash-card-sub">Can request</div>
           </div>
           <div class="dash-card" onclick="setWsStatusFilter('In Progress')">
             <div class="dash-card-label">In Progress</div>
             <div class="dash-card-val" id="ws-progress-count" style="color:var(--status-progress);">0</div>
-            <div class="dash-card-sub">Under repair</div>
           </div>
           <div class="dash-card" onclick="setWsStatusFilter('Waiting')">
             <div class="dash-card-label">Waiting</div>
             <div class="dash-card-val" id="ws-waiting-count" style="color:var(--status-waiting);">0</div>
-            <div class="dash-card-sub">Awaiting parts</div>
           </div>
           <div class="dash-card" onclick="setWsStatusFilter('Delay')">
             <div class="dash-card-label">Delay</div>
             <div class="dash-card-val" id="ws-delay-count" style="color:var(--status-delay);">0</div>
-            <div class="dash-card-sub">Over schedule</div>
           </div>
           <div class="dash-card" onclick="setWsStatusFilter('External')">
             <div class="dash-card-label">External</div>
             <div class="dash-card-val" id="ws-external-count" style="color:var(--status-external);">0</div>
-            <div class="dash-card-sub">Outside vendor</div>
           </div>
           <div class="dash-card" onclick="setWsStatusFilter('Dispatched')">
             <div class="dash-card-label">Dispatched</div>
             <div class="dash-card-val" id="ws-dispatched-count" style="color:var(--status-dispatched);">0</div>
-            <div class="dash-card-sub">Exited to site</div>
           </div>
         </div>
 
@@ -868,10 +866,10 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
           <div>
             <div class="section-title">Equipment Follow-Up 2026</div>
-            <div class="section-sub" style="margin-bottom:0;">Live project provision requests · Click cards to filter status</div>
-          </div>
+                      </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
             <button class="btn-sm" onclick="exportFuPDF()">📄 PDF</button>
+          <button class="btn-sm" onclick="exportFuPDF('xlsx')">📊 Excel</button>
             <button id="fu-btn-undo" class="btn-sm" style="display:none;background:rgba(240,165,0,.15);border-color:rgba(240,165,0,.4);color:var(--accent);" onclick="undoLastFuStatus()" title="Undo last status change">↩ Undo</button>
             <button id="fu-btn-add" class="btn-sm" style="display:none;background:rgba(63,185,80,.15);border-color:rgba(63,185,80,.4);color:var(--green);" onclick="openAddFuModal()">+ Add Equipment</button>
             <label id="fu-btn-upload" class="btn-sm" style="display:none;background:rgba(88,166,255,.15);border-color:rgba(88,166,255,.4);color:var(--blue);cursor:pointer;">
@@ -955,7 +953,7 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
         <div class="rd-head">
           <div>
             <div class="section-title">Rental Database</div>
-            <div class="section-sub" id="rd-sub">Rental equipment rates · 10th of Ramadan sector</div>
+            <div class="section-sub" id="rd-sub"></div>
           </div>
           <div class="rd-head-r">
             <span id="rd-status"></span>
@@ -1296,6 +1294,7 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 
 <!-- ═══════════════════════════════════════════════════════════
      HAC — GLOBAL NAME CANONICALIZER  (O.D / Project / Category / Equipment / Subcontractor)
@@ -2324,7 +2323,6 @@ function renderDashboard(){
     return '<div class="dash-card '+(multiFilter.cat===cat?'active':'')+'" onclick="toggleCat(\''+cat.replace(/'/g,"\\'")+'\')">'
       +'<div class="dash-card-val" style="color:'+(CAT_COLORS[cat]||'var(--accent)')+'">'+cnt+'</div>'
       +'<div class="dash-card-label">'+cat.replace(' Equipment','')+'</div>'
-      +'<div class="dash-card-sub">click to filter · ℹ breakdown</div>'
     +'</div>';
   }).join('');
 
@@ -2380,7 +2378,6 @@ function renderDashboard(){
   document.getElementById('kpi-projects').textContent = Array.from(new Set(filtered.map(function(e){return e.project;}).filter(Boolean))).length;
   document.getElementById('kpi-ods').textContent = Array.from(new Set(filtered.map(function(e){return e.od;}).filter(Boolean))).length;
   document.getElementById('kpi-updated').textContent = allTransfers.length ? allTransfers[0].date||'—' : '—';
-  document.getElementById('kpi-transfers-sub').textContent = allTransfers.length + ' transfers logged';
 
   updateFilterChips();
 }
@@ -3377,7 +3374,7 @@ function renderFuPriceResult(res){
   return h;
 }
 
-function exportFuPDF() {
+function exportFuPDF(kind) {
   const data = getFilteredFuData();
   function f(k){ return function(r){ return r[k]; }; }
   const cols = [
@@ -3386,7 +3383,7 @@ function exportFuPDF() {
     {h:'Engineer',g:f('engineer'),t:'t'},{h:'Contact',g:f('contact'),t:'t'},{h:'Submission',g:f('submission_date'),t:'t'},
     {h:'Provision',g:f('provision'),t:'t'},{h:'From',g:f('date_from'),t:'t'},{h:'To',g:f('date_to'),t:'t'},
     {h:'Days',g:function(r){return r.days;},t:'i',s:true},{h:'Notes',g:f('notes'),t:'t'}];
-  window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 Equipment Follow-Up Export',cols:cols,rows:data});
+  window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 Equipment Follow-Up Export',cols:cols,rows:data}, kind);
 }
 
 /* ➕ Add New Only — يقرا من الشيت الصفوف الجديدة بس (SN أكبر من آخر SN متسجل) ومايلمسش الموجود */
@@ -4049,7 +4046,31 @@ function addNewEquipFromExcel(input) {
 }
 
 /* Same list the table shows (search + filters + fleet) -> shared PDF (Master Rental settings) */
-function exportEquipPDF() {
+/* Dashboard export: one row per project — O.D, units per category, total (follows the dashboard filters) */
+function exportDashPDF(kind) {
+  const data = getFiltered();
+  const byProj = {}, catTot = {};
+  data.forEach(function(e){
+    const p = e.project || '(No project)', c = String(catKey(e)).replace(' Equipment','');
+    const row = byProj[p] || (byProj[p] = { project:p, ods:{}, cats:{}, total:0 });
+    if(e.od) row.ods[e.od] = 1;
+    row.cats[c] = (row.cats[c] || 0) + 1; row.total++;
+    catTot[c] = (catTot[c] || 0) + 1;
+  });
+  const cats = Object.keys(catTot).sort(function(a,b){ return catTot[b] - catTot[a]; });
+  const rows = Object.keys(byProj).map(function(k){ return byProj[k]; }).sort(function(a,b){ return b.total - a.total; });
+  const cols = [
+    {h:'#', g:function(r,i){ return i+1; }, t:'t'},
+    {h:'Project', g:function(r){ return r.project; }, t:'t'},
+    {h:'O.D', g:function(r){ return Object.keys(r.ods).join(' / '); }, t:'t'}
+  ].concat(cats.map(function(c){ return {h:c, g:function(r){ return r.cats[c] || 0; }, t:'z', s:true}; }))
+   .concat([{h:'Total', g:function(r){ return r.total; }, t:'i', s:true}]);
+  const f = [multiFilter.od && ('O.D: ' + multiFilter.od), multiFilter.cat && ('Category: ' + multiFilter.cat), multiFilter.proj && ('Project: ' + multiFilter.proj)].filter(Boolean).join(' \u00b7 ');
+  const fl = (document.getElementById('dash-fleet-title') || {}).textContent || 'Dashboard';
+  window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 ' + fl.replace(/\s*\u2014\s*Dashboard$/,'') + ' Dashboard Export', sub:f, cols:cols, rows:rows}, kind);
+}
+
+function exportEquipPDF(kind) {
   const q = document.getElementById('search-input').value.toLowerCase();
   const cat = document.getElementById('filter-cat').value;
   const type = document.getElementById('filter-type').value;
@@ -4066,7 +4087,7 @@ function exportEquipPDF() {
     {h:'#',g:function(r,i){return i+1;},t:'t'},{h:'Equipment',g:f('equipment'),t:'t'},{h:'Category',g:f('category'),t:'t'},
     {h:'Brand / Model',g:f('brand'),t:'t'},{h:'Capacity',g:function(r){return eqCapacity(r).v;},t:'t'},{h:'Code',g:f('code'),t:'t'},
     {h:'Project',g:f('project'),t:'t'},{h:'O.D',g:function(r){return isCentralWorkshop(r.project) ? '\u2014' : (r.od||'');},t:'t'},{h:'Year',g:f('year'),t:'t'}];
-  window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 Equipment List Export',cols:cols,rows:data});
+  window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 Equipment List Export',cols:cols,rows:data}, kind);
 }
 
 function clearAndImport(input) {
@@ -4721,14 +4742,16 @@ page.className='page'; page.id='page-masterowned';
 page.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
   <div>
     <div class="section-title">Master Owned — Executive Dashboard</div>
-    <div class="section-sub" id="mo-head-meta" style="margin-bottom:0">Owned fleet · utilization · money · fuel</div>
+    <div class="section-sub" id="mo-head-meta" style="margin-bottom:0"></div>
   </div>
   <div style="display:flex;gap:6px;flex-wrap:wrap;">
     <button class="btn-sm" id="mo-btn-table">📋 Table</button>
     <button class="btn-sm" id="mo-btn-audit">🗓 Months Audit</button>
     <button class="btn-sm" id="mo-btn-refresh">⟳ Refresh</button>
     <button class="btn-sm" id="mo-btn-export-pdf">📄 Export PDF</button>
+    <button class="btn-sm" id="mo-btn-export-xlsx">📊 Export Excel</button>
     <button class="btn-sm accent" id="mo-btn-director">📄 Director Report</button>
+    <button class="btn-sm mo-hide" id="mo-btn-projects">✏️ Projects</button>
     <button class="btn-sm accent mo-hide" id="mo-btn-import">📥 Import XLSX</button>
     <button class="btn-sm mo-hide" id="mo-btn-smart-add" style="border-color:rgba(63,185,80,.4);color:#3fb950;">➕ إضافة جديد بس</button>
     <button class="btn-sm danger mo-hide" id="mo-btn-wipe">🗑 Delete All</button>
@@ -4775,11 +4798,11 @@ page.innerHTML=`<div style="display:flex;align-items:center;justify-content:spac
 
 <div class="mo-2col" style="margin-top:12px;">
   <div>
-    <div class="mo-col-h">By Status — click to drill</div>
+    <div class="mo-col-h">By Status</div>
     <div class="cards-grid" id="mo-status-cards"></div>
   </div>
   <div>
-    <div class="mo-col-h">By O.D — click to drill</div>
+    <div class="mo-col-h">By O.D</div>
     <div class="od-buttons" id="mo-od-buttons"></div>
     <div class="mo-panel" id="mo-od-bd"></div>
   </div>
@@ -4788,12 +4811,12 @@ page.innerHTML=`<div style="display:flex;align-items:center;justify-content:spac
 
 <div class="mo-2col" style="margin-top:14px;">
   <div>
-    <div class="mo-col-h">By Category — click to drill</div>
+    <div class="mo-col-h">By Category</div>
     <div class="cards-grid" id="mo-cat-cards"></div>
     <div class="mo-panel" id="mo-cat-bd"></div>
   </div>
   <div>
-    <div class="mo-col-h">By Project — click to drill</div>
+    <div class="mo-col-h">By Project</div>
     <div class="proj-filter-wrap">
       <input class="proj-search" type="text" id="mo-proj-search" placeholder="Search project...">
       <div class="proj-list" id="mo-proj-list" style="max-height:210px"></div>
@@ -4802,9 +4825,9 @@ page.innerHTML=`<div style="display:flex;align-items:center;justify-content:spac
 </div>
 
 <div class="mo-charts">
-  <div class="mo-chart-box"><h4>Status — units · click to filter</h4><div class="ch-wrap"><canvas id="mo-ch-status"></canvas><div class="mo-empty-chart mo-hide" id="mo-ch-status-empty">No data</div></div></div>
-  <div class="mo-chart-box"><h4>Top 10 Projects — Money Made · click to filter</h4><div class="ch-wrap"><canvas id="mo-ch-proj"></canvas><div class="mo-empty-chart mo-hide" id="mo-ch-proj-empty">No data</div></div></div>
-  <div class="mo-chart-box"><h4>Standby Cost by Project (EGP) · click to filter</h4><div class="ch-wrap"><canvas id="mo-ch-lost"></canvas><div class="mo-empty-chart mo-hide" id="mo-ch-lost-empty">No data</div></div></div>
+  <div class="mo-chart-box"><h4>Status — units</h4><div class="ch-wrap"><canvas id="mo-ch-status"></canvas><div class="mo-empty-chart mo-hide" id="mo-ch-status-empty">No data</div></div></div>
+  <div class="mo-chart-box"><h4>Top 10 Projects — Money Made</h4><div class="ch-wrap"><canvas id="mo-ch-proj"></canvas><div class="mo-empty-chart mo-hide" id="mo-ch-proj-empty">No data</div></div></div>
+  <div class="mo-chart-box"><h4>Standby Cost by Project (EGP)</h4><div class="ch-wrap"><canvas id="mo-ch-lost"></canvas><div class="mo-empty-chart mo-hide" id="mo-ch-lost-empty">No data</div></div></div>
   <div class="mo-chart-box"><h4>By Hiring Month — Money · Lost · Utilization</h4><div class="ch-wrap"><canvas id="mo-ch-trend"></canvas><div class="mo-empty-chart mo-hide" id="mo-ch-trend-empty">محتاج شهرين على الأقل</div></div></div>
 </div>
 
@@ -4834,7 +4857,7 @@ auth.onAuthStateChanged(function(u){
   if(!moLoaded){ moLoaded=true; moLoadDataset(false); }
 });
 function setAdminUI(on){
-  ['mo-btn-import','mo-btn-smart-update','mo-btn-smart-add','mo-btn-wipe','mo-import-row'].forEach(function(id){
+  ['mo-btn-projects','mo-btn-import','mo-btn-smart-update','mo-btn-smart-add','mo-btn-wipe','mo-import-row'].forEach(function(id){
     var el=document.getElementById(id); if(el) el.classList.toggle('mo-hide',!on);
   });
 }
@@ -5000,9 +5023,9 @@ function moRenderDrill(){
     title='Fleet Equipment — Breakdown';
     tiles=tile('Units',full(u),'#f0a500')+tile('Rows',full(base.length),'#7d8590')+tile('Types',new Set(base.map(function(r){return r.equipment;})).size,'#58a6ff')
       +tile('Projects',Object.keys(grp(base,'project')).length,'#3fb950')+tile('O.Ds',Object.keys(grp(base,'od')).length,'#a371f7')+tile('Months',Object.keys(grp(base,'month')).length,'#ffa657');
-    cols=col('By Status — click',bars(grp(base,'status'),{metric:'units',attr:'data-status2',color:'#3fb950',isOn:function(k){return moFilter.status===k;}}))
-      +col('By Category — click',bars(grp(base,'cat'),{metric:'units',attr:'data-cat2',color:'#f0a500',label:function(k){return k.replace(' Equipment','');},isOn:function(k){return moFilter.cat===k;}}))
-      +col('Top Projects — click',bars(grp(base,'project'),{metric:'units',attr:'data-proj2',color:'#58a6ff',isOn:function(k){return moFilter.proj===k;}}));
+    cols=col('By Status',bars(grp(base,'status'),{metric:'units',attr:'data-status2',color:'#3fb950',isOn:function(k){return moFilter.status===k;}}))
+      +col('By Category',bars(grp(base,'cat'),{metric:'units',attr:'data-cat2',color:'#f0a500',label:function(k){return k.replace(' Equipment','');},isOn:function(k){return moFilter.cat===k;}}))
+      +col('Top Projects',bars(grp(base,'project'),{metric:'units',attr:'data-proj2',color:'#58a6ff',isOn:function(k){return moFilter.proj===k;}}));
   }
   else if(moDrill==='projects'){
     var pg2=grp(base,'project'), pk=Object.keys(pg2);
@@ -5015,18 +5038,18 @@ function moRenderDrill(){
       +tile('Top Project',topProj?esc(topProj):'—','#a371f7',topProj||'')
       +tile('Highest Cost',costliest?esc(costliest):'—','#ffa657',costliest||'')
       +tile('Most Standby Cost',idlest&&pg2[idlest].lost>0?esc(idlest):'—','#f85149',idlest||'');
-    cols=col('By Units — click',bars(pg2,{metric:'units',attr:'data-proj2',color:'#3fb950',n:12,isOn:function(k){return moFilter.proj===k;}}))
-      +col('By Money Made — click',bars(pg2,{metric:'cost',attr:'data-proj2',color:'#58a6ff',n:12,fmt:abbr,suffix:' EGP',isOn:function(k){return moFilter.proj===k;}}))
-      +col('By Standby Cost — click',bars(pg2,{metric:'lost',attr:'data-proj2',color:'#f85149',n:12,fmt:abbr,suffix:' EGP',isOn:function(k){return moFilter.proj===k;}}));
+    cols=col('By Units',bars(pg2,{metric:'units',attr:'data-proj2',color:'#3fb950',n:12,isOn:function(k){return moFilter.proj===k;}}))
+      +col('By Money Made',bars(pg2,{metric:'cost',attr:'data-proj2',color:'#58a6ff',n:12,fmt:abbr,suffix:' EGP',isOn:function(k){return moFilter.proj===k;}}))
+      +col('By Standby Cost',bars(pg2,{metric:'lost',attr:'data-proj2',color:'#f85149',n:12,fmt:abbr,suffix:' EGP',isOn:function(k){return moFilter.proj===k;}}));
   }
   else if(moDrill==='avail'){
     var notAv=base.filter(function(r){ return toNum(r.avail)!==1; });
     title='Availability — Breakdown';
     tiles=tile('Availability %',pct(av,u),'#3fb950')+tile('Available Units',full(av),'#3fb950')+tile('Not Available',full(uSum(notAv)),'#f85149')
       +tile('Money Made',abbr(money)+' EGP','#58a6ff')+tile('Standby Cost',abbr(lostAll)+' EGP','#f85149',full(lostAll))+tile('Idle Days',full(idleDays(idleRows)),'#ffa657');
-    cols=col('Available by O.D — click',bars(grp(avRows,'od'),{metric:'units',attr:'data-od2',color:'#3fb950',isOn:function(k){return moFilter.od===k;}}))
-      +col('Available by Project — click',bars(grp(avRows,'project'),{metric:'units',attr:'data-proj2',color:'#58a6ff',isOn:function(k){return moFilter.proj===k;}}))
-      +col('Not Available by Category — click',bars(grp(notAv,'cat'),{metric:'units',attr:'data-cat2',color:'#f85149',label:function(k){return k.replace(' Equipment','');},isOn:function(k){return moFilter.cat===k;}}));
+    cols=col('Available by O.D',bars(grp(avRows,'od'),{metric:'units',attr:'data-od2',color:'#3fb950',isOn:function(k){return moFilter.od===k;}}))
+      +col('Available by Project',bars(grp(avRows,'project'),{metric:'units',attr:'data-proj2',color:'#58a6ff',isOn:function(k){return moFilter.proj===k;}}))
+      +col('Not Available by Category',bars(grp(notAv,'cat'),{metric:'units',attr:'data-cat2',color:'#f85149',label:function(k){return k.replace(' Equipment','');},isOn:function(k){return moFilter.cat===k;}}));
   }
   else if(moDrill==='utl'){
     var low=base.filter(function(r){ var v=toNum(r.utl); return v!==null&&v<0.2; });
@@ -5035,9 +5058,9 @@ function moRenderDrill(){
     tiles=tile('Avg Utilization',(au===null?'—':au.toFixed(2)),'#a371f7')+tile('Reported Rows',full(base.filter(function(r){return toNum(r.utl)!==null;}).length),'#7d8590')
       +tile('Under 20%',full(low.length)+' rows','#f85149')+tile('Best O.D',bestKey(ag,'utl')||'—','#3fb950')
       +tile('Units <20%',full(uSum(low)),'#f85149')+tile('Standby Cost',abbr(lostAll)+' EGP','#f85149',full(lostAll));
-    cols=col('By O.D — click',bars(ag,{metric:'utl',attr:'data-od2',color:'#a371f7',fmt:function(v){return v.toFixed(2);},isOn:function(k){return moFilter.od===k;}}))
-      +col('By Project — click',bars(grp(base,'project'),{metric:'utl',attr:'data-proj2',color:'#58a6ff',fmt:function(v){return v.toFixed(2);},isOn:function(k){return moFilter.proj===k;}}))
-      +col('Lowest Utilization Assets — click',bars(grp(low,'assetLabel'),{metric:'utl',attr:'data-asset2',color:'#f85149',n:10,val:function(){return true;}}));
+    cols=col('By O.D',bars(ag,{metric:'utl',attr:'data-od2',color:'#a371f7',fmt:function(v){return v.toFixed(2);},isOn:function(k){return moFilter.od===k;}}))
+      +col('By Project',bars(grp(base,'project'),{metric:'utl',attr:'data-proj2',color:'#58a6ff',fmt:function(v){return v.toFixed(2);},isOn:function(k){return moFilter.proj===k;}}))
+      +col('Lowest Utilization Assets',bars(grp(low,'assetLabel'),{metric:'utl',attr:'data-asset2',color:'#f85149',n:10,val:function(){return true;}}));
   }
   else if(moDrill==='money'){
     var wd=colSum(base,'worked');
@@ -5045,9 +5068,9 @@ function moRenderDrill(){
     tiles=tile('Total Money',abbr(money)+' EGP','#58a6ff',full(money))+tile('Per Unit',abbr(u?money/u:0)+' EGP','#3fb950')
       +tile('Per Working Day',abbr(wd?money/wd:0)+' EGP','#f0a500')+tile('Working Days',full(wd),'#7d8590')
       +tile('Top Project',bestKey(grp(base,'project'),'cost')||'—','#a371f7')+tile('Top O.D',bestKey(grp(base,'od'),'cost')||'—','#ffa657');
-    cols=col('Top Projects — click',bars(grp(base,'project'),{metric:'cost',attr:'data-proj2',color:'#f0a500',fmt:abbr,suffix:' EGP',isOn:function(k){return moFilter.proj===k;}}))
-      +col('By O.D — click',bars(grp(base,'od'),{metric:'cost',attr:'data-od2',color:'#58a6ff',fmt:abbr,suffix:' EGP',isOn:function(k){return moFilter.od===k;}}))
-      +col('By Category — click',bars(grp(base,'cat'),{metric:'cost',attr:'data-cat2',color:'#3fb950',fmt:abbr,suffix:' EGP',label:function(k){return k.replace(' Equipment','');},isOn:function(k){return moFilter.cat===k;}}));
+    cols=col('Top Projects',bars(grp(base,'project'),{metric:'cost',attr:'data-proj2',color:'#f0a500',fmt:abbr,suffix:' EGP',isOn:function(k){return moFilter.proj===k;}}))
+      +col('By O.D',bars(grp(base,'od'),{metric:'cost',attr:'data-od2',color:'#58a6ff',fmt:abbr,suffix:' EGP',isOn:function(k){return moFilter.od===k;}}))
+      +col('By Category',bars(grp(base,'cat'),{metric:'cost',attr:'data-cat2',color:'#3fb950',fmt:abbr,suffix:' EGP',label:function(k){return k.replace(' Equipment','');},isOn:function(k){return moFilter.cat===k;}}));
   }
   else if(moDrill==='fuel'){
     var fg=grp(base,'project'), og=grp(base,'od');
@@ -5057,9 +5080,9 @@ function moRenderDrill(){
     tiles=tile('Total Liters',full(fl)+' L','#ffa657')+tile('Per Working Day',(colSum(base,'worked')?full(fl/colSum(base,'worked')):'—')+' L','#f0a500')
       +tile('Per Unit',full(u?fl/u:0)+' L','#58a6ff')+tile('Top Consumer',assets.length?assets[0].label:'—','#f85149')
       +tile('Top Project',bestKey(fg,'fuel')||'—','#a371f7')+tile('Top O.D',bestKey(og,'fuel')||'—','#3fb950');
-    cols=col('Top Projects — click',bars(fg,{metric:'fuel',attr:'data-proj2',color:'#ffa657',fmt:abbr,suffix:' L',isOn:function(k){return moFilter.proj===k;}}))
-      +col('By O.D — click',bars(og,{metric:'fuel',attr:'data-od2',color:'#58a6ff',fmt:abbr,suffix:' L',isOn:function(k){return moFilter.od===k;}}))
-      +col('Top 10 Assets by Fuel — click',assets.map(function(a){
+    cols=col('Top Projects',bars(fg,{metric:'fuel',attr:'data-proj2',color:'#ffa657',fmt:abbr,suffix:' L',isOn:function(k){return moFilter.proj===k;}}))
+      +col('By O.D',bars(og,{metric:'fuel',attr:'data-od2',color:'#58a6ff',fmt:abbr,suffix:' L',isOn:function(k){return moFilter.od===k;}}))
+      +col('Top 10 Assets by Fuel',assets.map(function(a){
           return bar(esc(a.label),full(a.liters)+' L · '+full(a.lph)+' L/day','data-asset2',a.id,a.liters,amax,'#f85149',false);
         }).join('')||'<span class="mo-hint">—</span>');
   }
@@ -5070,9 +5093,9 @@ function moRenderDrill(){
     tiles=tile('Total Standby Cost',abbr(lostAll)+' EGP','#f85149',full(lostAll))+tile('Standby Units',full(uSum(idleRows)),'#ffa657')
       +tile('Standby Days',full(lostDAll),'#f0a500')+tile('Avg Days / Unit',(uSum(idleRows)?(lostDAll/uSum(idleRows)).toFixed(1):'—'),'#58a6ff')
       +tile('Standby Cost per Unit',abbr(uSum(idleRows)?lostAll/uSum(idleRows):0)+' EGP','#f85149')+tile('% of Money Made',pct(lostAll,money),'#a371f7');
-    cols=col('Lost by Project — click',bars(grp(idleRows,'project'),{metric:'lost',attr:'data-proj2',color:'#f85149',fmt:abbr,suffix:' EGP',isOn:function(k){return moFilter.proj===k;}}))
-      +col('Lost by O.D — click',bars(grp(idleRows,'od'),{metric:'lost',attr:'data-od2',color:'#ffa657',fmt:abbr,suffix:' EGP',isOn:function(k){return moFilter.od===k;}}))
-      +col('Top Idle Assets — click',la.map(function(a){
+    cols=col('Lost by Project',bars(grp(idleRows,'project'),{metric:'lost',attr:'data-proj2',color:'#f85149',fmt:abbr,suffix:' EGP',isOn:function(k){return moFilter.proj===k;}}))
+      +col('Lost by O.D',bars(grp(idleRows,'od'),{metric:'lost',attr:'data-od2',color:'#ffa657',fmt:abbr,suffix:' EGP',isOn:function(k){return moFilter.od===k;}}))
+      +col('Top Idle Assets',la.map(function(a){
           return bar(esc(a.label),abbr(a.lost)+' EGP · '+full(a.days)+'d','data-asset2',a.id,a.lost,lmax,'#f0a500',false);
         }).join('')||'<span class="mo-hint">—</span>');
   }
@@ -5084,9 +5107,9 @@ function moRenderDrill(){
     tiles=tile('Total Overtime',abbr(otAll)+' EGP','#bc8cff',full(otAll))+tile('Per Unit',abbr(u?otAll/u:0)+' EGP','#3fb950')
       +tile('Per Working Day',abbr(otWd?otAll/otWd:0)+' EGP','#f0a500')+tile('% of Money Made',pct(otAll,money),'#58a6ff')
       +tile('Top Project',bestKey(grp(base,'project'),'ot')||'—','#a371f7')+tile('Top O.D',bestKey(grp(base,'od'),'ot')||'—','#ffa657');
-    cols=col('Top Projects — click',bars(grp(base,'project'),{metric:'ot',attr:'data-proj2',color:'#bc8cff',fmt:abbr,suffix:' EGP',isOn:function(k){return moFilter.proj===k;}}))
-      +col('By O.D — click',bars(grp(base,'od'),{metric:'ot',attr:'data-od2',color:'#58a6ff',fmt:abbr,suffix:' EGP',isOn:function(k){return moFilter.od===k;}}))
-      +col('By Category — click',bars(grp(base,'cat'),{metric:'ot',attr:'data-cat2',color:'#3fb950',fmt:abbr,suffix:' EGP',label:function(k){return k.replace(' Equipment','');},isOn:function(k){return moFilter.cat===k;}}));
+    cols=col('Top Projects',bars(grp(base,'project'),{metric:'ot',attr:'data-proj2',color:'#bc8cff',fmt:abbr,suffix:' EGP',isOn:function(k){return moFilter.proj===k;}}))
+      +col('By O.D',bars(grp(base,'od'),{metric:'ot',attr:'data-od2',color:'#58a6ff',fmt:abbr,suffix:' EGP',isOn:function(k){return moFilter.od===k;}}))
+      +col('By Category',bars(grp(base,'cat'),{metric:'ot',attr:'data-cat2',color:'#3fb950',fmt:abbr,suffix:' EGP',label:function(k){return k.replace(' Equipment','');},isOn:function(k){return moFilter.cat===k;}}));
   }
 
   wrap.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">'
@@ -5135,9 +5158,9 @@ function moRenderStatusBd(){
       +tile('Fuel',full(fuel(base))+' L','#ffa657')
       +tile('Avg Utilization',(avgUtl(base)===null?'—':avgUtl(base).toFixed(2)),'#a371f7')
     +'</div><div class="mo-3col">'
-    +col('Top Projects — click',bars(grp(base,'project'),{metric:'units',attr:'data-proj2',color:'#f0a500',n:10,isOn:function(k){return moFilter.proj===k;}}))
-    +col('Equipment Types — click',bars(grp(base,'equipment'),{metric:'units',attr:'data-type2',color:STATUS_COLORS[moFilter.status]}))
-    +col('By O.D — click',bars(grp(base,'od'),{metric:'units',attr:'data-od2',color:'#58a6ff',n:8,isOn:function(k){return moFilter.od===k;}}))
+    +col('Top Projects',bars(grp(base,'project'),{metric:'units',attr:'data-proj2',color:'#f0a500',n:10,isOn:function(k){return moFilter.proj===k;}}))
+    +col('Equipment Types',bars(grp(base,'equipment'),{metric:'units',attr:'data-type2',color:STATUS_COLORS[moFilter.status]}))
+    +col('By O.D',bars(grp(base,'od'),{metric:'units',attr:'data-od2',color:'#58a6ff',n:8,isOn:function(k){return moFilter.od===k;}}))
     +'</div>';
   wrap.style.display='block';
 }
@@ -5165,9 +5188,9 @@ function moRenderCatBd(){
       +tile('Fuel',full(fuel(base))+' L','#ffa657')
       +tile('Avg Utilization',(avgUtl(base)===null?'—':avgUtl(base).toFixed(2)),'#a371f7')
     +'</div><div class="mo-3col">'
-    +col('Equipment Types — click',bars(grp(base,'equipment'),{metric:'units',attr:'data-type2',color:colr,n:8}))
-    +col('By O.D — click',bars(grp(base,'od'),{metric:'units',attr:'data-od2',color:'#58a6ff',n:8,isOn:function(k){return moFilter.od===k;}}))
-    +col('By Status — click',bars(grp(base,'status'),{metric:'units',attr:'data-status2',color:'#3fb950',isOn:function(k){return moFilter.status===k;}}))
+    +col('Equipment Types',bars(grp(base,'equipment'),{metric:'units',attr:'data-type2',color:colr,n:8}))
+    +col('By O.D',bars(grp(base,'od'),{metric:'units',attr:'data-od2',color:'#58a6ff',n:8,isOn:function(k){return moFilter.od===k;}}))
+    +col('By Status',bars(grp(base,'status'),{metric:'units',attr:'data-status2',color:'#3fb950',isOn:function(k){return moFilter.status===k;}}))
     +'</div>';
   wrap.style.display='block';
 }
@@ -5209,9 +5232,9 @@ function moRenderOdBd(){
       +tile('Working Days',full(wd),'#3fb950')+tile('Fuel',full(fuel(base))+' L','#ffa657')
       +tile('Per Working Day',abbr(wd?cost(base)/wd:0)+' EGP','#f0a500')
     +'</div><div class="mo-3col">'
-    +col('Status Mix — click',bars(grp(base,'status'),{metric:'units',attr:'data-status2',color:'#3fb950',isOn:function(k){return moFilter.status===k;}}))
-    +col('Categories — click',bars(grp(base,'cat'),{metric:'units',attr:'data-cat2',color:'#f0a500',n:8,label:function(k){return k.replace(' Equipment','');},isOn:function(k){return moFilter.cat===k;}}))
-    +col('Top Projects — click',bars(grp(base,'project'),{metric:'units',attr:'data-proj2',color:'#58a6ff',n:10,isOn:function(k){return moFilter.proj===k;}}))
+    +col('Status Mix',bars(grp(base,'status'),{metric:'units',attr:'data-status2',color:'#3fb950',isOn:function(k){return moFilter.status===k;}}))
+    +col('Categories',bars(grp(base,'cat'),{metric:'units',attr:'data-cat2',color:'#f0a500',n:8,label:function(k){return k.replace(' Equipment','');},isOn:function(k){return moFilter.cat===k;}}))
+    +col('Top Projects',bars(grp(base,'project'),{metric:'units',attr:'data-proj2',color:'#58a6ff',n:10,isOn:function(k){return moFilter.proj===k;}}))
     +'</div>';
   wrap.style.display='block';
 }
@@ -5422,8 +5445,10 @@ document.getElementById('mo-sl-next').addEventListener('click',function(){ docum
 document.getElementById('mo-btn-table').addEventListener('click',function(){ moTableOpen=!moTableOpen; document.getElementById('mo-table-wrap').classList.toggle('mo-hide',!moTableOpen); this.classList.toggle('accent',moTableOpen); if(moTableOpen) moTableApply(); });
 document.getElementById('mo-btn-audit').addEventListener('click',function(){ moAuditOpen=!moAuditOpen; document.getElementById('mo-audit').style.display=moAuditOpen?'block':'none'; this.classList.toggle('accent',moAuditOpen); if(moAuditOpen) moRenderAudit(); });
 document.getElementById('mo-btn-refresh').addEventListener('click',function(){ moLoadDataset(true); });
-document.getElementById('mo-btn-export-pdf').addEventListener('click',moExportPDF);
+document.getElementById('mo-btn-export-pdf').addEventListener('click',function(){ moExportPDF(); });
+document.getElementById('mo-btn-export-xlsx').addEventListener('click',function(){ moExportPDF('xlsx'); });
 document.getElementById('mo-btn-director').addEventListener('click',moDirectorReport);
+document.getElementById('mo-btn-projects').addEventListener('click',function(){ if(window.pmOpen) window.pmOpen('mo'); });
 document.getElementById('mo-btn-import').addEventListener('click',function(){ document.getElementById('mo-file-input').click(); });
 document.getElementById('mo-btn-file').addEventListener('click',function(){ document.getElementById('mo-file-input').click(); });
 document.getElementById('mo-btn-wipe').addEventListener('click',moWipeAll);
@@ -5462,7 +5487,7 @@ function moExport(){
 }
 
 /* ═════ 13) Director Report ═════ */
-function moExportPDF(){
+function moExportPDF(kind){
   var rows=searchRows(moBase(null));
   if(!rows.length){ if(typeof toast==='function') toast('Nothing to export','error'); return; }
   function f(k){ return function(r){ return r[k]; }; }
@@ -5475,7 +5500,7 @@ function moExportPDF(){
     {h:'Money Made',g:function(r){return toNum(r.totalCost);},t:'m',s:true},{h:'OT/Day',g:function(r){return toNum(r.otPerDay);},t:'dz'},{h:'OT Cost',g:function(r){return toNum(r.costOt);},t:'z',s:true},
     {h:'Qty',g:function(r){return units(r);},t:'i',s:true},{h:'Avail',g:f('avail'),t:'t'},{h:'Fuel L',g:function(r){return toNum(r.totalFuel);},t:'i',s:true},
     {h:'Util%',g:f('utl'),t:'t'},{h:'Status',g:f('status'),t:'t'}];
-  window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 Master Owned Equipment Export',cols:cols,rows:rows});
+  window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 Master Owned Equipment Export',cols:cols,rows:rows}, kind);
 }
 function moDirectorReport(){
   var rows=moBase(null);
@@ -5674,7 +5699,7 @@ function moWriteDataset(data){
     });
   });
   chain=chain.then(function(){ return moCleanupLegacy(); });
-  chain.then(function(){
+  return chain.then(function(){
     localStorage.removeItem('mo_cache_dataset');
     ptxt.textContent='✓ تم استيراد '+full(data.length)+' صف ('+full(uSum(data))+' معدة)';
     if(typeof toast==='function') toast('✓ Import complete · no duplicates','success');
@@ -6385,7 +6410,7 @@ function monthStrip(){
   var keys=Object.keys(ms).sort();
   var h='<div class="mr-sect">BY MONTH - SLIDE &#8594;</div><div class="mr-strip">';
   h+='<div class="mr-mcard'+(F.month?'':' on')+'" data-act="month" data-v=""><div class="t">All Months</div><div class="c">'+keys.length+' month(s)</div><div class="c">show all</div></div>';
-  keys.forEach(function(k){ h+='<div class="mr-mcard'+(F.month===k?' on':'')+'" data-act="month" data-v="'+k+'"><div class="t">'+k+'</div><div class="c">click to filter</div></div>'; });
+  keys.forEach(function(k){ h+='<div class="mr-mcard'+(F.month===k?' on':'')+'" data-act="month" data-v="'+k+'"><div class="t">'+k+'</div></div>'; });
   h+='</div>';
   return h;
 }
@@ -6408,7 +6433,7 @@ function catSection(){
   base.forEach(function(r){ var k=S(r.category); if(!k) return; if(CAT_BLOCKLIST.indexOf(k.trim().toLowerCase())>=0) return; if(!map[k]) map[k]={u:0,v:0,n:0}; map[k].u+=unitsOf(r); map[k].v+=N(r.totalPrice); map[k].n++; });
   var arr=Object.keys(map).map(function(k){return [k,map[k]];}).sort(function(a,b){return b[1].u-a[1].u;});
   var max=arr.length?arr[0][1].u:1;
-  var h='<div class="mr-sect">BY CATEGORY - click to filter & breakdown</div><div class="mr-cards">';
+  var h='<div class="mr-sect">BY CATEGORY</div><div class="mr-cards">';
   arr.forEach(function(p){
     h+='<div class="mr-ccard'+(F.cat===p[0]?' on':'')+'" data-act="cat" data-v="'+esc(p[0])+'" title="'+fmtInt(p[1].u)+' units · '+fmtInt(p[1].v)+' EGP">'
       +'<div class="n">'+esc(p[0])+'</div><div class="v">'+fmtInt(p[1].u)+'</div>'
@@ -6429,14 +6454,14 @@ function odSection(){
   var base=vfilter('od'), map={};
   base.forEach(function(r){ var k=S(r.od)||'-'; if(!map[k]) map[k]={u:0,v:0,projSet:{}}; map[k].u+=unitsOf(r); map[k].v+=N(r.totalPrice); var pj=S(r.project); if(pj) map[k].projSet[pj]=1; });
   var arr=Object.keys(map).map(function(k){return [k,map[k]];}).sort(function(a,b){return b[1].u-a[1].u;});
-  var h='<div class="mr-sect">BY O.D - click to filter</div><div class="mr-strip">';
+  var h='<div class="mr-sect">BY O.D</div><div class="mr-strip">';
   arr.forEach(function(p){ var projCount=Object.keys(p[1].projSet).length; h+='<div class="mr-mcard'+(F.od===p[0]?' on':'')+'" data-act="od" data-v="'+esc(p[0])+'" title="'+fmtInt(p[1].u)+' units · '+fmtInt(projCount)+' project(s) · '+fmtInt(p[1].v)+' EGP"><div class="t">'+esc(p[0])+'</div><div class="c">'+fmtInt(p[1].u)+' units</div><div class="c">'+fmtMoney(p[1].v)+'</div></div>'; });
   return h+'</div>';
 }
 
 function topSection(rows){
   var items=[['ot','Top projects by Overtime Cost'],['fuel','Top projects by Fuel (L)'],['deduct','Top projects by Savings (Total Deduct)'],['value','Top projects by Rental Value']];
-  var h='<div class="mr-sect">TOP PROJECTS - click any line for Top 5</div>';
+  var h='<div class="mr-sect">TOP PROJECTS</div>';
   h+='<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;">';
   items.forEach(function(it){
     var t=topProjects(rows,it[0],5);
@@ -6479,7 +6504,7 @@ function projFilterSection(rows){
   });
   var arr=Object.keys(map).map(function(k){return [k,map[k]];}).sort(function(a,b){return b[1].v-a[1].v;});
   if(!arr.length) return '';
-  var h='<div class="mr-sect">BY PROJECT - click to filter</div>';
+  var h='<div class="mr-sect">BY PROJECT</div>';
   h+='<div style="margin-bottom:8px;"><input class="mr-inp" id="mr-proj-q" placeholder="&#128269; Search project..." value="'+esc(F.q)+'"></div>';
   h+='<div class="mr-tblwrap"><table class="mr-tbl"><thead><tr>';
   ['#','Project','Units','Rental Value','Overtime','Deduct','Fuel (L)'].forEach(function(x){ h+='<th>'+x+'</th>'; });
@@ -6505,16 +6530,18 @@ function render(){
   var rows=view(), m=metrics(rows), h='';
   h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">';
   if(isAdminNow()) h+='<button class="btn-sm" style="background:var(--accent);color:#000;font-weight:700;" data-act="import">📥 Import Rental Excel</button>';
+  if(isAdminNow()) h+='<button class="btn-sm" data-act="projects">✏️ Projects</button>';
   if(isAdminNow()) h+='<button class="btn-sm" style="border-color:rgba(63,185,80,.4);color:#3fb950;" data-act="smart-pick" data-v="add">➕ Add New Only</button>';
   if(isAdminNow()) h+='<button class="btn-sm" style="border-color:rgba(248,81,73,.4);color:#f85149;" data-act="clear-import" title="Deletes ALL existing Master Rental data and replaces it with exactly what is in the uploaded sheet">🗑️ Clear & Import</button>';
   h+='<button class="btn-sm" data-act="refresh">⟳ Refresh</button>';
   h+='<button class="btn-sm accent" data-act="director">📄 Director Report</button>';
   h+='<button class="btn-sm" data-act="exportpdf">📄 Export PDF</button>';
+  h+='<button class="btn-sm" data-act="exportxlsx">📊 Export Excel</button>';
   if(isAdminNow()) h+='<button class="btn-sm" data-act="wipe" style="border-color:rgba(248,81,73,.5);color:var(--red);">🗑 Delete Rental Data</button>';
   h+='<span style="font-size:11px;color:var(--text-dim);margin-left:auto;">'+fmtInt(DATA.length)+' records stored | '+fmtInt(rows.length)+' shown</span></div>';
   h+='<div class="mr-grid">'
     +kpi('EQUIPMENT',fmtInt(Math.round(m.avgUnits)),'avg equipment units / month','var(--blue)','noop','')
-    +kpi('PROJECTS',fmtInt(m.projects),(F.proj?('1 of '+fmtInt(projUniverse())+' · click to change'):'active projects · click to filter'),'var(--accent)','projects','',fmtInt(m.projects)+' project(s) in current filters')
+    +kpi('PROJECTS',fmtInt(m.projects),'','var(--accent)','projects','',fmtInt(m.projects)+' project(s) in current filters')
     +kpi('O.D',fmtInt(m.ods),'operation districts','var(--text)','noop','')
     +kpi('TOTAL VALUE',fmtMoney(m.totalValue),'contracted rental value','var(--accent)','top','value',fmtInt(m.totalValue)+' EGP')
     +kpi('TOTAL DEDUCT',fmtMoney(m.deduct),'savings & penalties achieved','var(--green)','top','deduct',fmtInt(m.deduct)+' EGP')
@@ -6578,9 +6605,9 @@ function showBreakdown(key){
     +bdTile('Top Project',esc(topProj),'#a371f7')
     +bdTile('Top O.D',esc(topOd),'#ffa657');
   var cols='<div class="mo-3col">'
-    +bdCol('Top Projects — click',byProj,fmtV,'proj',conf.colr)
-    +bdCol('By O.D — click',byOd,fmtV,'od','#58a6ff')
-    +bdCol('By Category — click',byCat,fmtV,'cat','#3fb950')
+    +bdCol('Top Projects',byProj,fmtV,'proj',conf.colr)
+    +bdCol('By O.D',byOd,fmtV,'od','#58a6ff')
+    +bdCol('By Category',byCat,fmtV,'cat','#3fb950')
     +'</div>';
   var h='<div class="mr-modal" style="max-width:960px;width:94vw;">'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">'
@@ -6639,7 +6666,7 @@ function showTop(key){
   var titles={ot:'Top 5 Projects by Overtime Cost',fuel:'Top 5 Projects by Fuel (L)',deduct:'Top 5 Projects by Total Deduct (Savings)',value:'Top 5 Projects by Rental Value',od:'Top 5 O.D by Units',util:'Worst 5 Projects by Utilization'};
   var h='<div class="mr-modal"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div style="font-size:16px;font-weight:700;">'+esc(titles[key]||'Top 5')+'</div><button class="btn-sm" data-act="closeov">✕</button></div>';
   var fmt=function(x){ return d.unit==='L'?fmtInt(x)+' L':(d.unit==='%'?fmtNum(x,1)+'%':(d.unit==='units'?fmtInt(x)+' units':fmtMoney(x))); };
-  if(d.total!=null) h+='<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Total: <b style="color:var(--accent);">'+(d.unit==='L'?fmtInt(d.total)+' L':fmtMoney(d.total))+'</b> | projects: '+fmtInt(d.count)+' | click any row to filter.</div>';
+  if(d.total!=null) h+='<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Total: <b style="color:var(--accent);">'+(d.unit==='L'?fmtInt(d.total)+' L':fmtMoney(d.total))+'</b> | projects: '+fmtInt(d.count)+'</div>';
   var list=d.arr.slice(0,5), max=list.length?(Math.abs(list[0].v)||1):1;
   list.forEach(function(x,i){
     h+='<div class="mr-row" data-act="proj" data-v="'+esc(x.p)+'"><span>'+(i+1)+'. '+esc(x.p)+'</span><span style="font-family:\'JetBrains Mono\',monospace;font-weight:700;">'+fmt(x.v)+' | '+fmtInt(x.c)+' rows</span></div>'
@@ -6670,7 +6697,9 @@ function onAct(act,v){
   }
   if(act==='refresh'){ tt('Refreshing...'); load().then(function(){ render(); }); return; }
   if(act==='director'){ mrDirectorReport(); return; }
+  if(act==='projects'){ if(window.pmOpen) window.pmOpen('mr'); return; }
   if(act==='exportpdf'){ mrExportPDF(); return; }
+  if(act==='exportxlsx'){ mrExportPDF('xlsx'); return; }
   if(act==='clear-import'){
     if(!isAdminNow()){ tt('Admins only','error'); return; }
     if(!CLEAR_FILE_IN){ CLEAR_FILE_IN=document.createElement('input'); CLEAR_FILE_IN.type='file'; CLEAR_FILE_IN.accept='.xlsx,.xls,.csv'; CLEAR_FILE_IN.style.display='none'; document.body.appendChild(CLEAR_FILE_IN);
@@ -6723,7 +6752,7 @@ function initStandaloneRental(){
     p.id = 'page-masterrental';
     p.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;">'
       + '<div><div class="section-title">Master Rental — Executive Dashboard</div>'
-      + '<div class="section-sub" style="margin-bottom:0">Hired fleet · costs · fuel · overtime · savings</div></div>'
+      + '</div>'
       + '</div><div id="mr-body" style="padding:10px 0 30px;"></div>';
     content.appendChild(p);
   }
@@ -6841,7 +6870,7 @@ function mrPdfPageScript(){
   });
   apply();
 }
-function mrExportPDF(){
+function mrExportPDF(kind){
   var rows=view();
   if(!rows.length){ tt('Nothing to export','error'); return; }
   /* [label, field, type]  type: t=text, i=integer, d=1 decimal, m=money(0 dec), z=money zero→dash, p=percent */
@@ -6866,6 +6895,12 @@ function mrExportPDF(){
     return {txt:'', num:NaN, cls:''};
   }
   var sumIdx={}; ['qty','totalPrice','otCost','totalDeduct','fuel'].forEach(function(k){ sumIdx[k]=1; });
+  if(kind==='xlsx'){   // same columns / same sums as the PDF, written as a formatted Excel table
+    window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 Master Rental Export',rows:rows,cols:cols.map(function(c){
+      return {h:c[0], t:c[2], s:!!sumIdx[c[1]], g:function(r,i){ return c[1]==='#'?(i+1):r[c[1]]; }};
+    })},'xlsx');
+    return;
+  }
 
   var h='<!DOCTYPE html><html><head><meta charset="utf-8"><title>Master Rental — Export</title><style>';
   h+='*{box-sizing:border-box;margin:0;padding:0}body{font-family:Segoe UI,Arial,sans-serif;color:#1a1a1a;background:#fff;padding:16px 18px;font-size:10px}';
@@ -7074,7 +7109,7 @@ function cmpRender(){
     var clickable=bkKey?'cursor:pointer;transition:border-color .15s;':'';
     var hover=bkKey?' onmouseenter="this.style.borderColor=\'var(--accent)\'" onmouseleave="this.style.borderColor=\'var(--border)\'"':'';
     var click=bkKey?' onclick="cmpShowBreakdown(\''+bkKey+'\')"':'';
-    var hint=bkKey?'<div style="font-size:9px;color:var(--text-dim);margin-top:5px;letter-spacing:.5px;">CLICK · TOP 5 PROJECTS ↗</div>':'';
+    var hint='';
     return '<div class="cmp-kpi" style="'+clickable+'"'+hover+click+'><div class="cmp-kpi-label">'+label+'</div><div class="cmp-kpi-row">'
       +'<div class="cmp-kpi-side"><div class="cmp-kpi-tag cmp-tag-owned">● OWNED</div><div class="cmp-kpi-val" style="color:'+(oc||'#3fb950')+'">'+oVal+'</div></div>'
       +'<div class="cmp-kpi-divider"></div>'
@@ -7092,7 +7127,7 @@ function cmpRender(){
       +'<div class="cmp-kpi-side"><div class="cmp-kpi-tag cmp-tag-owned">&#9679; OWNED</div><div class="cmp-kpi-val" style="color:#3fb950">'+cmpInt(oProj.size)+'</div></div>'
       +'<div class="cmp-kpi-divider"></div>'
       +'<div class="cmp-kpi-side"><div class="cmp-kpi-tag cmp-tag-rental">&#9679; RENTAL</div><div class="cmp-kpi-val" style="color:#58a6ff">'+cmpInt(rProj.size)+'</div></div>'
-      +'</div><div style="font-size:9px;color:var(--text-dim);margin-top:5px;letter-spacing:.5px;">'+cmpInt(allProjCount)+' TOTAL &#183; '+cmpInt(shared)+' SHARED &#183; CLICK TO FILTER &#8599;</div></div>'
+      +'</div><div style="font-size:9px;color:var(--text-dim);margin-top:5px;letter-spacing:.5px;">'+cmpInt(allProjCount)+' TOTAL &#183; '+cmpInt(shared)+' SHARED</div></div>'
     +'</div>';
 
   /* saving card */
@@ -7100,7 +7135,7 @@ function cmpRender(){
     +'<div class="cmp-saving-main">'
     +'<div class="cmp-saving-title">Potential Saving — Standby Owned units deployed instead of Rental</div>'
     +'<div class="cmp-saving-val">'+cmpMoney(tOL)+'</div>'
-    +'<div class="cmp-saving-sub">'+cmpInt(tOSbU)+' unit(s) idle | '+cmpInt(tOSbD)+' total idle day(s) | Standby Cost = Unit Price × Days × 1.2 (days > 10 only) &nbsp;|&nbsp; Owned utilization: <b>'+(oUtilA?oUtilA.toFixed(1)+'%':'—')+'</b></div>'
+    +'<div class="cmp-saving-sub">'+cmpInt(tOSbU)+' unit(s) idle | '+cmpInt(tOSbD)+' total idle day(s) &nbsp;|&nbsp; Owned utilization: <b>'+(oUtilA?oUtilA.toFixed(1)+'%':'—')+'</b></div>'
     +'</div>'
     +'<div class="cmp-saving-pills">'
     +'<span class="cmp-pill cmp-pill-green">Owned Cost: '+cmpMoney(tOC)+'</span>'
@@ -7164,6 +7199,28 @@ window.cmpSetMonth=function(m){CMP.month=(CMP.month===m?'all':m);cmpRender();};
 window.cmpSetOd=function(o){CMP.od=(CMP.od===o?'all':o);cmpRender();};
 window.cmpSetProjectSearch=function(q){CMP.projectSearch=q;cmpRender();var el=document.getElementById('cmp-proj-search');if(el)el.focus();};
 window.cmpRender=cmpRender;
+/* Project-level Rental vs Owned table (follows the month / O.D / project-search filters) -> PDF or Excel */
+window.cmpExport=function(kind){
+  var owned=filterOwned(getOwned()),rental=filterRental(getRental());
+  var rows=buildProjTable(owned,rental);
+  if(!rows.length){ if(typeof toast==='function')toast('Nothing to export','error'); return; }
+  var f=[CMP.month!=='all'&&('Month: '+CMP.month),CMP.od!=='all'&&('O.D: '+CMP.od),CMP.projectSearch&&('Project: '+CMP.projectSearch)].filter(Boolean).join(' \u00b7 ');
+  var cols=[
+    {h:'#',g:function(r,i){return i+1;},t:'t'},
+    {h:'Project',g:function(r){return r.name;},t:'t'},
+    {h:'Type',g:function(r){return r.inO&&r.inR?'Shared':(r.inO?'Owned only':'Rental only');},t:'t'},
+    {h:'Owned Equipment',g:function(r){return r.oU;},t:'i',s:true},
+    {h:'Owned Cost',g:function(r){return r.oC;},t:'m',s:true},
+    {h:'Standby Units',g:function(r){return r.oSbU;},t:'z',s:true},
+    {h:'Standby Days',g:function(r){return r.oSbD;},t:'z',s:true},
+    {h:'Owned OT Cost',g:function(r){return r.oOT;},t:'z',s:true},
+    {h:'Rental Equipment',g:function(r){return r.rU;},t:'i',s:true},
+    {h:'Rental Cost',g:function(r){return r.rC;},t:'m',s:true},
+    {h:'Rental OT Cost',g:function(r){return r.rOT;},t:'z',s:true},
+    {h:'\u0394 Equipment',g:function(r){return r.rU-r.oU;},t:'i',s:true},
+    {h:'Potential Saving',g:function(r){return r.oSbD>0?r.oL:0;},t:'z',s:true}];
+  window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 Rental vs Owned Fleet Comparison',sub:f,cols:cols,rows:rows},kind);
+};
 
 window.cmpRefresh=function(){
   var btn=document.getElementById('cmp-btn-refresh');
@@ -7290,7 +7347,8 @@ function initComparison(){
     p.className='page';p.id='page-comparison';
     p.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:18px;">'
       +'<div><div class="section-title">⚖\ufe0f Rental vs Owned</div></div>'
-      +'<button class="btn-sm" id="cmp-btn-refresh" onclick="cmpRefresh()" style="border-color:rgba(63,185,80,.4);color:#3fb950;">↻ Refresh</button>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn-sm" onclick="cmpExport()">📄 PDF</button><button class="btn-sm" onclick="cmpExport(\'xlsx\')">📊 Excel</button>'
+      +'<button class="btn-sm" id="cmp-btn-refresh" onclick="cmpRefresh()" style="border-color:rgba(63,185,80,.4);color:#3fb950;">↻ Refresh</button></div>'
       +'</div><div id="cmp-body" style="padding-bottom:40px;"></div>';
     content.appendChild(p);
   }
@@ -7317,6 +7375,23 @@ var _ci=0,_civ=setInterval(function(){_ci++;initComparison();if(document.getElem
 .pm-btn{font-size:11px;padding:4px 9px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);cursor:pointer;}
 .pm-btn:hover{border-color:var(--accent);color:var(--accent);}
 .pm-search{width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:13px;margin-bottom:12px;box-sizing:border-box;}
+.pm-tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;}
+.pm-tab{font-size:12px;padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--text-muted);cursor:pointer;}
+.pm-tab.on{background:rgba(240,165,0,.15);border-color:var(--accent);color:var(--accent);font-weight:600;}
+.pm-var{font-size:11px;color:#ffa657;margin-top:3px;word-break:break-word;}
+.pm-sim{font-size:11px;color:#58a6ff;margin-top:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.pm-msg{font-size:12px;color:var(--text-muted);background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:10px;}
+.pm-lbl{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;margin:12px 0 6px;}
+.pm-box{border:1px solid var(--border);border-radius:8px;padding:6px 10px;background:var(--surface2);max-height:200px;overflow:auto;}
+.pm-check{display:flex;align-items:center;gap:8px;font-size:13px;padding:5px 0;cursor:pointer;}
+.pm-check input:disabled+span{opacity:.4;}
+.pm-cnt{margin-left:auto;font-size:11px;color:var(--text-muted);}
+.pm-input{width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:13px;box-sizing:border-box;}
+.pm-sum{margin-top:12px;font-size:13px;font-weight:700;color:var(--accent);}
+.pm-primary{background:rgba(63,185,80,.15);border-color:rgba(63,185,80,.5);color:#3fb950;}
+.pm-del{border-color:rgba(248,81,73,.5);color:#f85149;}
+.pm-btn:disabled{opacity:.45;cursor:not-allowed;}
+.pm-modal{width:min(820px,96vw);}
 </style>
 <script>
 (function(){
@@ -7358,170 +7433,313 @@ function pmBatchUpdateWhere(col,field,value,patch){
   });
 }
 
-/* ===== 3) لستة المشاريع من كل المصادر ===== */
-function pmProjectList(){
-  var set={};
-  try{ if(typeof OD_MAP!=='undefined') Object.keys(OD_MAP).forEach(function(k){ set[k]=1; }); }catch(e){}
-  try{ if(typeof moData!=='undefined') moData.forEach(function(r){ if(r.project) set[r.project]=1; }); }catch(e){}
-  try{ if(window.MR&&typeof window.MR.data==='function') window.MR.data().forEach(function(r){ if(r.project) set[r.project]=1; }); }catch(e){}
-  try{ if(typeof allEquipment!=='undefined') allEquipment.forEach(function(e){ if(e.project) set[e.project]=1; }); }catch(e){}
-  return Object.keys(set).sort(function(a,b){ return a.localeCompare(b); });
+/* ===== 2b) Batch delete ===== */
+function pmBatchDeleteWhere(col,field,value){
+  if(typeof db==='undefined') return Promise.resolve(0);
+  return db.collection(col).where(field,'==',value).get().then(function(snap){
+    var docs=snap.docs; if(!docs.length) return 0;
+    var groups=pmChunksArr(docs,400), chain=Promise.resolve();
+    groups.forEach(function(g){
+      chain=chain.then(function(){ var b=db.batch(); g.forEach(function(d){ b.delete(d.ref); }); return b.commit(); });
+    });
+    return chain.then(function(){ return docs.length; });
+  });
+}
+
+/* ===== 3) Projects from every source, grouped by NORMALISED spelling =====
+   "Al-Rehab  Villas", "al rehab villas" and "AL REHAB VILLAS" are one project with three spellings.
+   Names that are only *close* (typos, word order, one contains the other) are suggested for merging. */
+function pmNorm(s){
+  return String(s==null?'':s).toLowerCase()
+    .replace(/[\u064B-\u065F\u0640]/g,'').replace(/[\u0623\u0625\u0622]/g,'\u0627').replace(/\u0649/g,'\u064A').replace(/\u0629/g,'\u0647')
+    .replace(/&/g,' and ')
+    .replace(/[\s\-_.,;:\/\\|()\[\]]+/g,' ').trim();
+}
+function pmLev(a,b){
+  var m=a.length,n=b.length; if(!m) return n; if(!n) return m;
+  var prev=[],cur,i,j; for(j=0;j<=n;j++) prev[j]=j;
+  for(i=1;i<=m;i++){ cur=[i]; for(j=1;j<=n;j++) cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1)); prev=cur; }
+  return prev[n];
+}
+function pmSortTokens(s){ return s.split(' ').sort().join(' '); }
+function pmSim(a,b){
+  if(a===b) return 1;
+  var L=Math.max(a.length,b.length); if(!L) return 0;
+  var best=0, sh=a.length<b.length?a:b, lo=a.length<b.length?b:a;
+  if(sh.length>=5 && lo.indexOf(sh)!==-1 && sh.length/lo.length>=0.6) best=0.9;
+  if(Math.abs(a.length-b.length)/L<=0.4){
+    best=Math.max(best,1-pmLev(a,b)/L);
+    var ta=pmSortTokens(a), tb=pmSortTokens(b);
+    if(ta!==a||tb!==b) best=Math.max(best,1-pmLev(ta,tb)/Math.max(ta.length,tb.length));
+  }
+  return best;
+}
+function pmCollect(){
+  var m={};
+  function get(n){ return m[n]||(m[n]={name:n,mo:0,mr:0,eq:0,map:false}); }
+  try{ if(typeof OD_MAP!=='undefined') Object.keys(OD_MAP).forEach(function(k){ if(k) get(k).map=true; }); }catch(e){}
+  try{ if(typeof moData!=='undefined') moData.forEach(function(r){ if(r.project) get(r.project).mo++; }); }catch(e){}
+  try{ if(window.MR&&typeof window.MR.data==='function') window.MR.data().forEach(function(r){ if(r.project) get(r.project).mr++; }); }catch(e){}
+  try{ if(typeof allEquipment!=='undefined') allEquipment.forEach(function(e){ if(e.project) get(e.project).eq++; }); }catch(e){}
+  return m;
 }
 function pmOdOf(p){
   try{ if(typeof OD_MAP!=='undefined'&&OD_MAP[p]) return OD_MAP[p]; }catch(e){}
   try{ if(typeof moData!=='undefined'){ var r=moData.filter(function(x){return x.project===p;})[0]; if(r&&r.od) return r.od; } }catch(e){}
   try{ if(window.MR){ var arr=window.MR.data().filter(function(x){return x.project===p;}); if(arr[0]&&arr[0].od) return arr[0].od; } }catch(e){}
-  return '—';
+  return '';
+}
+function pmBuildGroups(){
+  var m=pmCollect(), g={};
+  Object.keys(m).forEach(function(n){ var k=pmNorm(n); if(!k) return; (g[k]||(g[k]={norm:k,variants:[]})).variants.push(m[n]); });
+  var arr=Object.keys(g).map(function(k){
+    var x=g[k];
+    x.variants.sort(function(a,b){ return (b.mo+b.mr+b.eq)-(a.mo+a.mr+a.eq) || a.name.localeCompare(b.name); });
+    x.name=x.variants[0].name; x.mo=0; x.mr=0; x.eq=0; x.map=false; x.od='';
+    x.variants.forEach(function(v){ x.mo+=v.mo; x.mr+=v.mr; x.eq+=v.eq; if(v.map) x.map=true; if(!x.od) x.od=pmOdOf(v.name); });
+    return x;
+  }).sort(function(a,b){ return a.name.localeCompare(b.name); });
+  if(arr.length<=1500){
+    for(var i=0;i<arr.length;i++){ for(var j=i+1;j<arr.length;j++){
+      var s=pmSim(arr[i].norm,arr[j].norm);
+      if(s>=0.84){
+        if(!arr[i].sim||s>arr[i].sim.s) arr[i].sim={j:j,s:s};
+        if(!arr[j].sim||s>arr[j].sim.s) arr[j].sim={j:i,s:s};
+      }
+    } }
+  }
+  return arr;
 }
 
-/* ===== 4) المودال ===== */
-var PM_Q='';
-function pmOpen(){
+/* ===== 4) Modal ===== */
+var PM={q:'',tab:'all',groups:[],act:null,busy:false,msg:''};
+function pmPlacesLabel(p){
+  var a=[]; if(p.mo) a.push('Master Owned ('+p.mo+')'); if(p.mr) a.push('Master Rental ('+p.mr+')'); if(p.eq) a.push('Fleet ('+p.eq+')'); if(p.map) a.push('O.D Map');
+  return a.join(' · ')||'—';
+}
+function pmOpen(tab){
   if(!pmIsAdmin()){ if(typeof toast==='function') toast('Admins only','error'); return; }
+  PM.tab=(tab==='mo'||tab==='mr')?tab:'all'; PM.q=''; PM.act=null; PM.busy=false; PM.msg='';
   var ov=document.getElementById('pm-ov');
   if(!ov){ ov=document.createElement('div'); ov.id='pm-ov'; ov.className='pm-ov';
-    ov.addEventListener('click',function(e){ if(e.target===ov) pmClose(); });
+    ov.addEventListener('click',function(e){ if(e.target===ov && !PM.busy) pmClose(); });
     document.body.appendChild(ov);
   }
-  ov.innerHTML='<div class="pm-modal">'
-    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">'
-    +'<div style="font-size:16px;font-weight:700;">🗂️ إدارة المشاريع (الاسم و الـ O.D)</div>'
-    +'<button class="pm-btn" id="pm-close-btn">✕ إغلاق</button></div>'
-    +'<input class="pm-search" id="pm-search" placeholder="دوّر على مشروع...">'
-    +'<div style="font-size:11px;color:var(--text-dim);margin:-6px 0 10px;">تعديل الاسم أو نقل الـ O.D هنا بيتحدّث تلقائي في Master Owned و Master Rental و Fleet و O.D Map مع بعض.</div>'
-    +'<div id="pm-list"></div></div>';
   ov.classList.add('on');
-  document.getElementById('pm-close-btn').addEventListener('click',pmClose);
-  document.getElementById('pm-search').addEventListener('input',function(e){ PM_Q=e.target.value; pmRenderList(); });
-  pmRenderList();
+  PM.groups=pmBuildGroups();
+  pmRender();
 }
 function pmClose(){ var ov=document.getElementById('pm-ov'); if(ov) ov.classList.remove('on'); }
-function pmRenderList(){
-  var list=document.getElementById('pm-list'); if(!list) return;
-  var q=PM_Q.trim().toLowerCase();
-  var projects=pmProjectList().filter(function(p){ return !q || p.toLowerCase().indexOf(q)!==-1; });
-  if(!projects.length){ list.innerHTML='<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:12px;">مفيش مشاريع مطابقة</div>'; return; }
-  var h='';
-  projects.forEach(function(p,idx){
-    h+='<div class="pm-row">'
-      +'<div><div class="pm-name">'+pmEsc(p)+'</div><div class="pm-od">O.D: '+pmEsc(pmOdOf(p))+'</div></div>'
-      +'<div class="pm-actions">'
-      +'<button class="pm-btn" data-pm-act="rename" data-pm-idx="'+idx+'">✏️ Rename</button>'
-      +'<button class="pm-btn" data-pm-act="move" data-pm-idx="'+idx+'">📍 Move O.D</button>'
+function pmRefreshGroups(){ PM.groups=pmBuildGroups(); pmRender(); }
+function pmRender(){
+  var ov=document.getElementById('pm-ov'); if(!ov) return;
+  var h='<div class="pm-modal"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">'
+    +'<div style="font-size:16px;font-weight:700;">🗂️ إدارة المشاريع</div>'
+    +'<button class="pm-btn" id="pm-close-btn"'+(PM.busy?' disabled':'')+'>✕ إغلاق</button></div>';
+  h+=PM.act?pmActHtml():pmListHtml();
+  h+='</div>';
+  ov.innerHTML=h;
+  document.getElementById('pm-close-btn').addEventListener('click',function(){ if(!PM.busy) pmClose(); });
+  if(PM.act) pmActBind(); else pmListBind();
+}
+
+/* --- list view --- */
+function pmVisibleGroups(){
+  var q=PM.q.trim().toLowerCase(), qn=pmNorm(PM.q);
+  return PM.groups.map(function(g,i){ return {g:g,i:i}; }).filter(function(x){
+    if(PM.tab==='mo' && !x.g.mo) return false;
+    if(PM.tab==='mr' && !x.g.mr) return false;
+    if(!q) return true;
+    return x.g.variants.some(function(v){ return v.name.toLowerCase().indexOf(q)!==-1; }) || (qn && x.g.norm.indexOf(qn)!==-1);
+  });
+}
+function pmListHtml(){
+  var tabs=[['all','كل الصفحات'],['mo','Master Owned'],['mr','Master Rental']];
+  var h='<div class="pm-tabs">'+tabs.map(function(t){ return '<button class="pm-tab'+(PM.tab===t[0]?' on':'')+'" data-pm-tab="'+t[0]+'">'+t[1]+'</button>'; }).join('')+'</div>';
+  h+='<input class="pm-search" id="pm-search" placeholder="دوّر على مشروع..." value="'+pmEsc(PM.q)+'">';
+  if(PM.msg) h+='<div class="pm-msg">'+pmEsc(PM.msg)+'</div>';
+  var vis=pmVisibleGroups();
+  var noMo=(typeof moData!=='undefined'&&!moData.length), noMr=!(window.MR&&window.MR.data&&window.MR.data().length);
+  if((PM.tab==='mo'&&noMo)||(PM.tab==='mr'&&noMr)) h+='<div class="pm-msg">الصفحة دي لسه مفيهاش داتا متحملة — افتحها الأول وبعدين ارجع هنا.</div>';
+  if(!vis.length) return h+'<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:12px;">مفيش مشاريع مطابقة</div>';
+  h+='<div id="pm-list">';
+  vis.slice(0,300).forEach(function(x){
+    var g=x.g, sim=g.sim?PM.groups[g.sim.j]:null;
+    h+='<div class="pm-row"><div style="min-width:0;flex:1;">'
+      +'<div class="pm-name">'+pmEsc(g.name)+'</div>'
+      +'<div class="pm-od">O.D: '+pmEsc(g.od||'—')+' · '+pmPlacesLabel(g)+'</div>';
+    if(g.variants.length>1) h+='<div class="pm-var">⚠ '+g.variants.length+' كتابات مختلفة: '+g.variants.map(function(v){ return pmEsc(v.name)+' ('+(v.mo+v.mr+v.eq)+')'; }).join(' · ')+'</div>';
+    if(sim) h+='<div class="pm-sim">🔗 شبهه: <b>'+pmEsc(sim.name)+'</b> ('+Math.round(g.sim.s*100)+'%) <button class="pm-btn" data-pm-act="merge" data-pm-i="'+x.i+'">دمج</button></div>';
+    h+='</div><div class="pm-actions">'
+      +'<button class="pm-btn" data-pm-act="rename" data-pm-i="'+x.i+'">✏️ '+(g.variants.length>1?'توحيد / Rename':'Rename')+'</button>'
+      +'<button class="pm-btn" data-pm-act="move" data-pm-i="'+x.i+'">📍 Move O.D</button>'
+      +'<button class="pm-btn pm-del" data-pm-act="remove" data-pm-i="'+x.i+'">🗑 Remove</button>'
       +'</div></div>';
   });
-  list.innerHTML=h;
-  list.querySelectorAll('[data-pm-act]').forEach(function(btn){
-    btn.addEventListener('click',function(){
-      var p=projects[parseInt(btn.getAttribute('data-pm-idx'),10)];
-      if(btn.getAttribute('data-pm-act')==='rename') pmRename(p); else pmMove(p);
-    });
+  if(vis.length>300) h+='<div class="pm-msg">ظاهر أول 300 من '+vis.length+' — استخدم البحث.</div>';
+  return h+'</div>';
+}
+function pmListBind(){
+  var ov=document.getElementById('pm-ov');
+  ov.querySelectorAll('[data-pm-tab]').forEach(function(b){ b.addEventListener('click',function(){ PM.tab=b.getAttribute('data-pm-tab'); pmRender(); }); });
+  var s=document.getElementById('pm-search');
+  s.addEventListener('input',function(e){ PM.q=e.target.value; var pos=s.selectionStart; pmRender(); var n=document.getElementById('pm-search'); n.focus(); try{ n.setSelectionRange(pos,pos); }catch(x){} });
+  ov.querySelectorAll('[data-pm-act]').forEach(function(b){
+    b.addEventListener('click',function(){ pmStartAct(b.getAttribute('data-pm-act'),parseInt(b.getAttribute('data-pm-i'),10)); });
   });
 }
 
-/* ===== 4.5) اكتشاف فين المشروع موجود فعلاً ===== */
-function pmWhereExists(project){
-  var res={mo:0, mr:0, eq:0, inMap:false};
-  try{ if(typeof OD_MAP!=='undefined') res.inMap=OD_MAP.hasOwnProperty(project); }catch(e){}
-  try{ if(typeof moData!=='undefined') res.mo=moData.filter(function(r){return r.project===project;}).length; }catch(e){}
-  try{ if(window.MR&&typeof window.MR.data==='function') res.mr=window.MR.data().filter(function(r){return r.project===project;}).length; }catch(e){}
-  return res;
+/* --- action view (rename / merge / move / remove) --- */
+function pmDefaultPlaces(type){
+  if(PM.tab==='mo') return {mo:true,mr:false,eq:false,map:false};
+  if(PM.tab==='mr') return {mo:false,mr:true,eq:false,map:false};
+  return type==='remove' ? {mo:true,mr:true,eq:false,map:true} : {mo:true,mr:true,eq:true,map:true};
 }
-function pmWherePromise(project){
-  if(typeof db==='undefined') return Promise.resolve(pmWhereExists(project));
-  return db.collection('equipment').where('project','==',project).get().then(function(snap){
-    var r=pmWhereExists(project); r.eq=snap.size; return r;
-  }).catch(function(){ return pmWhereExists(project); });
+function pmStartAct(type,gi){
+  var g=PM.groups[gi]; if(!g) return;
+  var A={type:(type==='merge'?'rename':type),gi:gi,partner:null,sel:{},pl:pmDefaultPlaces(type),newName:g.name,newOd:g.od||''};
+  if(type==='merge' && g.sim){
+    A.partner=g.sim.j; var p=PM.groups[A.partner];
+    var pt=p.mo+p.mr+p.eq, gt=g.mo+g.mr+g.eq;
+    A.newName=(pt>gt)?p.name:g.name;
+  }
+  pmAllVariants(A).forEach(function(v){ A.sel[v.name]=true; });
+  PM.act=A; pmRender();
 }
-function pmPlacesLine(w){
-  var parts=[];
-  if(w.mo) parts.push('Master Owned ('+w.mo+' صف)');
-  if(w.mr) parts.push('Master Rental ('+w.mr+' صف)');
-  if(w.eq) parts.push('Fleet ('+w.eq+' معدة)');
-  if(w.inMap) parts.push('O.D Map');
-  return parts.length?parts.join(' + '):'(المشروع ده مش موجود بيانات فعلية في أي مكان، غير O.D Map لو كان مسجل فيه)';
+function pmAllVariants(A){
+  var g=PM.groups[A.gi], v=g.variants.slice();
+  if(A.partner!=null) v=v.concat(PM.groups[A.partner].variants);
+  return v;
 }
-
-/* ===== 5) Rename ===== */
-function pmRename(oldName){
-  var newName=prompt('الاسم الجديد للمشروع:',oldName);
-  if(!newName) return;
-  newName=newName.trim();
-  if(!newName||newName===oldName) return;
-  if(typeof toast==='function') toast('⏳ بفحص فين المشروع موجود...');
-  pmWherePromise(oldName).then(function(w){
-    if(!w.mo && !w.mr && !w.eq && !w.inMap){ if(typeof toast==='function') toast('المشروع ده مش موجود في أي بيانات','error'); return; }
-    if(!confirm('هيتم تغيير اسم "'+oldName+'" إلى "'+newName+'" في: '+pmPlacesLine(w)+'. متأكد؟')) return;
-    pmDoRename(oldName,newName,w);
+function pmSelVariants(A){ return pmAllVariants(A).filter(function(v){ return A.sel[v.name]; }); }
+function pmCountRows(A){
+  var vs=pmSelVariants(A), n=0;
+  if(A.type==='rename') vs=vs.filter(function(v){ return v.name!==A.newName.trim(); });
+  vs.forEach(function(v){ if(A.pl.mo) n+=v.mo; if(A.pl.mr) n+=v.mr; if(A.pl.eq) n+=v.eq; });
+  return n;
+}
+function pmActHtml(){
+  var A=PM.act, g=PM.groups[A.gi], vs=pmAllVariants(A);
+  var title={rename:(A.partner!=null?'🔗 دمج مشروعين':'✏️ Rename / توحيد الاسم'),move:'📍 Move O.D',remove:'🗑 Remove Project'}[A.type];
+  var h='<div style="font-size:14px;font-weight:700;margin-bottom:10px;'+(A.type==='remove'?'color:#f85149;':'')+'">'+title+' — '+pmEsc(g.name)+'</div>';
+  h+='<div class="pm-lbl">الكتابات اللي هتتأثر</div><div class="pm-box">';
+  vs.forEach(function(v,i){
+    h+='<label class="pm-check"><input type="checkbox" data-pm-var="'+i+'"'+(A.sel[v.name]?' checked':'')+'> <span>'+pmEsc(v.name)+'</span> <span class="pm-cnt">'+pmPlacesLabel(v)+'</span></label>';
   });
+  h+='</div>';
+  if(A.type==='rename'){
+    h+='<div class="pm-lbl">الاسم الموحّد الجديد</div><input class="pm-input" id="pm-newname" value="'+pmEsc(A.newName)+'">';
+  } else if(A.type==='move'){
+    h+='<div class="pm-lbl">الـ O.D الجديد</div><input class="pm-input" id="pm-newod" value="'+pmEsc(A.newOd)+'">';
+  }
+  var t={mo:vs.reduce(function(a,v){return a+v.mo;},0),mr:vs.reduce(function(a,v){return a+v.mr;},0),eq:vs.reduce(function(a,v){return a+v.eq;},0),map:vs.some(function(v){return v.map;})};
+  var verb=A.type==='remove'?'يتمسح من':(A.type==='move'?'يتنقل في':'يتغير في');
+  h+='<div class="pm-lbl">'+verb+'</div><div class="pm-box">'
+    +[['mo','Master Owned',t.mo+' صف'],['mr','Master Rental',t.mr+' صف'],['eq','Fleet (جدول المعدات)',t.eq+' معدة'],['map','O.D Map',t.map?'موجود':'—']].map(function(p){
+      var n=(p[0]==='map')?(t.map?1:0):t[p[0]];
+      return '<label class="pm-check"><input type="checkbox" data-pm-pl="'+p[0]+'"'+(A.pl[p[0]]&&n?' checked':'')+(n?'':' disabled')+'> <span>'+p[1]+'</span> <span class="pm-cnt">'+p[2]+'</span></label>';
+    }).join('')+'</div>';
+  h+='<div class="pm-sum" id="pm-sum"></div>';
+  if(PM.busy) h+='<div class="pm-msg">⏳ جاري التنفيذ... متقفلش الصفحة</div>';
+  h+='<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">'
+    +'<button class="pm-btn" id="pm-back"'+(PM.busy?' disabled':'')+'>← رجوع</button>'
+    +'<button class="pm-btn '+(A.type==='remove'?'pm-del':'pm-primary')+'" id="pm-apply"'+(PM.busy?' disabled':'')+'></button></div>';
+  return h;
 }
-function pmDoRename(oldName,newName,w){
-  if(typeof toast==='function') toast('⏳ جاري التعديل...');
-  var jobs=[];
-  if(w.inMap){
-    try{
-      if(typeof OD_MAP!=='undefined'){
-        if(OD_MAP.hasOwnProperty(oldName)){ OD_MAP[newName]=OD_MAP[oldName]; delete OD_MAP[oldName]; }
-        jobs.push(pmSaveOdMap());
-      }
-    }catch(e){}
+function pmActUpdateSummary(){
+  var A=PM.act; if(!A) return;
+  var n=pmCountRows(A), sum=document.getElementById('pm-sum'), btn=document.getElementById('pm-apply');
+  if(!sum||!btn) return;
+  var mapOnly=!n && A.pl.map && pmSelVariants(A).some(function(v){return v.map;});
+  sum.textContent=(A.type==='remove'?'هيتم حذف ':(A.type==='move'?'هيتم نقل ':'هيتم تغيير '))+n+' صف'+(A.pl.map?' + O.D Map':'');
+  btn.textContent=(A.type==='remove'?'🗑 احذف ':(A.type==='move'?'📍 انقل ':'✅ طبّق '))+(n?n+' صف':(mapOnly?'(O.D Map)':''));
+  btn.disabled=PM.busy||(!n&&!mapOnly);
+}
+function pmActBind(){
+  var A=PM.act, ov=document.getElementById('pm-ov'), vs=pmAllVariants(A);
+  ov.querySelectorAll('[data-pm-var]').forEach(function(c){ c.addEventListener('change',function(){ A.sel[vs[parseInt(c.getAttribute('data-pm-var'),10)].name]=c.checked; pmActUpdateSummary(); }); });
+  ov.querySelectorAll('[data-pm-pl]').forEach(function(c){ c.addEventListener('change',function(){ A.pl[c.getAttribute('data-pm-pl')]=c.checked; pmActUpdateSummary(); }); });
+  var nn=document.getElementById('pm-newname'); if(nn) nn.addEventListener('input',function(){ A.newName=nn.value; pmActUpdateSummary(); });
+  var no=document.getElementById('pm-newod'); if(no) no.addEventListener('input',function(){ A.newOd=no.value; });
+  document.getElementById('pm-back').addEventListener('click',function(){ PM.act=null; pmRender(); });
+  document.getElementById('pm-apply').addEventListener('click',pmConfirmApply);
+  pmActUpdateSummary();
+}
+function pmConfirmApply(){
+  var A=PM.act; if(!A||PM.busy) return;
+  var vs=pmSelVariants(A); if(!vs.length){ if(typeof toast==='function') toast('اختار كتابة واحدة على الأقل','error'); return; }
+  var places=[]; if(A.pl.mo) places.push('Master Owned'); if(A.pl.mr) places.push('Master Rental'); if(A.pl.eq) places.push('Fleet'); if(A.pl.map) places.push('O.D Map');
+  if(!places.length){ if(typeof toast==='function') toast('اختار مكان واحد على الأقل','error'); return; }
+  var n=pmCountRows(A);
+  if(A.type==='rename'){
+    var nm=A.newName.trim(); if(!nm){ if(typeof toast==='function') toast('اكتب الاسم الجديد','error'); return; }
+    if(!confirm('هيتم توحيد '+vs.length+' كتابة إلى "'+nm+'" في: '+places.join(' + ')+' ('+n+' صف). متأكد؟')) return;
+    pmRun(pmApplyRename(A,nm),'✅ اتوحّد الاسم إلى "'+nm+'"');
+  } else if(A.type==='move'){
+    var od=A.newOd.trim(); if(!od){ if(typeof toast==='function') toast('اكتب الـ O.D الجديد','error'); return; }
+    if(!confirm('هيتم نقل المشروع إلى O.D "'+od+'" في: '+places.join(' + ')+' ('+n+' صف). متأكد؟')) return;
+    pmRun(pmApplyMove(A,od),'✅ الـ O.D اتحدّث');
+  } else {
+    if(!confirm('⚠️ هيتم حذف "'+PM.groups[A.gi].name+'" نهائياً من: '+places.join(' + ')+' ('+n+' صف). متأكد؟')) return;
+    if(A.pl.eq && vs.some(function(v){return v.eq;}) && prompt('ده هيمسح معدات من الـ Fleet نفسها.\nاكتب DELETE للتأكيد:')!=='DELETE') return;
+    pmRun(pmApplyRemove(A),'🗑 اتمسح المشروع');
   }
-  if(w.mo){
-    try{
-      if(typeof moData!=='undefined'){
-        var moChanged=false;
-        moData.forEach(function(r){ if(r.project===oldName){ r.project=newName; moChanged=true; } });
-        if(moChanged && typeof moWriteDataset==='function') moWriteDataset(moData);
-      }
-    }catch(e){}
-  }
-  if(w.mr) jobs.push(pmBatchUpdateWhere('master_rental','project',oldName,{project:newName}));
-  if(w.eq) jobs.push(pmBatchUpdateWhere('equipment','project',oldName,{project:newName}));
-  Promise.all(jobs).then(function(){
+}
+function pmRun(job,okMsg){
+  PM.busy=true; pmRender();
+  job.then(function(rep){
+    PM.busy=false; PM.act=null;
+    PM.msg=okMsg+(rep&&rep.length?' — '+rep.join(' · '):'');
+    if(typeof toast==='function') toast(PM.msg,'success');
     if(window.MR&&typeof window.MR.load==='function') window.MR.load().then(function(){ if(typeof window.MR.render==='function') window.MR.render(); });
     if(typeof loadData==='function') loadData();
-    if(typeof toast==='function') toast('✅ اتغيّر الاسم في: '+pmPlacesLine({mo:w.mo,mr:w.mr,eq:w.eq,inMap:w.inMap}),'success');
-    pmRenderList();
-  }).catch(function(err){ if(typeof toast==='function') toast('خطأ: '+(err&&err.message||err),'error'); });
-}
-
-/* ===== 6) Move O.D ===== */
-function pmMove(project){
-  var current=pmOdOf(project);
-  var newOd=prompt('الـ O.D الجديد لمشروع "'+project+'":', current==='—'?'':current);
-  if(newOd==null) return;
-  newOd=newOd.trim();
-  if(!newOd) return;
-  if(typeof toast==='function') toast('⏳ بفحص فين المشروع موجود...');
-  pmWherePromise(project).then(function(w){
-    if(!w.mo && !w.mr && !w.eq && !w.inMap){ if(typeof toast==='function') toast('المشروع ده مش موجود في أي بيانات','error'); return; }
-    w.inMap=true; // هنضيفه/نحدثه في الماب على أي حال
-    if(!confirm('هيتم نقل "'+project+'" إلى O.D: "'+newOd+'" في: '+pmPlacesLine(w)+'. متأكد؟')) return;
-    pmDoMove(project,newOd,w);
+    pmRender();
+    setTimeout(function(){ if(document.getElementById('pm-ov')&&document.getElementById('pm-ov').classList.contains('on')&&!PM.act) pmRefreshGroups(); },1800);
+  }).catch(function(err){
+    PM.busy=false; if(typeof toast==='function') toast('خطأ: '+(err&&err.message||err),'error'); pmRender();
   });
 }
-function pmDoMove(project,newOd,w){
-  if(typeof toast==='function') toast('⏳ جاري النقل...');
-  var jobs=[];
-  try{ if(typeof OD_MAP!=='undefined'){ OD_MAP[project]=newOd; jobs.push(pmSaveOdMap()); } }catch(e){}
-  if(w.mo){
-    try{
-      if(typeof moData!=='undefined'){
-        var moChanged=false;
-        moData.forEach(function(r){ if(r.project===project){ r.od=newOd; moChanged=true; } });
-        if(moChanged && typeof moWriteDataset==='function') moWriteDataset(moData);
-      }
-    }catch(e){}
+
+/* ===== 5) Apply ===== */
+function pmApplyRename(A,newName){
+  var names=pmSelVariants(A).map(function(v){return v.name;}).filter(function(n){return n!==newName;});
+  var pl=A.pl, jobs=[], rep=[];
+  if(pl.map){ try{ if(typeof OD_MAP!=='undefined'){ var ch=false;
+    names.forEach(function(n){ if(OD_MAP.hasOwnProperty(n)){ if(!OD_MAP[newName]) OD_MAP[newName]=OD_MAP[n]; delete OD_MAP[n]; ch=true; } });
+    if(ch){ jobs.push(pmSaveOdMap()); rep.push('O.D Map'); } } }catch(e){} }
+  if(pl.mo && typeof moData!=='undefined'){
+    var c=0; moData.forEach(function(r){ if(names.indexOf(r.project)!==-1){ r.project=newName; c++; } });
+    if(c){ rep.push('Master Owned ('+c+')'); jobs.push(Promise.resolve(moWriteDataset(moData))); }
   }
-  if(w.mr) jobs.push(pmBatchUpdateWhere('master_rental','project',project,{od:newOd}));
-  if(w.eq) jobs.push(pmBatchUpdateWhere('equipment','project',project,{od:newOd}));
-  Promise.all(jobs).then(function(){
-    if(window.MR&&typeof window.MR.load==='function') window.MR.load().then(function(){ if(typeof window.MR.render==='function') window.MR.render(); });
-    if(typeof loadData==='function') loadData();
-    if(typeof toast==='function') toast('✅ الـ O.D اتحدّث في: '+pmPlacesLine(w),'success');
-    pmRenderList();
-  }).catch(function(err){ if(typeof toast==='function') toast('خطأ: '+(err&&err.message||err),'error'); });
+  if(pl.mr) names.forEach(function(n){ jobs.push(pmBatchUpdateWhere('master_rental','project',n,{project:newName}).then(function(k){ if(k) rep.push('Master Rental ('+k+')'); })); });
+  if(pl.eq) names.forEach(function(n){ jobs.push(pmBatchUpdateWhere('equipment','project',n,{project:newName}).then(function(k){ if(k) rep.push('Fleet ('+k+')'); })); });
+  return Promise.all(jobs).then(function(){ return rep; });
 }
+function pmApplyMove(A,newOd){
+  var names=pmSelVariants(A).map(function(v){return v.name;});
+  var pl=A.pl, jobs=[], rep=[];
+  if(pl.map){ try{ if(typeof OD_MAP!=='undefined'){ names.forEach(function(n){ OD_MAP[n]=newOd; }); jobs.push(pmSaveOdMap()); rep.push('O.D Map'); } }catch(e){} }
+  if(pl.mo && typeof moData!=='undefined'){
+    var c=0; moData.forEach(function(r){ if(names.indexOf(r.project)!==-1){ r.od=newOd; c++; } });
+    if(c){ rep.push('Master Owned ('+c+')'); jobs.push(Promise.resolve(moWriteDataset(moData))); }
+  }
+  if(pl.mr) names.forEach(function(n){ jobs.push(pmBatchUpdateWhere('master_rental','project',n,{od:newOd}).then(function(k){ if(k) rep.push('Master Rental ('+k+')'); })); });
+  if(pl.eq) names.forEach(function(n){ jobs.push(pmBatchUpdateWhere('equipment','project',n,{od:newOd}).then(function(k){ if(k) rep.push('Fleet ('+k+')'); })); });
+  return Promise.all(jobs).then(function(){ return rep; });
+}
+function pmApplyRemove(A){
+  var names=pmSelVariants(A).map(function(v){return v.name;});
+  var pl=A.pl, jobs=[], rep=[];
+  if(pl.map){ try{ if(typeof OD_MAP!=='undefined'){ var ch=false; names.forEach(function(n){ if(OD_MAP.hasOwnProperty(n)){ delete OD_MAP[n]; ch=true; } }); if(ch){ jobs.push(pmSaveOdMap()); rep.push('O.D Map'); } } }catch(e){} }
+  if(pl.mo && typeof moData!=='undefined'){
+    var keep=moData.filter(function(r){ return names.indexOf(r.project)===-1; }), removed=moData.length-keep.length;
+    if(removed){ rep.push('Master Owned ('+removed+')'); jobs.push(Promise.resolve(moWriteDataset(keep))); }
+  }
+  if(pl.mr) names.forEach(function(n){ jobs.push(pmBatchDeleteWhere('master_rental','project',n).then(function(k){ if(k) rep.push('Master Rental ('+k+')'); })); });
+  if(pl.eq) names.forEach(function(n){ jobs.push(pmBatchDeleteWhere('equipment','project',n).then(function(k){ if(k) rep.push('Fleet ('+k+')'); })); });
+  return Promise.all(jobs).then(function(){ return rep; });
+}
+window.pmOpen=pmOpen;
 
 /* ===== 7) نافبار زرار ===== */
 function pmInjectNav(){
@@ -7883,7 +8101,7 @@ function start(){
   decorate();
   $('rd-msg').innerHTML=''; $('rd-main').style.display='block';
   var ms=meta&&meta.updatedAtMs?new Date(meta.updatedAtMs).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):'';
-  $('rd-sub').textContent='Rental equipment rates · 10th of Ramadan sector · '+fmt(rows.length)+' records'+(ms?' · uploaded '+ms:'')+(meta&&meta.fileName?' · '+meta.fileName:'');
+  $('rd-sub').textContent=fmt(rows.length)+' records'+(ms?' · uploaded '+ms:'')+(meta&&meta.fileName?' · '+meta.fileName:'');
   buildSelects(); render();
 }
 
@@ -7919,7 +8137,7 @@ function card(val,label,sub,opt){
   opt=opt||{};
   var attr=opt.act?' data-rd="'+opt.act+'" data-v="'+enc(opt.v)+'"':'';
   return '<div class="dash-card'+(opt.act?'':' rd-static')+(opt.warn?' warn':'')+(opt.on?' active':'')+'"'+attr+'>'
-    +'<div class="dash-card-val">'+val+'</div><div class="dash-card-label">'+label+'</div>'+(sub?'<div class="dash-card-sub">'+sub+'</div>':'')+'</div>';
+    +'<div class="dash-card-val">'+val+'</div><div class="dash-card-label">'+label+'</div>'+''+'</div>';
 }
 function renderCards(){
   var L=list(), T=rows.length, filt=L.length!==T;
@@ -7966,7 +8184,7 @@ function renderPanels(){
   var h='';
 
   var byCat=countBy(list('cat'),function(r){return r.catL;});
-  h+=panel('Equipment categories','By '+MN[metric]+' — click a bar to filter',barRows(byCat,'cat',{colors:colors}));
+  h+=panel('Equipment categories','By '+MN[metric],barRows(byCat,'cat',{colors:colors}));
 
   var byPlant=countBy(list('plant'),function(r){return r.plant;});
   h+=panel('Plants','By '+MN[metric],barRows(byPlant,'plant',{color:'var(--blue)'}));
@@ -8339,8 +8557,92 @@ window.__rd={parseWorkbook:parseWorkbook,setRows:function(r,m){ rows=r; meta=m||
     if(t==='p') return {txt:Math.round(n)+'%', num:Math.round(n), cls:'n'+(n<75?' lo':'')};
     return {txt:'', num:NaN, cls:''};
   }
-  /* opts: {title, sub, cols:[{h:'Header', g:function(row,i){...}, t:'t'|'i'|..., s:true(sum)}], rows:[...]} */
-  window.hacPdfTable=function(o){
+  /* ═════ Excel export — same table as the PDF, as a formatted sheet ═════
+     navy header · zebra rows · frozen header + filter buttons · totals row with SUBTOTAL (follows the filter,
+     like the PDF footer) · A4 landscape print setup with the header repeated on every page. */
+  var XL_FMT={i:'#,##0',d:'#,##0.0',m:'#,##0',z:'#,##0;-#,##0;"\u2013"',dz:'#,##0.0;-#,##0.0;"\u2013"',p:'0"%"'};
+  function colLetter(n){ var s='',m; while(n>0){ m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=Math.floor((n-1)/26); } return s; }
+  function buildXlsx(o,EJ){
+    var cols=o.cols, rows=o.rows, nC=cols.length, nR=rows.length, first=4, last=3+nR, tot=last+1, lastCol=colLetter(nC);
+    var wb=new EJ.Workbook(); wb.creator='HAC PMV'; wb.created=new Date();
+    var ws=wb.addWorksheet(String(o.title||'Export').replace(/[\\\/\?\*\[\]:]/g,' ').slice(0,31),
+      {views:[{state:'frozen',ySplit:3,activeCell:'A4'}],properties:{tabColor:{argb:'FFF0A500'}}});
+    var NAVY='FF0D1B2E', AMBER='FFF0A500', thinB={style:'thin',color:{argb:'FFE3E7ED'}};
+    ws.mergeCells('A1:'+lastCol+'1'); ws.mergeCells('A2:'+lastCol+'2');
+    var t1=ws.getCell('A1'); t1.value=o.title||''; t1.font={name:'Calibri',size:15,bold:true,color:{argb:NAVY}}; t1.alignment={vertical:'middle'};
+    ws.getRow(1).height=26;
+    var t2=ws.getCell('A2'); t2.value=nR.toLocaleString('en-US')+' rows \u00b7 Generated '+new Date().toLocaleString()+(o.sub?' \u00b7 '+o.sub:'');
+    t2.font={name:'Calibri',size:10,color:{argb:'FF666666'}}; t2.border={bottom:{style:'medium',color:{argb:AMBER}}};
+    for(var c=2;c<=nC;c++) ws.getCell(2,c).border={bottom:{style:'medium',color:{argb:AMBER}}};
+    var hr=ws.getRow(3); hr.height=30;
+    cols.forEach(function(col,j){
+      var cell=hr.getCell(j+1); cell.value=col.h;
+      cell.font={name:'Calibri',size:10,bold:true,color:{argb:'FFFFFFFF'}};
+      cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:NAVY}};
+      cell.alignment={vertical:'middle',horizontal:col.t==='t'?'left':'right',wrapText:true};
+      cell.border={bottom:{style:'medium',color:{argb:AMBER}}};
+    });
+    var w=cols.map(function(col){ return String(col.h).length*1.15+3; });
+    var sums=cols.map(function(){ return 0; });
+    rows.forEach(function(r,i){
+      var row=ws.getRow(first+i), zebra=(i%2===1);
+      cols.forEach(function(col,j){
+        var v=col.g(r,i), cell=row.getCell(j+1);
+        if(col.t==='t'){
+          if(v instanceof Date) v=v.getFullYear()+'-'+two(v.getMonth()+1)+'-'+two(v.getDate());
+          v=(v==null)?'':String(v); cell.value=v;
+          cell.alignment={vertical:'middle',horizontal:'left'};
+          if(v.length+2>w[j]) w[j]=Math.min(46,v.length+2);
+        } else {
+          var n=Number(v); if(!isFinite(n)) n=0;
+          if(col.t==='i'||col.t==='m'||col.t==='z'||col.t==='p') n=Math.round(n); else n=+n.toFixed(1);
+          cell.value=n; cell.numFmt=XL_FMT[col.t]||'#,##0';
+          cell.alignment={vertical:'middle',horizontal:'right'};
+          if(col.t==='p'&&n<75) cell.font={name:'Calibri',size:10,bold:true,color:{argb:'FFD93025'}};
+          else if((col.t==='z'||col.t==='dz')&&!n) cell.font={name:'Calibri',size:10,color:{argb:'FFBBBBBB'}};
+          if(col.s) sums[j]+=n;
+          var L=String(Math.round(n)).length+3; if(L>w[j]) w[j]=Math.min(46,L);
+        }
+        if(!cell.font) cell.font={name:'Calibri',size:10};
+        if(zebra) cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF8FAFC'}};
+        cell.border={bottom:thinB};
+      });
+    });
+    var tr=ws.getRow(tot); tr.height=20;
+    cols.forEach(function(col,j){
+      var cell=tr.getCell(j+1);
+      if(j===0) cell.value='Total';
+      else if(col.s){ cell.value={formula:'SUBTOTAL(109,'+colLetter(j+1)+first+':'+colLetter(j+1)+last+')',result:sums[j]}; cell.numFmt=XL_FMT[col.t]||'#,##0'; cell.alignment={horizontal:'right'}; }
+      cell.font={name:'Calibri',size:10,bold:true};
+      cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF4F4F4'}};
+      cell.border={top:{style:'medium',color:{argb:AMBER}}};
+    });
+    ws.columns=cols.map(function(col,j){ return {width:Math.max(8,Math.min(46,w[j]))}; });
+    if(nR) ws.autoFilter={from:{row:3,column:1},to:{row:last,column:nC}};
+    ws.pageSetup={paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,
+      margins:{left:.3,right:.3,top:.4,bottom:.5,header:.2,footer:.2},printTitlesRow:'3:3'};
+    ws.headerFooter={oddFooter:'&L&8HAC \u00b7 PMV&C&8Page &P of &N&R&8&D'};
+    return wb;
+  }
+  window.hacBuildXlsx=buildXlsx;
+  window.hacXlsxTable=function(o){
+    var rows=o.rows||[];
+    if(!rows.length){ if(typeof toast==='function') toast('Nothing to export','error'); return; }
+    var EJ=window.ExcelJS;
+    if(!EJ){ if(typeof toast==='function') toast('Excel library did not load \u2014 check the internet connection','error'); return; }
+    var d=new Date(), stamp=d.getFullYear()+'-'+two(d.getMonth()+1)+'-'+two(d.getDate());
+    var fname=String(o.title||'Export').replace(/[\\\/:*?"<>|\u00b7\u2014]+/g,' ').replace(/\s+/g,'_').replace(/^_+|_+$/g,'')+'_'+stamp+'.xlsx';
+    buildXlsx(o,EJ).xlsx.writeBuffer().then(function(buf){
+      var blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+      var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fname;
+      document.body.appendChild(a); a.click();
+      setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1500);
+    }).catch(function(err){ if(typeof toast==='function') toast('Excel export failed: '+(err&&err.message||err),'error'); });
+  };
+
+  /* opts: {title, sub, cols:[{h:'Header', g:function(row,i){...}, t:'t'|'i'|..., s:true(sum)}], rows:[...]}  ·  kind 'xlsx' -> Excel instead of PDF */
+  window.hacPdfTable=function(o,kind){
+    if(kind==='xlsx') return window.hacXlsxTable(o);
     var rows=o.rows||[], cols=o.cols||[];
     if(!rows.length){ if(typeof toast==='function') toast('Nothing to export','error'); return; }
     var h='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+esc(o.title)+'</title><style>';
