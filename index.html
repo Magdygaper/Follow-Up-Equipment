@@ -8353,6 +8353,25 @@ function renderPanels(){
     +(types.length>12?'<button class="rd-link" data-rd="alltypes">'+(allTypes?'Show top 12 only':'Show all '+fmt(types.length)+' types')+'</button>':'');
   h+=panel('Daily rate by equipment type','Min / median / max of daily-basis rows only ('+CCY+') · capacity varies inside a type, so use the table below for like-for-like',tb,true);
 
+  /* latest price per plant for the selected equipment type */
+  if(F.item){
+    var byPlant={};
+    list().forEach(function(r){
+      var key=r.plant||'—';
+      if(!byPlant[key]||(r.date||'')>(byPlant[key].date||'')) byPlant[key]=r;
+    });
+    var plantRows=Object.keys(byPlant).map(function(k){return byPlant[k];})
+      .sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+    var ptb=!plantRows.length?'<div class="rd-psub" style="margin:8px 6px;">No rows match the other filters.</div>'
+      :'<div class="table-wrap" style="border:none;background:transparent;"><table class="rd-bt"><thead><tr><th>Plant</th><th class="n">Latest date</th><th>Rate</th><th class="n">Latest price ('+CCY+')</th><th>Vendor</th><th>Contract</th></tr></thead><tbody>'
+      +plantRows.map(function(r){
+        return '<tr class="rd-btr'+(F.plant===r.plant?' on':'')+'" data-rd="plant" data-v="'+enc(r.plant||'')+'"><td>'+E(r.plant||'—')+'</td>'
+          +'<td class="n code-cell">'+dateLabel(r.date)+'</td><td>'+E(r.rateL)+'</td>'
+          +'<td class="n code-cell">'+fmt(r.cost,2)+'</td><td>'+E(r.vendor||'—')+'</td><td class="code-cell">'+E(r.contract||'—')+'</td></tr>';
+      }).join('')+'</tbody></table></div>';
+    h+=panel('Latest price by plant — '+E(F.item),'Most recent rate for this equipment type in each plant it appears in · click a plant to filter the table below',ptb,true);
+  }
+
   $('rd-panels').innerHTML=h;
 }
 
