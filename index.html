@@ -343,11 +343,11 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
 .rd-num{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);text-align:right;white-space:nowrap;}
 .rd-terms{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:18px;}
 .rd-tblock-t{font-size:11px;color:var(--text-muted);margin-bottom:6px;padding:0 6px;}
-.rd-months{display:flex;align-items:stretch;gap:6px;height:190px;}
-.rd-mcol{flex:1;display:flex;flex-direction:column;align-items:center;cursor:pointer;border-radius:6px;padding:4px 2px;min-width:0;}
+.rd-months{display:flex;align-items:stretch;gap:5px;height:190px;overflow-x:auto;overflow-y:hidden;padding-bottom:6px;scrollbar-width:thin;}
+.rd-mcol{flex:0 0 38px;display:flex;flex-direction:column;align-items:center;cursor:pointer;border-radius:6px;padding:4px 2px;}
 .rd-mcol:hover{background:var(--surface2);}
 .rd-mcol.on{background:rgba(240,165,0,.1);}
-.rd-mn{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);height:14px;}
+.rd-mn{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);height:14px;white-space:nowrap;}
 .rd-mbw{flex:1;width:100%;display:flex;align-items:flex-end;}
 .rd-mb{width:100%;background:var(--blue);border-radius:4px 4px 0 0;min-height:2px;}
 .rd-mcol.on .rd-mb{background:var(--accent);}
@@ -368,6 +368,7 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
   .rd-cards{grid-template-columns:repeat(2,1fr);gap:8px;}
   .rd-cards .dash-card-val{font-size:20px;}
   .rd-months{height:150px;}
+  .rd-mcol{flex-basis:32px;}
   .rd-lbl{white-space:normal;}
 }
 
@@ -990,7 +991,7 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
 
           <div class="dash-section-label">Rate records</div>
           <div class="toolbar">
-            <input type="text" class="search-box" id="rd-q" placeholder="Search equipment, model, vendor, project, contact, note…">
+            <input type="text" class="search-box" id="rd-q" placeholder="Search contract, equipment, model, vendor, project, contact, note…">
             <select id="rd-sel-plant"></select>
             <select id="rd-sel-cat"></select>
             <select id="rd-sel-rate"></select>
@@ -8022,7 +8023,7 @@ function parseMaster(matrix,headerAt,catPairs){
   var head=matrix[headerAt].map(function(h){ return clean(h).toLowerCase(); }), ix={};
   head.forEach(function(h,i){ if(h&&ix[h]==null) ix[h]=i; });
   function col(){ for(var i=0;i<arguments.length;i++){ if(ix[arguments[i]]!=null) return ix[arguments[i]]; } return -1; }
-  var C={plant:col('plant'),project:col('project'),vendor:col('vendors','vendor'),contact:col('contacts','contact'),
+  var C={contract:col('contract','contract no','contract number'),plant:col('plant'),project:col('project'),vendor:col('vendors','vendor'),contact:col('contacts','contact'),
          cat:col('eq category','category'),item:col('equipment / item','equipment'),model:col('model / capacity','model'),
          qty:col('qty'),cost:col('unit cost'),rate:col('rate'),date:col('date'),sb:col('s.b rate','s.b'),
          fuel:col('fuel cost','fuel'),trans:col('transportation'),note:col('note')};
@@ -8035,7 +8036,7 @@ function parseMaster(matrix,headerAt,catPairs){
     var item=clean(g(r,'item')), cost=toNum(g(r,'cost'));
     if(!item&&cost==null){ skipped++; continue; }
     out.push({
-      plant:clean(g(r,'plant')), project:clean(g(r,'project')), vendor:clean(g(r,'vendor')), contact:clean(g(r,'contact')),
+      contract:clean(g(r,'contract')), plant:clean(g(r,'plant')), project:clean(g(r,'project')), vendor:clean(g(r,'vendor')), contact:clean(g(r,'contact')),
       cat:clean(g(r,'cat')), item:item, model:clean(g(r,'model')), qty:toNum(g(r,'qty')), cost:cost,
       rate:rateOf(g(r,'rate')), date:toISO(g(r,'date')), sb:toSB(g(r,'sb')),
       fuel:party(g(r,'fuel')), trans:party(g(r,'trans')), note:clean(g(r,'note'))
@@ -8195,7 +8196,7 @@ function decorate(){
     var dk=[r.plant,r.project,r.vendor,r.item,r.model,r.rate,r.cost,r.date,r.sb,r.fuel,r.trans,r.note].join('|');
     if(seen[dk]) f.push('dup'); else seen[dk]=1;
     r.flags=f;
-    r._h=(r.item+' '+r.model+' '+r.vendor+' '+r.project+' '+r.contact+' '+r.plant+' '+r.note).toLowerCase();
+    r._h=(r.item+' '+r.model+' '+r.vendor+' '+r.project+' '+r.contact+' '+r.plant+' '+r.note+' '+r.contract).toLowerCase();
   });
 }
 var FIELD={plant:'plant',cat:'catL',rate:'rateL',fuel:'fuelL',trans:'transL',sb:'sbL',month:'month',vendor:'vendor',project:'project',item:'item'};
@@ -8326,16 +8327,6 @@ function renderPanels(){
       return '<div class="rd-mcol'+(F.month===m?' on':'')+'" data-rd="month" data-v="'+enc(m)+'"><span class="rd-mn">'+(metric==='n'?fmt(n):compact(n))+'</span><span class="rd-mbw"><span class="rd-mb" style="height:'+(n/mmax*100)+'%"></span></span><span class="rd-ml">'+monLabel(m)+'</span></div>';
     }).join('')+'</div>');
 
-  var LC=list('check'), cnt={nocat:0,high:0,unspec:0,dup:0}; LC.forEach(function(r){ r.flags.forEach(function(f){ cnt[f]++; }); });
-  var CH=[['nocat','No category','Equipment name is not in the Categories sheet (often a typo), so it cannot be grouped.'],
-          ['high','Daily rate ≥ '+fmt(HIGH_DAILY),'Marked daily but priced like a monthly rate (mostly generators). Confirm the rate basis.'],
-          ['unspec','Fuel or transport blank','Fuel cost or Transportation is empty, so who pays for it is unclear.'],
-          ['dup','Identical rows','Same vendor, item, model, rate, date and terms as an earlier row: extra units or a duplicate entry.']];
-  h+=panel('Data checks','Rows with a possible data problem (a row can have several flags). Click one to list its rows.',
-    CH.map(function(c){
-      return '<div class="rd-chk'+(F.check===c[0]?' on':'')+'" data-rd="check" data-v="'+c[0]+'"><span class="rd-chk-n">'+fmt(cnt[c[0]])+'</span><span><b>'+c[1]+'</b><br><span class="rd-chk-h">'+c[2]+'</span></span></div>';
-    }).join(''));
-
   var byV=countBy(list('vendor'),function(r){return r.vendor;});
   h+=panel('Top vendors','Top 10 of '+fmt(byV.length)+' by '+MN[metric],barRows(byV.slice(0,10),'vendor',{color:'#a371f7'}));
 
@@ -8365,7 +8356,7 @@ function renderPanels(){
   $('rd-panels').innerHTML=h;
 }
 
-var COLS=[['item','Equipment'],['model','Model / Capacity'],['catL','Category'],['rateL','Rate'],['cost','Unit cost'],['sb','S.B'],['vendor','Vendor'],
+var COLS=[['contract','Contract'],['item','Equipment'],['model','Model / Capacity'],['catL','Category'],['rateL','Rate'],['cost','Unit cost'],['sb','S.B'],['vendor','Vendor'],
           ['project','Project'],['plant','Plant'],['date','Date'],['fuelL','Fuel'],['transL','Transport'],['contact','Contact'],['note','Note']];
 function renderTable(){
   var L=list();
@@ -8384,6 +8375,7 @@ function renderTable(){
   var body=L.slice(0,limit).map(function(r,i){
     var flagged=r.flags.indexOf('high')>=0;
     return '<tr><td class="rd-muted">'+(i+1)+'</td>'
+      +'<td class="code-cell">'+E(r.contract||'—')+'</td>'
       +'<td style="font-weight:600;">'+E(r.item)+'</td>'
       +'<td>'+E(r.model||'—')+'</td>'
       +'<td><span class="cat-badge"'+(cc[r.catL]?' style="border-left:3px solid '+cc[r.catL]+'"':'')+'>'+(r.cat?E(r.cat):'<span class="rd-muted">Uncategorized</span>')+'</span></td>'
