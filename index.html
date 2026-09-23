@@ -385,6 +385,15 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
 <style id="no-descriptions">
 /* explanatory captions removed — layout kept */
 .section-sub:empty,.mr-kpi .s,.rd-psub:not([style]),.rd-chk-h{display:none !important}
+</style>
+<style id="app-print">
+/* اطبع محتوى الصفحة بس — من غير الـ Topbar (Access Log/Admin/Logout) ولا الـ Sidebar ولا أزرار الشاشة */
+@media print{
+  .topbar,.sidebar,.fleet-pill,button,.btn{display:none !important}
+  .content{padding:6mm !important}
+  body{background:#fff !important}
+  @page{margin:8mm}
+}
 #page-executive>div:first-child,#page-dashboard>div:first-child,#page-equipment>div:first-child,#page-transfers>div:first-child,#page-workshop>div:first-child,#page-followup>div:first-child,#page-rentaldb>div:first-child{margin-bottom:16px !important}
 </style>
 </head>
@@ -815,6 +824,8 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
         <div class="ws-view-tabs">
           <button class="ws-tab-btn active" id="ws-tab-active-btn" onclick="switchWsTab('active')">🛠️ Active Workshop</button>
           <button class="ws-tab-btn" id="ws-tab-archive-btn" onclick="switchWsTab('archive')">📦 Dispatched / Archive List</button>
+          <button class="btn-sm" style="margin-left:auto;" onclick="exportWsExcel('pdf')">📄 PDF</button>
+          <button class="btn-sm" onclick="exportWsExcel('xlsx')">📊 Excel</button>
         </div>
 
         <div class="toolbar">
@@ -2731,6 +2742,45 @@ function switchWsTab(tab){
   document.getElementById('ws-tab-active-btn').classList.toggle('active', tab==='active');
   document.getElementById('ws-tab-archive-btn').classList.toggle('active', tab==='archive');
   renderWsTable();
+}
+
+function wsFilteredRows(){
+  const q = (document.getElementById('ws-search').value||'').toLowerCase().trim();
+  const dept = document.getElementById('ws-dept-filter').value;
+  let filtered = wsEquipment.filter(function(item){
+    const isArchived = (item.status === 'Dispatched');
+    return currentWsTab === 'active' ? !isArchived : isArchived;
+  });
+  if(wsStatusFilter === 'Long'){ filtered = filtered.filter(function(i){ return _mgmtDays(i) > 15; }); }
+  else if(wsStatusFilter !== 'All'){ filtered = filtered.filter(function(i){ return i.status === wsStatusFilter; }); }
+  if(dept !== 'All') filtered = filtered.filter(function(i){ return i.dept === dept; });
+  if(q){
+    filtered = filtered.filter(function(i){
+      return [i.name, i.code, i.report, i.project].some(function(val){ return val && val.toLowerCase().indexOf(q) !== -1; });
+    });
+  }
+  return filtered;
+}
+/* نفس شكل باقي التقارير في السيستم بالظبط (العنوان الكبير + الأعمدة المنسّقة) عن طريق نفس محرك hacPdfTable/hacXlsxTable المستخدم في Master Owned/Rental وباقي الصفحات */
+function exportWsExcel(kind){
+  if(typeof window.hacPdfTable!=='function'){ if(typeof toast==='function') toast('Export engine not loaded yet','error'); return; }
+  var rowsX=wsFilteredRows();
+  if(!rowsX.length){ if(typeof toast==='function') toast('Nothing to export','error'); return; }
+  function f(k){ return function(r){ return r[k]||''; }; }
+  var cols=[
+    {h:'#', g:function(r,i){ return i+1; }, t:'n'},
+    {h:'Equipment', g:f('name'), t:'t'},
+    {h:'Code', g:f('code'), t:'t'},
+    {h:'Condition Report', g:f('report'), t:'t'},
+    {h:'Project In', g:f('project'), t:'t'},
+    {h:'Project Out', g:f('exitProject'), t:'t'},
+    {h:'Entry Date', g:f('entryDate'), t:'t'},
+    {h:'Exit Date', g:function(r){ return r.exitDate||'Active'; }, t:'t'},
+    {h:'Duration', g:function(r){ return calculateDays(r.entryDate,r.exitDate,r.status); }, t:'t'},
+    {h:'Department', g:function(r){ return r.dept||'Mechanics'; }, t:'t'},
+    {h:'Status', g:f('status'), t:'t'}
+  ];
+  window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 Central Workshop ('+(currentWsTab==='archive'?'Dispatched / Archive':'Active')+') Export', cols:cols, rows:rowsX}, kind||'xlsx');
 }
 
 function setWsStatusFilter(status){
@@ -4867,7 +4917,7 @@ function moLoadDataset(force){
   if(moBusy) return;
   var cached=force?null:localStorage.getItem('mo_cache_dataset');
   if(cached){
-    try{ var c=JSON.parse(cached); if(c&&c.rows&&c.rows.length){ moData=assignKeys(prep(c.rows)); moMeta=c.meta||null; moRender(); return; } }catch(e){}
+    try{ var c=JSON.parse(cached); if(c&&c.rows&&c.rows.length){ window.__pmMoHidden=c.rows.filter(function(r){ return !r.hiring; }); moData=assignKeys(prep(c.rows)); moMeta=c.meta||null; moRender(); return; } }catch(e){}
   }
   moBusy=true;
   if(typeof toast==='function') toast('⏳ Loading Master Owned data...');
@@ -4878,6 +4928,7 @@ function moLoadDataset(force){
     return Promise.all(ids.map(function(id){ return db.collection(MO_COL).doc(DS).collection('chunks').doc(id).get(); }))
       .then(function(snaps){
         var rows=[]; snaps.forEach(function(s){ var d=s.data(); if(d&&Array.isArray(d.rows)) rows=rows.concat(d.rows); });
+        window.__pmMoHidden=rows.filter(function(r){ return !r.hiring; });
         moData=assignKeys(prep(rows));
         try{ localStorage.setItem('mo_cache_dataset',JSON.stringify({rows:rows,meta:moMeta})); }catch(e){}
         moBusy=false; moRender();
@@ -5709,6 +5760,7 @@ function moWriteDataset(data){
   }).catch(function(err){
     if(typeof toast==='function') toast(err.code==='resource-exhausted'?'⚠\ufe0f Quota reached':'Import error: '+err.message,'error');
     ptxt.textContent='✕ Failed: '+err.message;
+    throw err;
   });
 }
 function moCleanupLegacy(){
@@ -6052,6 +6104,10 @@ var n=0, iv=setInterval(function(){ n++; if($('fu-btn-upload')||n>40){ clearInte
 'use strict';
 
 var COL='master_rental', LS='mr_cache_v12';
+var MR_META=db.collection('settings').doc('mrMeta');
+function mrBumpVersion(){
+  return MR_META.set({v:firebase.firestore.FieldValue.increment(1),updatedAtMs:Date.now()},{merge:true}).catch(function(){});
+}
 var DATA=[], EXIST={}, AUDIT=null, FILE_IN=null, SMART_FILE_IN=null, SMART_MODE=null, CLEAR_FILE_IN=null;
 var F={cat:null,od:null,month:null,proj:null,q:''};
 
@@ -6216,19 +6272,31 @@ function index(){
   if(window.HAC) window.HAC.apply('rental', DATA, {od:'od', project:'project', category:'category', equipment:'equipment', subcon:'subcon'});
   EXIST={}; DATA.forEach(function(r){ EXIST[r.id]=r; });
 }
-function load(){
-  var cached=null; try{ cached=JSON.parse(localStorage.getItem(LS)||'null'); }catch(e){}
-  if(cached&&cached.length){ DATA=cached; index(); if($('mr-body')) render(); }
-  if(typeof db==='undefined') return Promise.resolve(DATA);
+function mrFullLoad(v){
   return db.collection(COL).get().then(function(snap){
     DATA=snap.docs.map(function(d){ var o=d.data(); o.id=d.id; return o; });
     index();
-    try{ localStorage.setItem(LS,JSON.stringify(DATA)); }catch(e){}
+    try{
+      localStorage.setItem(LS,JSON.stringify(DATA));
+      if(v!=null) localStorage.setItem(LS+'_v',JSON.stringify(v));
+    }catch(e){}
     return DATA;
   }).catch(function(e){
     if(DATA.length){ return DATA; }
     tt('Read error: '+e.message,'error'); return DATA;
   });
+}
+function load(force){
+  var cached=null; try{ cached=JSON.parse(localStorage.getItem(LS)||'null'); }catch(e){}
+  if(cached&&cached.length){ DATA=cached; index(); if($('mr-body')) render(); }
+  if(typeof db==='undefined') return Promise.resolve(DATA);
+  if(force) return mrFullLoad(null);
+  return MR_META.get().then(function(snap){
+    var v = snap.exists ? (snap.data().v||0) : null;
+    var cv=null; try{ cv=JSON.parse(localStorage.getItem(LS+'_v')||'null'); }catch(e){}
+    if(v!=null && cv!=null && v===cv && cached && cached.length) return DATA;
+    return mrFullLoad(v);
+  }).catch(function(){ return mrFullLoad(null); });
 }
 
 function writeBatches(rows,tries,onProgress,done){
@@ -6272,7 +6340,7 @@ function doImport(file){
     if(!toWrite.length){ tt('No changes - '+nSame+' identical rows'); showAudit(); return; }
     tt('Uploading '+fmtInt(toWrite.length)+' rows...');
     writeBatches(toWrite,3,function(done,total){},function(failed){
-      load().then(function(){ render(); });
+      mrBumpVersion().then(function(){ return load(true); }).then(function(){ render(); });
       tt('✓ Uploaded '+fmtInt(toWrite.length)+' active rows successfully');
     });
   });
@@ -6298,7 +6366,7 @@ function doImportMode(file,mode){
     if(!confirm(msg)) return;
     tt('Uploading '+fmtInt(toWrite.length)+' rows...');
     writeBatches(toWrite,3,function(done,total){},function(failed){
-      load().then(function(){ render(); });
+      mrBumpVersion().then(function(){ return load(true); }).then(function(){ render(); });
       tt('✓ '+fmtInt(toWrite.length)+' rows uploaded ('+(mode==='update'?'update-only':'add-only')+')');
     });
   });
@@ -6322,7 +6390,7 @@ function doClearAndImport(file){
       recs.forEach(function(r){ r._h=rowHash(r); });
       tt('⏳ Uploading '+fmtInt(recs.length)+' rows...');
       writeBatches(recs,3,function(done,total){},function(failed){
-        load().then(function(){ render(); });
+        mrBumpVersion().then(function(){ return load(true); }).then(function(){ render(); });
         tt('✓ Replaced with '+fmtInt(recs.length)+' rows'+(failed&&failed.length?' (some batches failed — check console)':''));
       });
     }).catch(function(e){ tt('Delete failed: '+e.message,'error'); });
@@ -6339,7 +6407,7 @@ function doWipe(){
     var chain=Promise.resolve();
     chunks.forEach(function(ch){ chain=chain.then(function(){ var b=db.batch(); ch.forEach(function(d){ b.delete(d.ref); }); return b.commit(); }); });
     return chain;
-  }).then(function(){ try{localStorage.removeItem(LS);}catch(e){} DATA=[];EXIST={};AUDIT=null; render(); tt('Deleted ✓'); })
+  }).then(function(){ try{localStorage.removeItem(LS);localStorage.removeItem(LS+'_v');}catch(e){} DATA=[];EXIST={};AUDIT=null; mrBumpVersion(); render(); tt('Deleted ✓'); })
    .catch(function(e){ tt('Delete failed: '+e.message,'error'); });
 }
 
@@ -6936,7 +7004,7 @@ function mrExportPDF(kind){
   w.document.write(h); w.document.close();
 }
 
-window.MR={ import:doImport, importMode:doImportMode, wipe:doWipe, load:load, render:render, data:function(){return DATA;} };
+window.MR={ import:doImport, importMode:doImportMode, wipe:doWipe, load:load, render:render, data:function(){return DATA;}, bumpVersion:mrBumpVersion };
 
 if(document.readyState!=='loading') initStandaloneRental(); else document.addEventListener('DOMContentLoaded',initStandaloneRental);
 var tries=0, iv=setInterval(function(){ tries++; initStandaloneRental(); if($('nav-masterrental')&&$('page-masterrental')) clearInterval(iv); if(tries>30) clearInterval(iv); },500);
@@ -7398,10 +7466,20 @@ var _ci=0,_civ=setInterval(function(){_ci++;initComparison();if(document.getElem
 'use strict';
 
 /* ===== 1) O.D Map persistence (Firestore: settings/odMap) ===== */
+var PM_REMOVED={};   /* أسماء اتشالت/اتغيّرت — لازم تتحفظ عشان الـ OD_MAP الثابت في الملف مايرجّعهاش تاني */
+function pmReseed(){
+  try{
+    if(!window.HAC||typeof OD_MAP==='undefined') return;
+    var reg=window.HAC.registry();
+    ['project','od'].forEach(function(ns){ var b=reg[ns]; if(!b) return; Object.keys(b).forEach(function(k){ if(b[k].seed){ b[k].seed=null; b[k].dirty=true; } }); });
+    window.HAC.seed('project',Object.keys(OD_MAP));
+    window.HAC.seed('od',Object.keys(OD_MAP).map(function(k){ return OD_MAP[k]; }));
+  }catch(e){}
+}
 function pmSaveOdMap(){
   if(typeof db==='undefined'||typeof OD_MAP==='undefined') return Promise.resolve();
   return db.collection('settings').doc('odMap').set({
-    map: OD_MAP, updatedAtMs: Date.now(),
+    map: OD_MAP, removed: Object.keys(PM_REMOVED).filter(function(k){ return !OD_MAP.hasOwnProperty(k); }), updatedAtMs: Date.now(),
     updatedBy:(typeof currentUser!=='undefined'&&currentUser)?currentUser.email:''
   });
 }
@@ -7409,8 +7487,10 @@ function pmLoadOdMap(){
   if(typeof db==='undefined') return;
   db.collection('settings').doc('odMap').get().then(function(snap){
     if(snap.exists){
-      var d=(snap.data()||{}).map||{};
+      var doc=snap.data()||{}, d=doc.map||{};
+      (doc.removed||[]).forEach(function(k){ PM_REMOVED[k]=1; if(!d.hasOwnProperty(k) && typeof OD_MAP!=='undefined') delete OD_MAP[k]; });
       Object.keys(d).forEach(function(k){ if(typeof OD_MAP!=='undefined') OD_MAP[k]=d[k]; });
+      pmReseed();
     } else {
       pmSaveOdMap();
     }
@@ -7421,29 +7501,56 @@ function pmLoadOdMap(){
 function pmIsAdmin(){ try{ return (typeof isAdmin!=='undefined')&&!!isAdmin; }catch(e){ return false; } }
 function pmEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function pmChunksArr(arr,n){ var out=[]; for(var i=0;i<arr.length;i+=n) out.push(arr.slice(i,i+n)); return out; }
+/* الاسم اللي بيظهر في الشاشة هو الاسم "الموحّد" (HAC)، مش الاسم المتخزّن في Firestore.
+   هنا بنجيب كل الكتابات الأصلية اللي ليها نفس المفتاح عشان الـ where() تلاقيها فعلاً. */
+function pmRawNames(col,field,value){
+  var out={}; out[value]=1;
+  try{
+    var rows=null;
+    if(col==='master_rental'&&window.MR&&window.MR.data) rows=window.MR.data();
+    else if(col==='equipment'&&typeof allEquipment!=='undefined') rows=allEquipment;
+    if(rows&&window.HAC){
+      var k=window.HAC.key(field,value);
+      rows.forEach(function(r){
+        var raw=(r.__hac&&r.__hac[field]!==undefined)?r.__hac[field]:r[field];
+        if(raw!=null&&raw!==''&&window.HAC.key(field,raw)===k) out[raw]=1;
+      });
+    }
+  }catch(e){}
+  return Object.keys(out);
+}
 function pmBatchUpdateWhere(col,field,value,patch){
   if(typeof db==='undefined') return Promise.resolve(0);
-  return db.collection(col).where(field,'==',value).get().then(function(snap){
-    var docs=snap.docs; if(!docs.length) return 0;
-    var groups=pmChunksArr(docs,400), chain=Promise.resolve();
-    groups.forEach(function(g){
-      chain=chain.then(function(){ var b=db.batch(); g.forEach(function(d){ b.update(d.ref,patch); }); return b.commit(); });
+  var names=pmRawNames(col,field,value), total=0, chain=Promise.resolve();
+  names.forEach(function(nm){
+    if(patch&&patch[field]===nm) return;
+    chain=chain.then(function(){
+      return db.collection(col).where(field,'==',nm).get().then(function(snap){
+        var docs=snap.docs; if(!docs.length) return;
+        var c=Promise.resolve();
+        pmChunksArr(docs,400).forEach(function(g){ c=c.then(function(){ var b=db.batch(); g.forEach(function(d){ b.update(d.ref,patch); }); return b.commit(); }); });
+        return c.then(function(){ total+=docs.length; });
+      });
     });
-    return chain.then(function(){ return docs.length; });
   });
+  return chain.then(function(){ return total; });
 }
 
 /* ===== 2b) Batch delete ===== */
 function pmBatchDeleteWhere(col,field,value){
   if(typeof db==='undefined') return Promise.resolve(0);
-  return db.collection(col).where(field,'==',value).get().then(function(snap){
-    var docs=snap.docs; if(!docs.length) return 0;
-    var groups=pmChunksArr(docs,400), chain=Promise.resolve();
-    groups.forEach(function(g){
-      chain=chain.then(function(){ var b=db.batch(); g.forEach(function(d){ b.delete(d.ref); }); return b.commit(); });
+  var names=pmRawNames(col,field,value), total=0, chain=Promise.resolve();
+  names.forEach(function(nm){
+    chain=chain.then(function(){
+      return db.collection(col).where(field,'==',nm).get().then(function(snap){
+        var docs=snap.docs; if(!docs.length) return;
+        var c=Promise.resolve();
+        pmChunksArr(docs,400).forEach(function(g){ c=c.then(function(){ var b=db.batch(); g.forEach(function(d){ b.delete(d.ref); }); return b.commit(); }); });
+        return c.then(function(){ total+=docs.length; });
+      });
     });
-    return chain.then(function(){ return docs.length; });
   });
+  return chain.then(function(){ return total; });
 }
 
 /* ===== 3) Projects from every source, grouped by NORMALISED spelling =====
@@ -7688,10 +7795,11 @@ function pmConfirmApply(){
 function pmRun(job,okMsg){
   PM.busy=true; pmRender();
   job.then(function(rep){
+    pmReseed();
     PM.busy=false; PM.act=null;
     PM.msg=okMsg+(rep&&rep.length?' — '+rep.join(' · '):'');
     if(typeof toast==='function') toast(PM.msg,'success');
-    if(window.MR&&typeof window.MR.load==='function') window.MR.load().then(function(){ if(typeof window.MR.render==='function') window.MR.render(); });
+    if(window.MR&&typeof window.MR.load==='function') window.MR.load(true).then(function(){ if(typeof window.MR.render==='function') window.MR.render(); }); if(window.MR&&typeof window.MR.bumpVersion==='function') window.MR.bumpVersion();
     if(typeof loadData==='function') loadData();
     pmRender();
     setTimeout(function(){ if(document.getElementById('pm-ov')&&document.getElementById('pm-ov').classList.contains('on')&&!PM.act) pmRefreshGroups(); },1800);
@@ -7701,42 +7809,51 @@ function pmRun(job,okMsg){
 }
 
 /* ===== 5) Apply ===== */
+function pmOwnedHidden(){ return window.__pmMoHidden||[]; }   /* صفوف Master Owned اللي مالهاش Hiring date — مش بتظهر بس لازم متتمسحش */
+function pmVarMap(A){ var m={}; pmSelVariants(A).forEach(function(v){ m[v.name]=v; }); return m; }
+function pmChk(rep,label,k,exp){
+  if(k) rep.push(label+' ('+k+')');
+  if(exp && k<exp) rep.push('\u26a0 '+label+': \u0627\u062a\u063a\u064a\u0651\u0631 '+k+' \u0645\u0646 '+exp);
+}
 function pmApplyRename(A,newName){
   var names=pmSelVariants(A).map(function(v){return v.name;}).filter(function(n){return n!==newName;});
-  var pl=A.pl, jobs=[], rep=[];
+  var vm=pmVarMap(A), pl=A.pl, jobs=[], rep=[];
   if(pl.map){ try{ if(typeof OD_MAP!=='undefined'){ var ch=false;
-    names.forEach(function(n){ if(OD_MAP.hasOwnProperty(n)){ if(!OD_MAP[newName]) OD_MAP[newName]=OD_MAP[n]; delete OD_MAP[n]; ch=true; } });
+    names.forEach(function(n){ if(OD_MAP.hasOwnProperty(n)){ if(!OD_MAP[newName]) OD_MAP[newName]=OD_MAP[n]; delete OD_MAP[n]; PM_REMOVED[n]=1; ch=true; } });
+    delete PM_REMOVED[newName];
     if(ch){ jobs.push(pmSaveOdMap()); rep.push('O.D Map'); } } }catch(e){} }
   if(pl.mo && typeof moData!=='undefined'){
     var c=0; moData.forEach(function(r){ if(names.indexOf(r.project)!==-1){ r.project=newName; c++; } });
-    if(c){ rep.push('Master Owned ('+c+')'); jobs.push(Promise.resolve(moWriteDataset(moData))); }
+    if(c){ rep.push('Master Owned ('+c+')'); jobs.push(Promise.resolve(moWriteDataset(moData.concat(pmOwnedHidden())))); }
   }
-  if(pl.mr) names.forEach(function(n){ jobs.push(pmBatchUpdateWhere('master_rental','project',n,{project:newName}).then(function(k){ if(k) rep.push('Master Rental ('+k+')'); })); });
-  if(pl.eq) names.forEach(function(n){ jobs.push(pmBatchUpdateWhere('equipment','project',n,{project:newName}).then(function(k){ if(k) rep.push('Fleet ('+k+')'); })); });
+  if(pl.mr) names.forEach(function(n){ jobs.push(pmBatchUpdateWhere('master_rental','project',n,{project:newName}).then(function(k){ pmChk(rep,'Master Rental',k,vm[n]&&vm[n].mr); })); });
+  if(pl.eq) names.forEach(function(n){ jobs.push(pmBatchUpdateWhere('equipment','project',n,{project:newName}).then(function(k){ pmChk(rep,'Fleet',k,vm[n]&&vm[n].eq); })); });
   return Promise.all(jobs).then(function(){ return rep; });
 }
 function pmApplyMove(A,newOd){
   var names=pmSelVariants(A).map(function(v){return v.name;});
-  var pl=A.pl, jobs=[], rep=[];
-  if(pl.map){ try{ if(typeof OD_MAP!=='undefined'){ names.forEach(function(n){ OD_MAP[n]=newOd; }); jobs.push(pmSaveOdMap()); rep.push('O.D Map'); } }catch(e){} }
+  var vm=pmVarMap(A), pl=A.pl, jobs=[], rep=[];
+  if(pl.map){ try{ if(typeof OD_MAP!=='undefined'){ names.forEach(function(n){ OD_MAP[n]=newOd; delete PM_REMOVED[n]; }); jobs.push(pmSaveOdMap()); rep.push('O.D Map'); } }catch(e){} }
   if(pl.mo && typeof moData!=='undefined'){
     var c=0; moData.forEach(function(r){ if(names.indexOf(r.project)!==-1){ r.od=newOd; c++; } });
-    if(c){ rep.push('Master Owned ('+c+')'); jobs.push(Promise.resolve(moWriteDataset(moData))); }
+    if(c){ rep.push('Master Owned ('+c+')'); jobs.push(Promise.resolve(moWriteDataset(moData.concat(pmOwnedHidden())))); }
   }
-  if(pl.mr) names.forEach(function(n){ jobs.push(pmBatchUpdateWhere('master_rental','project',n,{od:newOd}).then(function(k){ if(k) rep.push('Master Rental ('+k+')'); })); });
-  if(pl.eq) names.forEach(function(n){ jobs.push(pmBatchUpdateWhere('equipment','project',n,{od:newOd}).then(function(k){ if(k) rep.push('Fleet ('+k+')'); })); });
+  if(pl.mr) names.forEach(function(n){ jobs.push(pmBatchUpdateWhere('master_rental','project',n,{od:newOd}).then(function(k){ pmChk(rep,'Master Rental',k,vm[n]&&vm[n].mr); })); });
+  if(pl.eq) names.forEach(function(n){ jobs.push(pmBatchUpdateWhere('equipment','project',n,{od:newOd}).then(function(k){ pmChk(rep,'Fleet',k,vm[n]&&vm[n].eq); })); });
   return Promise.all(jobs).then(function(){ return rep; });
 }
 function pmApplyRemove(A){
   var names=pmSelVariants(A).map(function(v){return v.name;});
-  var pl=A.pl, jobs=[], rep=[];
-  if(pl.map){ try{ if(typeof OD_MAP!=='undefined'){ var ch=false; names.forEach(function(n){ if(OD_MAP.hasOwnProperty(n)){ delete OD_MAP[n]; ch=true; } }); if(ch){ jobs.push(pmSaveOdMap()); rep.push('O.D Map'); } } }catch(e){} }
+  var vm=pmVarMap(A), pl=A.pl, jobs=[], rep=[];
+  if(pl.map){ try{ if(typeof OD_MAP!=='undefined'){ var ch=false; names.forEach(function(n){ if(OD_MAP.hasOwnProperty(n)){ delete OD_MAP[n]; PM_REMOVED[n]=1; ch=true; } }); if(ch){ jobs.push(pmSaveOdMap()); rep.push('O.D Map'); } } }catch(e){} }
   if(pl.mo && typeof moData!=='undefined'){
     var keep=moData.filter(function(r){ return names.indexOf(r.project)===-1; }), removed=moData.length-keep.length;
-    if(removed){ rep.push('Master Owned ('+removed+')'); jobs.push(Promise.resolve(moWriteDataset(keep))); }
+    var nk=names.map(function(n){ return window.HAC?window.HAC.key('project',n):n; });
+    var hid=pmOwnedHidden().filter(function(r){ return nk.indexOf(window.HAC?window.HAC.key('project',r.project):r.project)===-1; });
+    if(removed){ rep.push('Master Owned ('+removed+')'); jobs.push(Promise.resolve(moWriteDataset(keep.concat(hid)))); }
   }
-  if(pl.mr) names.forEach(function(n){ jobs.push(pmBatchDeleteWhere('master_rental','project',n).then(function(k){ if(k) rep.push('Master Rental ('+k+')'); })); });
-  if(pl.eq) names.forEach(function(n){ jobs.push(pmBatchDeleteWhere('equipment','project',n).then(function(k){ if(k) rep.push('Fleet ('+k+')'); })); });
+  if(pl.mr) names.forEach(function(n){ jobs.push(pmBatchDeleteWhere('master_rental','project',n).then(function(k){ pmChk(rep,'Master Rental',k,vm[n]&&vm[n].mr); })); });
+  if(pl.eq) names.forEach(function(n){ jobs.push(pmBatchDeleteWhere('equipment','project',n).then(function(k){ pmChk(rep,'Fleet',k,vm[n]&&vm[n].eq); })); });
   return Promise.all(jobs).then(function(){ return rep; });
 }
 window.pmOpen=pmOpen;
@@ -7967,11 +8084,18 @@ function parseWorkbook(wb){
 /* ───────────── 2) FIRESTORE ───────────── */
 function ref(){ return db.collection(COL).doc(DSID); }
 
+var RD_LS='rd_cache_v1';
 var loadP=null;
 function load(force){
   if(loaded&&!force) return Promise.resolve();
   if(loadP) return loadP;
-  showMsg('<b>Loading rental database…</b>');
+  if(!force){
+    try{
+      var c=JSON.parse(localStorage.getItem(RD_LS)||'null');
+      if(c&&c.rows&&c.rows.length){ rows=c.rows; meta=c.meta||null; decorate(); loaded=true; start(); }
+    }catch(e){}
+  }
+  if(!loaded) showMsg('<b>Loading rental database…</b>');
   loadP=ref().get().then(function(m){
     if(!m.exists){ rows=[]; meta=null; return; }
     meta=m.data();
@@ -7979,7 +8103,10 @@ function load(force){
     return Promise.all(ids.map(function(id){ return ref().collection('chunks').doc(id).get(); })).then(function(snaps){
       rows=[]; snaps.forEach(function(s){ if(s.exists) rows=rows.concat(s.data().rows||[]); });
     });
-  }).then(function(){ if(rows&&rows.length) decorate(); loaded=true; })
+  }).then(function(){
+    if(rows&&rows.length){ decorate(); try{ localStorage.setItem(RD_LS,JSON.stringify({rows:rows,meta:meta})); }catch(e){} }
+    loaded=true;
+  })
   .catch(function(err){
     var denied=err&&err.code==='permission-denied';
     showMsg(denied
@@ -7987,7 +8114,7 @@ function load(force){
       : 'Could not load the rental database: '+E(err&&err.message||err), true);
     if(err&&err.code==='resource-exhausted') say('⚠️ Quota reached','error');
     rows=null;
-  }).then(function(){ loadP=null; });
+  }).then(function(){ loadP=null; if(document.getElementById('rd-main')&&document.getElementById('rd-main').style.display==='block') start(); });
   return loadP;
 }
 
@@ -8037,6 +8164,7 @@ function importFile(input){
     if(!confirm(msg)){ input.value=''; return; }
     writeAll(list,file.name).then(function(){
       rows=list; loaded=true; F=freshF(); limit=PAGE; $('rd-q').value='';
+      try{ localStorage.setItem(RD_LS,JSON.stringify({rows:rows,meta:meta})); }catch(e){}
       $('rd-status').textContent='✓ '+fmt(list.length)+' records uploaded';
       say('✓ Rental database updated ('+fmt(list.length)+' records)','success');
       setTimeout(function(){ $('rd-status').textContent=''; },3000);
