@@ -7941,7 +7941,7 @@ var pmN=0, pmIv=setInterval(function(){ pmN++; pmInjectNav(); if(document.getEle
 var COL='rental_database', DSID='_dataset', CHUNK=150, PAGE=150;
 var CCY='EGP', HIGH_DAILY=40000;          /* daily rates at/above this are flagged "verify basis" */
 var rows=[], meta=null, loaded=false;
-var F={plant:null,cat:null,rate:null,fuel:null,trans:null,sb:null,month:null,vendor:null,project:null,item:null,check:null,q:''};
+var F={plant:null,cat:null,rate:null,fuel:null,trans:null,sb:null,month:null,vendor:null,project:null,item:null,model:null,check:null,q:''};
 var sortKey='date', sortDir=-1, limit=PAGE, allTypes=false, metric='n';
 var MN={n:'records',d:'sum of daily rates ('+CCY+'/day)',m:'sum of monthly rates ('+CCY+'/month)'};
 var FUELL={HA:'HA · fuel on HAC',Owner:'Owner · fuel on contractor'};
@@ -7967,6 +7967,24 @@ var ZW=/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF\u00AD\u0640]/g;
 function clean(v){ if(v==null) return ''; return String(v).replace(ZW,'').replace(/\u00A0/g,' ').replace(/\s+/g,' ').trim(); }
 function keyOf(s){ return clean(s).toLowerCase().replace(/&/g,'and').replace(/[^\p{L}\p{N}]+/gu,''); }
 function plantKey(s){ return keyOf(s).replace(/cost$/,'coast'); }
+/* crane/capacity models like "LTM 1050-1 / 50 Ton" — the "-1" / "/1/" is a certificate or serial
+   suffix, not a different machine. Key = brand + series letters + model number + capacity (the
+   number right before TON/طن), ignoring any other numeric token in between. Anything without a
+   recognisable "<number> TON/طن" falls back to the plain keyOf grouping used for other models. */
+function modelKey(s){
+  var toks=clean(s).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  if(!toks.length) return keyOf(s);
+  var tonIdx=-1;
+  for(var i=0;i<toks.length;i++){ var tl=toks[i].toLowerCase(); if(tl==='ton'||tl==='tons'||toks[i]==='طن'){ tonIdx=i; break; } }
+  if(tonIdx<1) return keyOf(s);
+  var capacity=toks[tonIdx-1];
+  if(!/^\d+$/.test(capacity)) return keyOf(s);
+  var modelIdx=-1;
+  for(var j=0;j<tonIdx-1;j++){ if(/^\d/.test(toks[j])){ modelIdx=j; break; } }
+  if(modelIdx<0) return keyOf(s);
+  var brand=toks.slice(0,modelIdx).join('').toLowerCase();
+  return brand+toks[modelIdx].toLowerCase()+capacity+'ton';
+}
 
 /* one label per spelling-group: the most frequent spelling wins (or the master spelling if given) */
 function canonMap(values,keyFn,master){
@@ -8051,11 +8069,13 @@ function parseMaster(matrix,headerAt,catPairs){
   var mProj =canonMap(out.map(function(r){return r.project;}),keyOf);
   var mVend =canonMap(out.map(function(r){return r.vendor;}),keyOf);
   var mItem =canonMap(out.map(function(r){return r.item;}),keyOf,itemMaster);
+  var mModel=canonMap(out.map(function(r){return r.model;}),modelKey);
   var mCat  =canonMap(out.map(function(r){return r.cat;}).concat(catPairs.map(function(p){return clean(p[0]);})),keyOf);
   out.forEach(function(r){
     if(r.plant)   r.plant  =mPlant[plantKey(r.plant)]||r.plant;
     if(r.project) r.project=mProj[keyOf(r.project)]||r.project;
     if(r.vendor)  r.vendor =mVend[keyOf(r.vendor)]||r.vendor;
+    if(r.model)   r.model  =mModel[modelKey(r.model)]||r.model;
     var ik=keyOf(r.item);
     r.item=mItem[ik]||r.item;
     if(!r.cat&&catOfItem[ik]) r.cat=catOfItem[ik];
@@ -8199,8 +8219,8 @@ function decorate(){
     r._h=(r.item+' '+r.model+' '+r.vendor+' '+r.project+' '+r.contact+' '+r.plant+' '+r.note+' '+r.contract).toLowerCase();
   });
 }
-var FIELD={plant:'plant',cat:'catL',rate:'rateL',fuel:'fuelL',trans:'transL',sb:'sbL',month:'month',vendor:'vendor',project:'project',item:'item'};
-function freshF(){ return {plant:null,cat:null,rate:null,fuel:null,trans:null,sb:null,month:null,vendor:null,project:null,item:null,check:null,q:''}; }
+var FIELD={plant:'plant',cat:'catL',rate:'rateL',fuel:'fuelL',trans:'transL',sb:'sbL',month:'month',vendor:'vendor',project:'project',item:'item',model:'model'};
+function freshF(){ return {plant:null,cat:null,rate:null,fuel:null,trans:null,sb:null,month:null,vendor:null,project:null,item:null,model:null,check:null,q:''}; }
 function pass(r,skip){
   for(var k in FIELD){ if(k!==skip&&F[k]!==null&&r[FIELD[k]]!==F[k]) return false; }
   if(skip!=='check'&&F.check){ if(F.check==='any'){ if(!r.flags.length) return false; } else if(r.flags.indexOf(F.check)<0) return false; }
@@ -8248,7 +8268,7 @@ function syncSelects(){
 function syncSeg(){ document.querySelectorAll('#rd-seg [data-rd="metric"]').forEach(function(b){ b.classList.toggle('on',b.getAttribute('data-v')===metric); }); }
 function render(){ renderChips(); renderCards(); renderPanels(); renderTable(); syncSelects(); syncSeg(); }
 
-var CHIP={plant:'Plant',cat:'Category',rate:'Rate',fuel:'Fuel',trans:'Transport',sb:'S.B',month:'Month',vendor:'Vendor',project:'Project',item:'Equipment',check:'Check'};
+var CHIP={plant:'Plant',cat:'Category',rate:'Rate',fuel:'Fuel',trans:'Transport',sb:'S.B',month:'Month',vendor:'Vendor',project:'Project',item:'Equipment',model:'Capacity',check:'Check'};
 var CHECK={any:'Needs review',nocat:'No category',high:'Daily ≥ '+fmt(HIGH_DAILY),unspec:'Fuel/transport unspecified',dup:'Identical rows'};
 function renderChips(){
   var bar=$('rd-filterbar'), h='', any=false;
@@ -8353,8 +8373,19 @@ function renderPanels(){
     +(types.length>12?'<button class="rd-link" data-rd="alltypes">'+(allTypes?'Show top 12 only':'Show all '+fmt(types.length)+' types')+'</button>':'');
   h+=panel('Daily rate by equipment type','Min / median / max of daily-basis rows only ('+CCY+') · capacity varies inside a type, so use the table below for like-for-like',tb,true);
 
-  /* latest price per plant for the selected equipment type */
-  if(F.item){
+  /* drill-down: pick a capacity for the selected equipment type, then see its price per plant */
+  if(F.item&&!F.model){
+    var LM=list(), gm={};
+    LM.forEach(function(r){ var key=r.model||'—'; var o=gm[key]||(gm[key]={n:0,d:[]}); o.n++; if(r.rate==='daily'&&r.cost!=null) o.d.push(r.cost); });
+    var caps=Object.keys(gm).map(function(k){ var d=gm[k].d.sort(function(a,b){return a-b;}); return {v:k,n:gm[k].n,min:d.length?d[0]:null,med:pctl(d,.5),max:d.length?d[d.length-1]:null}; })
+      .sort(function(a,b){ return b.n-a.n||a.v.localeCompare(b.v); });
+    var ctb='<div class="table-wrap" style="border:none;background:transparent;"><table class="rd-bt"><thead><tr><th>Model / Capacity</th><th class="n">Records</th><th class="n">Min</th><th class="n">Median</th><th class="n">Max</th></tr></thead><tbody>'
+      +caps.map(function(c){
+        return '<tr class="rd-btr" data-rd="model" data-v="'+enc(c.v)+'"><td>'+E(c.v)+'</td><td class="n">'+fmt(c.n)+'</td><td class="n">'+fmt(c.min)+'</td><td class="n">'+fmt(c.med)+'</td><td class="n">'+fmt(c.max)+'</td></tr>';
+      }).join('')+'</tbody></table></div>';
+    h+=panel('Capacities — '+E(F.item),'Pick a model/capacity to see its latest price in every plant it appears in',ctb,true);
+  }
+  if(F.item&&F.model){
     var byPlant={};
     list().forEach(function(r){
       var key=r.plant||'—';
@@ -8362,14 +8393,15 @@ function renderPanels(){
     });
     var plantRows=Object.keys(byPlant).map(function(k){return byPlant[k];})
       .sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
-    var ptb=!plantRows.length?'<div class="rd-psub" style="margin:8px 6px;">No rows match the other filters.</div>'
+    var ptb=(!plantRows.length?'<div class="rd-psub" style="margin:8px 6px;">No rows match the other filters.</div>'
       :'<div class="table-wrap" style="border:none;background:transparent;"><table class="rd-bt"><thead><tr><th>Plant</th><th class="n">Latest date</th><th>Rate</th><th class="n">Latest price ('+CCY+')</th><th>Vendor</th><th>Contract</th></tr></thead><tbody>'
       +plantRows.map(function(r){
         return '<tr class="rd-btr'+(F.plant===r.plant?' on':'')+'" data-rd="plant" data-v="'+enc(r.plant||'')+'"><td>'+E(r.plant||'—')+'</td>'
           +'<td class="n code-cell">'+dateLabel(r.date)+'</td><td>'+E(r.rateL)+'</td>'
           +'<td class="n code-cell">'+fmt(r.cost,2)+'</td><td>'+E(r.vendor||'—')+'</td><td class="code-cell">'+E(r.contract||'—')+'</td></tr>';
-      }).join('')+'</tbody></table></div>';
-    h+=panel('Latest price by plant — '+E(F.item),'Most recent rate for this equipment type in each plant it appears in · click a plant to filter the table below',ptb,true);
+      }).join('')+'</tbody></table></div>')
+      +'<button class="rd-link" data-rd="clear" data-v="model">← Back to capacities</button>';
+    h+=panel('Latest price by plant — '+E(F.item)+' · '+E(F.model),'Most recent rate for this exact capacity in each plant it appears in · click a plant to filter the table below',ptb,true);
   }
 
   $('rd-panels').innerHTML=h;
@@ -8607,7 +8639,7 @@ document.addEventListener('click',function(e){
   else if(k==='more'){ limit+=PAGE; renderTable(); return; }
   else if(k==='metric'){ metric=v; syncSeg(); renderPanels(); return; }
   else if(k==='alltypes'){ allTypes=!allTypes; renderPanels(); return; }
-  else if(FIELD[k]||k==='check'){ F[k]=(F[k]===v)?null:v; }
+  else if(FIELD[k]||k==='check'){ F[k]=(F[k]===v)?null:v; if(k==='item') F.model=null; }
   else return;
   limit=PAGE; render();
 });
