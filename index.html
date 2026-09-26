@@ -930,7 +930,7 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
           <select id="fu-proj-filter" onchange="renderFollowUpTable()" style="min-width:220px;">
             <option value="">All Projects</option>
           </select>
-          <select id="fu-month-filter" onchange="renderFollowUpTable()" style="min-width:160px;">
+          <select id="fu-month-filter" onchange="renderFollowUpTable()" style="min-width:160px;" title="Filter by Submission Month">
             <option value="">All Months</option>
           </select>
           <button class="btn-sm" id="fu-clear-filters-btn" style="display:none;color:var(--accent);border-color:rgba(240,165,0,.4);" onclick="clearFuFilters()">Clear Filters ✕</button>
@@ -2837,7 +2837,7 @@ function submitWsRequest(e) {
 
 // ─── 5. FOLLOW-UP SYSTEM LOGIC ───
 let FU_DATA = [];
-let fuFilters = { prov: null };
+let fuFilters = { prov: [] };
 let fuStatusHistory = [];
 
 function initFollowUpDefault() {
@@ -2859,7 +2859,7 @@ function setupFollowUpUI() {
   projSel.innerHTML = '<option value="">All Projects</option>' + projs.map(function(p){ return '<option value="'+p+'">'+p+'</option>'; }).join('');
   if(projs.includes(currentProj)) projSel.value = currentProj;
 
-  const months = Array.from(new Set(FU_DATA.map(function(r){ return fuMonthKey(r.date_from); }).filter(Boolean))).sort();
+  const months = Array.from(new Set(FU_DATA.map(function(r){ return fuMonthKey(r.submission_date); }).filter(Boolean))).sort();
   const monthSel = document.getElementById('fu-month-filter');
   const currentMonth = monthSel.value;
   monthSel.innerHTML = '<option value="">All Months</option>' + months.map(function(m){ return '<option value="'+m+'">'+fuMonthLabel(m)+'</option>'; }).join('');
@@ -2870,8 +2870,19 @@ function setupFollowUpUI() {
 
 function fuMonthKey(dateStr) {
   if(!dateStr || dateStr === '—') return '';
-  const m = String(dateStr).match(/^(\d{4})-(\d{2})/);
-  return m ? (m[1] + '-' + m[2]) : '';
+  const s = String(dateStr).trim();
+  let m = s.match(/^(\d{4})-(\d{2})/);
+  if(m) return m[1] + '-' + m[2];
+  const num = Number(s);
+  if(!isNaN(num) && num > 30000 && num < 70000) {
+    const d = new Date(Math.round((num - 25569) * 86400 * 1000));
+    return d.getUTCFullYear() + '-' + String(d.getUTCMonth()+1).padStart(2,'0');
+  }
+  m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if(m) return m[3] + '-' + String(m[2]).padStart(2,'0');
+  const d2 = new Date(s);
+  if(!isNaN(d2.getTime())) return d2.getFullYear() + '-' + String(d2.getMonth()+1).padStart(2,'0');
+  return '';
 }
 
 function fuMonthLabel(key) {
@@ -2889,30 +2900,32 @@ function getScopedFuData() {
   return FU_DATA.filter(function(r){
     if(proj && (r.project||'').trim() !== proj) return false;
     if(eq && (r.equipment||'').trim() !== eq) return false;
-    if(month && fuMonthKey(r.date_from) !== month) return false;
+    if(month && fuMonthKey(r.submission_date) !== month) return false;
     return true;
   });
 }
 
 function getFilteredFuData() {
   const scoped = getScopedFuData();
-  if(!fuFilters.prov) return scoped;
+  if(!fuFilters.prov.length) return scoped;
   return scoped.filter(function(r){
-    return r.provision === fuFilters.prov;
+    return fuFilters.prov.indexOf(r.provision) !== -1;
   });
 }
 
 function setFuCardProv(prov) {
-  if(fuFilters.prov === prov) {
-    fuFilters.prov = null;
+  if(prov === null) {
+    fuFilters.prov = [];
   } else {
-    fuFilters.prov = prov;
+    const idx = fuFilters.prov.indexOf(prov);
+    if(idx !== -1) fuFilters.prov.splice(idx, 1);
+    else fuFilters.prov.push(prov);
   }
   renderFollowUpTable();
 }
 
 function clearFuFilters() {
-  fuFilters.prov = null;
+  fuFilters.prov = [];
   document.getElementById('fu-equip-filter').value = '';
   document.getElementById('fu-proj-filter').value = '';
   const monthSel = document.getElementById('fu-month-filter');
@@ -3066,18 +3079,22 @@ function renderFollowUpTable() {
     const el = document.getElementById(cid);
     if(el) el.classList.remove('active');
   });
-  if(!fuFilters.prov) {
+  if(!fuFilters.prov.length) {
     const allEl = document.getElementById('fu-card-all');
     if(allEl) allEl.classList.add('active');
-  } else if(cardMap[fuFilters.prov]) {
-    const actEl = document.getElementById(cardMap[fuFilters.prov]);
-    if(actEl) actEl.classList.add('active');
+  } else {
+    fuFilters.prov.forEach(function(p){
+      if(cardMap[p]) {
+        const actEl = document.getElementById(cardMap[p]);
+        if(actEl) actEl.classList.add('active');
+      }
+    });
   }
 
   const eqVal = document.getElementById('fu-equip-filter').value;
   const projVal = document.getElementById('fu-proj-filter').value;
   const monthVal = document.getElementById('fu-month-filter') ? document.getElementById('fu-month-filter').value : '';
-  const hasFilter = fuFilters.prov || eqVal || projVal || monthVal;
+  const hasFilter = fuFilters.prov.length || eqVal || projVal || monthVal;
   const clrBtn = document.getElementById('fu-clear-filters-btn');
   if(clrBtn) clrBtn.style.display = hasFilter ? 'inline-flex' : 'none';
 
@@ -3835,7 +3852,7 @@ function goWsCard(kind){
 function goFu(prov){
   var eqSel = document.getElementById('fu-equip-filter'); if(eqSel) eqSel.value = '';
   var prSel = document.getElementById('fu-proj-filter'); if(prSel) prSel.value = '';
-  fuFilters.prov = prov;
+  fuFilters.prov = prov ? [prov] : [];
   renderFollowUpTable();
   goPage('followup');
 }
