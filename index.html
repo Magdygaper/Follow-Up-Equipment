@@ -930,6 +930,9 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
           <select id="fu-proj-filter" onchange="renderFollowUpTable()" style="min-width:220px;">
             <option value="">All Projects</option>
           </select>
+          <select id="fu-month-filter" onchange="renderFollowUpTable()" style="min-width:160px;">
+            <option value="">All Months</option>
+          </select>
           <button class="btn-sm" id="fu-clear-filters-btn" style="display:none;color:var(--accent);border-color:rgba(240,165,0,.4);" onclick="clearFuFilters()">Clear Filters ✕</button>
         </div>
 
@@ -2856,15 +2859,37 @@ function setupFollowUpUI() {
   projSel.innerHTML = '<option value="">All Projects</option>' + projs.map(function(p){ return '<option value="'+p+'">'+p+'</option>'; }).join('');
   if(projs.includes(currentProj)) projSel.value = currentProj;
 
+  const months = Array.from(new Set(FU_DATA.map(function(r){ return fuMonthKey(r.date_from); }).filter(Boolean))).sort();
+  const monthSel = document.getElementById('fu-month-filter');
+  const currentMonth = monthSel.value;
+  monthSel.innerHTML = '<option value="">All Months</option>' + months.map(function(m){ return '<option value="'+m+'">'+fuMonthLabel(m)+'</option>'; }).join('');
+  if(months.includes(currentMonth)) monthSel.value = currentMonth;
+
   renderFollowUpTable();
+}
+
+function fuMonthKey(dateStr) {
+  if(!dateStr || dateStr === '—') return '';
+  const m = String(dateStr).match(/^(\d{4})-(\d{2})/);
+  return m ? (m[1] + '-' + m[2]) : '';
+}
+
+function fuMonthLabel(key) {
+  const parts = key.split('-');
+  const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const idx = parseInt(parts[1], 10) - 1;
+  return (names[idx] || parts[1]) + ' ' + parts[0];
 }
 
 function getScopedFuData() {
   const eq = document.getElementById('fu-equip-filter').value;
   const proj = document.getElementById('fu-proj-filter').value;
+  const monthSel = document.getElementById('fu-month-filter');
+  const month = monthSel ? monthSel.value : '';
   return FU_DATA.filter(function(r){
     if(proj && (r.project||'').trim() !== proj) return false;
     if(eq && (r.equipment||'').trim() !== eq) return false;
+    if(month && fuMonthKey(r.date_from) !== month) return false;
     return true;
   });
 }
@@ -2890,6 +2915,8 @@ function clearFuFilters() {
   fuFilters.prov = null;
   document.getElementById('fu-equip-filter').value = '';
   document.getElementById('fu-proj-filter').value = '';
+  const monthSel = document.getElementById('fu-month-filter');
+  if(monthSel) monthSel.value = '';
   renderFollowUpTable();
 }
 
@@ -3049,7 +3076,8 @@ function renderFollowUpTable() {
 
   const eqVal = document.getElementById('fu-equip-filter').value;
   const projVal = document.getElementById('fu-proj-filter').value;
-  const hasFilter = fuFilters.prov || eqVal || projVal;
+  const monthVal = document.getElementById('fu-month-filter') ? document.getElementById('fu-month-filter').value : '';
+  const hasFilter = fuFilters.prov || eqVal || projVal || monthVal;
   const clrBtn = document.getElementById('fu-clear-filters-btn');
   if(clrBtn) clrBtn.style.display = hasFilter ? 'inline-flex' : 'none';
 
