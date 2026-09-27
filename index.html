@@ -365,6 +365,7 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
 .rd-warn{color:var(--accent);font-weight:600;}
 .rd-muted{color:var(--text-dim);}
 @media (max-width:860px){
+  .fu-ded-grid{grid-template-columns:1fr !important;}
   .rd-cards{grid-template-columns:repeat(2,1fr);gap:8px;}
   .rd-cards .dash-card-val{font-size:20px;}
   .rd-months{height:150px;}
@@ -896,7 +897,7 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
           </div>
         </div>
 
-        <div class="cards-grid" style="grid-template-columns:repeat(6,1fr);margin-bottom:16px;">
+        <div class="cards-grid" style="grid-template-columns:repeat(7,1fr);margin-bottom:16px;">
           <div class="dash-card active" id="fu-card-all" onclick="setFuCardProv(null)">
             <div class="dash-card-label">All Requests</div>
             <div class="dash-card-val" id="fu-kpi-total">0</div>
@@ -920,6 +921,48 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
           <div class="dash-card" id="fu-card-cancel" onclick="setFuCardProv('Cancel')">
             <div class="dash-card-label">Cancel</div>
             <div class="dash-card-val" id="fu-kpi-cancel" style="color:var(--cancel)">0</div>
+          </div>
+          <div class="dash-card" id="fu-card-deduction" onclick="setFuDeductionFilter()" title="Notes containing 'خصم' (contractor deduction)">
+            <div class="dash-card-label">خصم ع المقاول</div>
+            <div class="dash-card-val" id="fu-kpi-deduction" style="color:#bc8cff">0</div>
+          </div>
+        </div>
+
+        <div id="fu-ded-chart-wrap" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+            <div style="font-weight:700;font-size:13px;color:#bc8cff;">📉 خصم ع المقاول — بالشهر والمشروع</div>
+            <div id="fu-ded-top-line" style="font-size:11.5px;color:var(--text-muted);"></div>
+          </div>
+          <div class="fu-ded-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+            <div>
+              <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">حسب الشهر (Month)</div>
+              <div id="fu-ded-month-bars"></div>
+            </div>
+            <div>
+              <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">حسب المشروع (Project) — Top 10</div>
+              <div id="fu-ded-project-bars"></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="fu-prov-chart-wrap" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+            <div style="font-weight:700;font-size:13px;" id="fu-prov-chart-title">📊 —</div>
+            <div id="fu-prov-top-line" style="font-size:11.5px;color:var(--text-muted);"></div>
+          </div>
+          <div class="fu-ded-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;">
+            <div>
+              <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">حسب الشهر (Month)</div>
+              <div id="fu-prov-month-bars"></div>
+            </div>
+            <div>
+              <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">حسب المعدة (Equipment) — Top 10</div>
+              <div id="fu-prov-equip-bars"></div>
+            </div>
+            <div>
+              <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">حسب المشروع (Project) — Top 10</div>
+              <div id="fu-prov-project-bars"></div>
+            </div>
           </div>
         </div>
 
@@ -2837,7 +2880,7 @@ function submitWsRequest(e) {
 
 // ─── 5. FOLLOW-UP SYSTEM LOGIC ───
 let FU_DATA = [];
-let fuFilters = { prov: [] };
+let fuFilters = { prov: [], deduction: false };
 let fuStatusHistory = [];
 
 function initFollowUpDefault() {
@@ -2901,31 +2944,42 @@ function getScopedFuData() {
     if(proj && (r.project||'').trim() !== proj) return false;
     if(eq && (r.equipment||'').trim() !== eq) return false;
     if(month && fuMonthKey(r.submission_date) !== month) return false;
+    if(fuFilters.deduction && !fuIsDeduction(r)) return false;
     return true;
   });
+}
+
+function fuIsDeduction(r) {
+  return /خصم/.test(String(r.notes||''));
 }
 
 function getFilteredFuData() {
   const scoped = getScopedFuData();
   if(!fuFilters.prov.length) return scoped;
-  return scoped.filter(function(r){
-    return fuFilters.prov.indexOf(r.provision) !== -1;
-  });
+  return scoped.filter(function(r){ return fuFilters.prov.indexOf(r.provision) !== -1; });
+}
+
+function setFuDeductionFilter() {
+  fuFilters.deduction = !fuFilters.deduction;
+  renderFollowUpTable();
 }
 
 function setFuCardProv(prov) {
   if(prov === null) {
     fuFilters.prov = [];
+  } else if(fuFilters.prov.length === 1 && fuFilters.prov[0] === prov) {
+    // نفس الكارت النشط دلوقتي — دوسه تاني يفك الفلتر (يرجع لـ All Requests)
+    fuFilters.prov = [];
   } else {
-    const idx = fuFilters.prov.indexOf(prov);
-    if(idx !== -1) fuFilters.prov.splice(idx, 1);
-    else fuFilters.prov.push(prov);
+    // يفك الفلتر من أي كارت تاني كان واقف عليه، ويقفل بس على الكارت المدووس عليه
+    fuFilters.prov = [prov];
   }
   renderFollowUpTable();
 }
 
 function clearFuFilters() {
   fuFilters.prov = [];
+  fuFilters.deduction = false;
   document.getElementById('fu-equip-filter').value = '';
   document.getElementById('fu-proj-filter').value = '';
   const monthSel = document.getElementById('fu-month-filter');
@@ -3053,10 +3107,116 @@ function removeFuRow(docId) {
   });
 }
 
+function renderFuDeductionChart(scopedData) {
+  const wrap = document.getElementById('fu-ded-chart-wrap');
+  if(!wrap) return;
+  if(!fuFilters.deduction) { wrap.style.display = 'none'; return; }
+  const dedRows = scopedData.filter(fuIsDeduction);
+  if(!dedRows.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+
+  const COLORS = ['#bc8cff','#f0a500','#58a6ff','#3fb950','#f85149','#ff7b72','#79c0ff','#d2a8ff'];
+
+  function buildBars(map, containerId, labelFn, limit) {
+    let sorted = Object.entries(map).sort(function(a,b){ return b[1]-a[1]; });
+    const fullCount = sorted.length;
+    if(limit) sorted = sorted.slice(0, limit);
+    const maxVal = sorted.length ? sorted[0][1] : 1;
+    document.getElementById(containerId).innerHTML = sorted.map(function(pair, i) {
+      const key = pair[0], cnt = pair[1];
+      const label = labelFn ? labelFn(key) : key;
+      return '<div style="margin-bottom:9px;">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;">'
+          + '<span style="font-size:11.5px;color:var(--text);' + (i===0?'font-weight:700;':'') + '">' + fuEsc(label) + (i===0?' 🔺':'') + '</span>'
+          + '<span style="font-size:11.5px;font-family:\'JetBrains Mono\',monospace;color:' + COLORS[i % COLORS.length] + ';">' + cnt + '</span>'
+        + '</div>'
+        + '<div style="height:7px;background:var(--surface2);border-radius:4px;overflow:hidden;">'
+          + '<div style="height:100%;width:' + Math.round(cnt / maxVal * 100) + '%;background:' + COLORS[i % COLORS.length] + ';border-radius:4px;"></div>'
+        + '</div>'
+      + '</div>';
+    }).join('') + (limit && fullCount > limit ? '<div style="font-size:10.5px;color:var(--text-muted);margin-top:2px;">+' + (fullCount - limit) + ' أخرى غير معروضة</div>' : '');
+    return sorted;
+  }
+
+  const byMonth = {};
+  dedRows.forEach(function(r){ const k = fuMonthKey(r.submission_date) || '—'; byMonth[k] = (byMonth[k]||0)+1; });
+  const monthSorted = buildBars(byMonth, 'fu-ded-month-bars', function(k){ return k==='—' ? '—' : fuMonthLabel(k); });
+
+  const byProject = {};
+  dedRows.forEach(function(r){ const p = (r.project||'—').trim() || '—'; byProject[p] = (byProject[p]||0)+1; });
+  const projSorted = buildBars(byProject, 'fu-ded-project-bars', null, 10);
+
+  const topMonth = monthSorted[0], topProj = projSorted[0];
+  const topLine = [];
+  if(fuFilters.prov.length) topLine.push('فلتر: <b style="color:#bc8cff">' + fuEsc(fuFilters.prov.join(', ')) + '</b>');
+  if(topMonth) topLine.push('أكتر شهر: <b style="color:#bc8cff">' + fuEsc(topMonth[0]==='—'?'—':fuMonthLabel(topMonth[0])) + '</b> (' + topMonth[1] + ')');
+  if(topProj) topLine.push('أكتر مشروع: <b style="color:#bc8cff">' + fuEsc(topProj[0]) + '</b> (' + topProj[1] + ')');
+  document.getElementById('fu-ded-top-line').innerHTML = topLine.join(' &nbsp;·&nbsp; ');
+}
+
+function renderFuProvChart(data) {
+  const wrap = document.getElementById('fu-prov-chart-wrap');
+  if(!wrap) return;
+  if(!fuFilters.prov || fuFilters.prov.length > 1) { wrap.style.display = 'none'; return; }
+  const prov = fuFilters.prov.length === 1 ? fuFilters.prov[0] : 'All Requests';
+  const rows = data;
+  if(!rows.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+
+  const PROV_COLOR = {Rental:'var(--rental)', Transfer:'var(--transfer)', Hold:'var(--hold)', Pending:'var(--pending)', Cancel:'var(--cancel)'}[prov] || 'var(--accent)';
+  const titleEl = document.getElementById('fu-prov-chart-title');
+  titleEl.innerHTML = '📊 ' + prov + ' — بالشهر / المعدة / المشروع';
+  titleEl.style.color = PROV_COLOR;
+
+  const COLORS = ['#58a6ff','#f0a500','#3fb950','#bc8cff','#f85149','#ff7b72','#79c0ff','#d2a8ff'];
+
+  function buildBars(map, containerId, labelFn, limit) {
+    let sorted = Object.entries(map).sort(function(a,b){ return b[1]-a[1]; });
+    const fullCount = sorted.length;
+    if(limit) sorted = sorted.slice(0, limit);
+    const maxVal = sorted.length ? sorted[0][1] : 1;
+    document.getElementById(containerId).innerHTML = sorted.map(function(pair, i) {
+      const key = pair[0], cnt = pair[1];
+      const label = labelFn ? labelFn(key) : key;
+      return '<div style="margin-bottom:9px;">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;">'
+          + '<span style="font-size:11.5px;color:var(--text);' + (i===0?'font-weight:700;':'') + '">' + fuEsc(label) + (i===0?' 🔺':'') + '</span>'
+          + '<span style="font-size:11.5px;font-family:\'JetBrains Mono\',monospace;color:' + COLORS[i % COLORS.length] + ';">' + cnt + '</span>'
+        + '</div>'
+        + '<div style="height:7px;background:var(--surface2);border-radius:4px;overflow:hidden;">'
+          + '<div style="height:100%;width:' + Math.round(cnt / maxVal * 100) + '%;background:' + COLORS[i % COLORS.length] + ';border-radius:4px;"></div>'
+        + '</div>'
+      + '</div>';
+    }).join('') + (limit && fullCount > limit ? '<div style="font-size:10.5px;color:var(--text-muted);margin-top:2px;">+' + (fullCount - limit) + ' أخرى غير معروضة</div>' : '');
+    return sorted;
+  }
+
+  const byMonth = {};
+  rows.forEach(function(r){ const k = fuMonthKey(r.submission_date) || '—'; byMonth[k] = (byMonth[k]||0)+1; });
+  const monthSorted = buildBars(byMonth, 'fu-prov-month-bars', function(k){ return k==='—' ? '—' : fuMonthLabel(k); });
+
+  const byEquip = {};
+  rows.forEach(function(r){ const e = (r.equipment||'—').trim() || '—'; byEquip[e] = (byEquip[e]||0)+1; });
+  const equipSorted = buildBars(byEquip, 'fu-prov-equip-bars', null, 10);
+
+  const byProject = {};
+  rows.forEach(function(r){ const p = (r.project||'—').trim() || '—'; byProject[p] = (byProject[p]||0)+1; });
+  const projSorted = buildBars(byProject, 'fu-prov-project-bars', null, 10);
+
+  const totalDays = rows.reduce(function(s,r){ return s + (Number(r.days)||0); }, 0);
+  const topLine = [rows.length + ' طلب &nbsp;·&nbsp; ' + totalDays.toLocaleString() + ' يوم إجمالي'];
+  if(monthSorted[0]) topLine.push('أكتر شهر: <b>' + fuEsc(monthSorted[0][0]==='—'?'—':fuMonthLabel(monthSorted[0][0])) + '</b> (' + monthSorted[0][1] + ')');
+  if(equipSorted[0]) topLine.push('أكتر معدة: <b>' + fuEsc(equipSorted[0][0]) + '</b> (' + equipSorted[0][1] + ')');
+  if(projSorted[0]) topLine.push('أكتر مشروع: <b>' + fuEsc(projSorted[0][0]) + '</b> (' + projSorted[0][1] + ')');
+  document.getElementById('fu-prov-top-line').innerHTML = topLine.join(' &nbsp;·&nbsp; ');
+}
+
 function renderFollowUpTable() {
   const scopedData = getScopedFuData();
   const data = getFilteredFuData();
   const tbody = document.getElementById('fu-table-body');
+  renderFuDeductionChart(data);
+  renderFuProvChart(data);
 
   const counts = {Rental:0, Transfer:0, Hold:0, Pending:0, Cancel:0};
   scopedData.forEach(function(r){ if(counts[r.provision] !== undefined) counts[r.provision]++; });
@@ -3067,6 +3227,7 @@ function renderFollowUpTable() {
   document.getElementById('fu-kpi-hold').textContent = counts.Hold;
   document.getElementById('fu-kpi-pending').textContent = counts.Pending;
   document.getElementById('fu-kpi-cancel').textContent = counts.Cancel;
+  document.getElementById('fu-kpi-deduction').textContent = scopedData.filter(fuIsDeduction).length;
 
   const cardMap = {
     'Rental': 'fu-card-rental',
@@ -3075,10 +3236,14 @@ function renderFollowUpTable() {
     'Pending': 'fu-card-pending',
     'Cancel': 'fu-card-cancel'
   };
-  ['fu-card-all','fu-card-rental','fu-card-transfer','fu-card-hold','fu-card-pending','fu-card-cancel'].forEach(function(cid){
+  ['fu-card-all','fu-card-rental','fu-card-transfer','fu-card-hold','fu-card-pending','fu-card-cancel','fu-card-deduction'].forEach(function(cid){
     const el = document.getElementById(cid);
     if(el) el.classList.remove('active');
   });
+  if(fuFilters.deduction) {
+    const dEl = document.getElementById('fu-card-deduction');
+    if(dEl) dEl.classList.add('active');
+  }
   if(!fuFilters.prov.length) {
     const allEl = document.getElementById('fu-card-all');
     if(allEl) allEl.classList.add('active');
@@ -3094,7 +3259,7 @@ function renderFollowUpTable() {
   const eqVal = document.getElementById('fu-equip-filter').value;
   const projVal = document.getElementById('fu-proj-filter').value;
   const monthVal = document.getElementById('fu-month-filter') ? document.getElementById('fu-month-filter').value : '';
-  const hasFilter = fuFilters.prov.length || eqVal || projVal || monthVal;
+  const hasFilter = fuFilters.prov.length || fuFilters.deduction || eqVal || projVal || monthVal;
   const clrBtn = document.getElementById('fu-clear-filters-btn');
   if(clrBtn) clrBtn.style.display = hasFilter ? 'inline-flex' : 'none';
 
@@ -3472,15 +3637,360 @@ function renderFuPriceResult(res){
 
 function exportFuPDF(kind) {
   const data = getFilteredFuData();
+  const scoped = getScopedFuData();
+  const kCounts = {Rental:0, Transfer:0, Hold:0, Pending:0, Cancel:0};
+  scoped.forEach(function(r){ if(kCounts[r.provision] !== undefined) kCounts[r.provision]++; });
+  const kpis = [
+    {label:'All Requests', value: scoped.length},
+    {label:'Rental', value: kCounts.Rental},
+    {label:'Transfer', value: kCounts.Transfer},
+    {label:'Hold', value: kCounts.Hold},
+    {label:'Pending', value: kCounts.Pending},
+    {label:'Cancel', value: kCounts.Cancel},
+    {label:'خصم ع المقاول', value: scoped.filter(fuIsDeduction).length}
+  ];
   function f(k){ return function(r){ return r[k]; }; }
   const cols = [
     {h:'#',g:function(r,i){return i+1;},t:'t'},{h:'Equipment',g:f('equipment'),t:'t'},{h:'Capacity',g:f('capacity'),t:'t'},
     {h:'Qty',g:function(r){return r.qty;},t:'i',s:true},{h:'SAP',g:f('sap'),t:'t'},{h:'Project',g:f('project'),t:'t'},
-    {h:'Engineer',g:f('engineer'),t:'t'},{h:'Contact',g:f('contact'),t:'t'},{h:'Submission',g:f('submission_date'),t:'t'},
     {h:'Provision',g:f('provision'),t:'t'},{h:'From',g:f('date_from'),t:'t'},{h:'To',g:f('date_to'),t:'t'},
     {h:'Days',g:function(r){return r.days;},t:'i',s:true},{h:'Notes',g:f('notes'),t:'t'}];
-  window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 Equipment Follow-Up Export',cols:cols,rows:data}, kind);
+  const opts = {title:'HAC \u00b7 PMV \u2014 Equipment Follow-Up Export',cols:cols,rows:data,kpis:kpis};
+  if(kind === 'xlsx') { exportFuXlsxWithDeduction(opts, scoped); return; }
+  window.hacPdfTable(opts, kind);
 }
+
+function fuColLetter(n){ var s='',m; while(n>0){ m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=Math.floor((n-1)/26); } return s; }
+
+/* Adds one more formatted data sheet (navy header, zebra rows, autofilter, totals row)
+   to an existing workbook — used for the per-provision (Rental/Transfer/Hold/Pending/Cancel) tabs. */
+function addFuDataSheet(wb, sheetName, title, rows, cols, tabColorArgb, dash) {
+  const NAVY='FF0D1B2E', AMBER='FFF0A500', thinB={style:'thin',color:{argb:'FFE3E7ED'}};
+  const nC = cols.length, nR = rows.length;
+  const hasBanner = !!(dash && dash.length);
+  const hdrRow = hasBanner ? 4 : 3, first = hdrRow+1, last = hdrRow+nR, tot = last+1;
+  const lastCol = fuColLetter(nC);
+  const ws = wb.addWorksheet(String(sheetName).replace(/[\\\/\?\*\[\]:]/g,' ').slice(0,31),
+    {views:[{state:'frozen', ySplit:hdrRow, activeCell:'A'+first}], properties:{tabColor:{argb:tabColorArgb||AMBER}}});
+  ws.mergeCells('A1:'+lastCol+'1');
+  const t1 = ws.getCell('A1'); t1.value = title||sheetName;
+  t1.font = {name:'Calibri', size:13, bold:true, color:{argb:NAVY}};
+  ws.getRow(1).height = 22;
+  ws.mergeCells('A2:'+lastCol+'2');
+  const t2 = ws.getCell('A2'); t2.value = nR.toLocaleString('en-US')+' rows';
+  t2.font = {name:'Calibri', size:10, color:{argb:'FF666666'}};
+  t2.border = {bottom:{style:'medium', color:{argb:AMBER}}};
+  for(let c=2; c<=nC; c++) ws.getCell(2,c).border = {bottom:{style:'medium', color:{argb:AMBER}}};
+
+  /* Single-line Total banner (Total Requests / Total Days / Avg / Top Project / خصم ع المقاول ...),
+     same style as the main export sheet's KPI line — no boxed side panel. */
+  if(hasBanner){
+    ws.mergeCells('A3:'+lastCol+'3');
+    const tk = ws.getCell('A3');
+    tk.value = dash.map(function(m){
+      const v = (typeof m.value==='number') ? m.value.toLocaleString('en-US') : m.value;
+      return m.label+': '+v;
+    }).join('   \u00b7   ');
+    tk.font = {name:'Calibri', size:10.5, bold:true, color:{argb:NAVY}};
+    tk.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FFFFF6DA'}};
+    tk.alignment = {vertical:'middle', horizontal:'center'};
+    tk.border = {bottom:{style:'medium', color:{argb:AMBER}}};
+    ws.getRow(3).height = 20;
+  }
+
+  const hr = ws.getRow(hdrRow); hr.height = 28;
+  cols.forEach(function(col,j){
+    const cell = hr.getCell(j+1); cell.value = col.h;
+    cell.font = {name:'Calibri', size:10, bold:true, color:{argb:'FFFFFFFF'}};
+    cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:NAVY}};
+    cell.alignment = {vertical:'middle', horizontal:col.t==='t'?'left':'right', wrapText:true};
+    cell.border = {bottom:{style:'medium', color:{argb:AMBER}}};
+  });
+  const w = cols.map(function(col){ return String(col.h).length*1.15+3; });
+  const sums = cols.map(function(){ return 0; });
+  rows.forEach(function(r,i){
+    const row = ws.getRow(first+i), zebra = (i%2===1);
+    cols.forEach(function(col,j){
+      let v = col.g(r,i);
+      const cell = row.getCell(j+1);
+      if(col.t==='t'){
+        v = (v==null) ? '' : String(v); cell.value = v;
+        cell.alignment = {vertical:'middle', horizontal:'left'};
+        if(v.length+2 > w[j]) w[j] = Math.min(46, v.length+2);
+      } else {
+        let n = Number(v); if(!isFinite(n)) n = 0;
+        n = Math.round(n);
+        cell.value = n; cell.numFmt = '#,##0';
+        cell.alignment = {vertical:'middle', horizontal:'right'};
+        if(col.s) sums[j] += n;
+        const L = String(n).length+3; if(L > w[j]) w[j] = Math.min(46, L);
+      }
+      if(!cell.font) cell.font = {name:'Calibri', size:10};
+      if(zebra) cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FFF8FAFC'}};
+      cell.border = {bottom:thinB};
+    });
+  });
+  if(nR) {
+    const tr = ws.getRow(tot); tr.height = 18;
+    cols.forEach(function(col,j){
+      const cell = tr.getCell(j+1);
+      if(j===0) cell.value = 'Total';
+      else if(col.s) { cell.value = {formula:'SUBTOTAL(109,'+fuColLetter(j+1)+first+':'+fuColLetter(j+1)+last+')', result:sums[j]}; cell.numFmt='#,##0'; cell.alignment={horizontal:'right'}; }
+      cell.font = {name:'Calibri', size:10, bold:true};
+      cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FFF4F4F4'}};
+      cell.border = {top:{style:'medium', color:{argb:AMBER}}};
+    });
+    ws.autoFilter = {from:{row:hdrRow, column:1}, to:{row:last, column:nC}};
+  }
+  const colDefs = cols.map(function(col,j){ return {width: Math.max(8, Math.min(46, w[j]))}; });
+
+  /* Month / Equipment / Project breakdown (Top 10 each) — placed to the right of the
+     table, right under the title, now that there's no boxed Summary panel in the way. */
+  addFuBreakdownBlock(ws, nC, 2, rows, tabColorArgb);
+  colDefs[nC] = {width:3};
+  colDefs[nC+1] = {width:22};
+  colDefs[nC+2] = {width:10};
+  colDefs[nC+3] = {width:3};
+  colDefs[nC+4] = {width:22};
+  colDefs[nC+5] = {width:10};
+  colDefs[nC+6] = {width:3};
+  colDefs[nC+7] = {width:22};
+  colDefs[nC+8] = {width:10};
+
+  ws.columns = colDefs;
+  ws.pageSetup = {paperSize:9, orientation:'landscape', fitToPage:true, fitToWidth:1, fitToHeight:0,
+    margins:{left:.3,right:.3,top:.4,bottom:.5,header:.2,footer:.2}, printTitlesRow:hdrRow+':'+hdrRow};
+  return ws;
+}
+
+/* Month / Equipment / Project mini breakdown tables (top 8 each, with data-bar formatting),
+   placed side by side to the right of a provision sheet's table, under its KPI box. */
+function addFuBreakdownBlock(ws, nC, rowStart, rowsP, colorArgb) {
+  const NAVY='FF0D1B2E';
+  function topN(map, n){ return Object.entries(map).sort(function(a,b){ return b[1]-a[1]; }).slice(0, n||8); }
+
+  const byMonth = {};
+  rowsP.forEach(function(r){ const k = fuMonthKey(r.submission_date) || '—'; byMonth[k] = (byMonth[k]||0)+1; });
+  const monthSorted = topN(byMonth).map(function(p){ return [p[0]==='—' ? '—' : fuMonthLabel(p[0]), p[1]]; });
+
+  const byEquip = {};
+  rowsP.forEach(function(r){ const e = (r.equipment||'—').trim() || '—'; byEquip[e] = (byEquip[e]||0)+1; });
+  const equipSorted = topN(byEquip, 10);
+
+  const byProj = {};
+  rowsP.forEach(function(r){ const p = (r.project||'—').trim() || '—'; byProj[p] = (byProj[p]||0)+1; });
+  const projSorted = topN(byProj, 10);
+
+  const blocks = [
+    {label:'Month', data:monthSorted, col: nC+2},
+    {label:'Equipment', data:equipSorted, col: nC+5},
+    {label:'Project', data:projSorted, col: nC+8}
+  ];
+  blocks.forEach(function(b){
+    const lc = fuColLetter(b.col), vc = fuColLetter(b.col+1);
+    const hL = ws.getCell(lc+rowStart), hV = ws.getCell(vc+rowStart);
+    hL.value = b.label; hV.value = 'Count';
+    [hL,hV].forEach(function(c){
+      c.font = {name:'Calibri', size:9, bold:true, color:{argb:'FFFFFFFF'}};
+      c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:NAVY}};
+    });
+    b.data.forEach(function(pair,i){
+      const r = rowStart+1+i;
+      const lcell = ws.getCell(lc+r), vcell = ws.getCell(vc+r);
+      lcell.value = pair[0]; vcell.value = pair[1];
+      lcell.font = {name:'Calibri', size:9, bold: i===0};
+      vcell.font = {name:'Calibri', size:9, bold: i===0};
+      vcell.alignment = {horizontal:'right'};
+    });
+    if(b.data.length){
+      ws.addConditionalFormatting({
+        ref: vc+(rowStart+1)+':'+vc+(rowStart+b.data.length),
+        rules: [{type:'dataBar', cfvo:[{type:'min'},{type:'max'}], color:{argb:colorArgb||'FFF0A500'}, priority:1}]
+      });
+    }
+  });
+}
+
+/* Builds the KPI list for a provision's mini-dashboard (Rental/Transfer/Hold/Pending/Cancel) */
+function fuNum(v){ if(typeof v==='number') return isFinite(v)?v:0; var n=parseFloat(String(v==null?'':v).replace(/[^0-9.,\-]/g,'').replace(/,/g,'')); return isFinite(n)?n:0; }
+function fuSavingOf(r){ return fuNum(r.saving_total) || (fuNum(r.rental_rate_incl_fuel)*fuNum(r.days)*(fuNum(r.qty)||1)); }
+function buildFuProvDash(rowsP, prov){
+  const n = rowsP.length;
+  const byProj = {};
+  rowsP.forEach(function(r){ const p=(r.project||'—').trim()||'—'; byProj[p]=(byProj[p]||0)+1; });
+  const topProj = Object.entries(byProj).sort(function(a,b){ return b[1]-a[1]; })[0];
+  const dedCount = rowsP.filter(fuIsDeduction).length;
+
+  const dash = [
+    {label:'Total Requests', value:n},
+    {label:'Top Project', value: topProj ? (topProj[0]+' ('+topProj[1]+')') : '—'},
+    {label:'خصم ع المقاول', value: dedCount, color:'FFBC8CFF'}
+  ];
+  if(prov==='Cancel' || prov==='Hold'){
+    const savTotal = rowsP.reduce(function(s,r){ return s+fuSavingOf(r); },0);
+    dash.push({label:'Savings (EGP)', value:Math.round(savTotal), fmt:'#,##0', color:'FF3FB950'});
+  }
+  return dash;
+}
+
+/* Cross-tab sheet: rows = projects, columns = months, so "how many in Benban / El Sokhna
+   / etc. in a given month" is visible at a glance, sorted by busiest project first. */
+function addFuMonthProjectPivot(wb, scoped) {
+  const NAVY='FF0D1B2E', AMBER='FFF0A500', thinB={style:'thin',color:{argb:'FFE3E7ED'}};
+  const months = Array.from(new Set(scoped.map(function(r){ return fuMonthKey(r.submission_date); }).filter(Boolean))).sort();
+  const projects = Array.from(new Set(scoped.map(function(r){ return (r.project||'').trim(); }).filter(Boolean)));
+  if(!months.length || !projects.length) return;
+
+  const matrix = {};
+  projects.forEach(function(p){ matrix[p] = {}; months.forEach(function(m){ matrix[p][m] = 0; }); });
+  scoped.forEach(function(r){
+    const p = (r.project||'').trim(), m = fuMonthKey(r.submission_date);
+    if(p && m && matrix[p] && matrix[p][m] !== undefined) matrix[p][m]++;
+  });
+
+  const order = projects.map(function(p){ return [p, months.reduce(function(s,m){ return s+matrix[p][m]; }, 0)]; })
+    .sort(function(a,b){ return b[1]-a[1]; });
+
+  const ws = wb.addWorksheet('By Month & Project', {views:[{state:'frozen', xSplit:1, ySplit:3}], properties:{tabColor:{argb:'FF58A6FF'}}});
+  const lastCol = fuColLetter(2+months.length);
+  ws.mergeCells('A1:'+lastCol+'1');
+  const t1 = ws.getCell('A1'); t1.value = 'Requests by Month \u00d7 Project';
+  t1.font = {name:'Calibri', size:13, bold:true, color:{argb:NAVY}};
+  ws.getRow(1).height = 22;
+
+  const hdrRow = 3, hr = ws.getRow(hdrRow); hr.height = 24;
+  hr.getCell(1).value = 'Project';
+  months.forEach(function(m,j){ hr.getCell(2+j).value = fuMonthLabel(m); });
+  hr.getCell(2+months.length).value = 'Total';
+  for(let c=1; c<=2+months.length; c++){
+    const cell = hr.getCell(c);
+    cell.font = {name:'Calibri', size:10, bold:true, color:{argb:'FFFFFFFF'}};
+    cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:NAVY}};
+    cell.alignment = {vertical:'middle', horizontal:c===1?'left':'center'};
+    cell.border = {bottom:{style:'medium', color:{argb:AMBER}}};
+  }
+
+  const monthTotals = months.map(function(){ return 0; });
+  order.forEach(function(pair, i) {
+    const p = pair[0], total = pair[1];
+    const row = ws.getRow(hdrRow+1+i);
+    row.getCell(1).value = p; row.getCell(1).font = {name:'Calibri', size:10};
+    row.getCell(1).alignment = {horizontal:'left'};
+    months.forEach(function(m,j){
+      const v = matrix[p][m];
+      const cell = row.getCell(2+j);
+      cell.value = v; cell.alignment = {horizontal:'center'};
+      cell.font = {name:'Calibri', size:10, color:{argb: v? 'FF000000':'FFCCCCCC'}};
+      monthTotals[j] += v;
+    });
+    const totalCell = row.getCell(2+months.length);
+    totalCell.value = total; totalCell.font = {name:'Calibri', size:10, bold:true};
+    totalCell.alignment = {horizontal:'center'};
+    for(let c=1; c<=2+months.length; c++) row.getCell(c).border = {bottom:thinB};
+  });
+
+  const totRow = ws.getRow(hdrRow+1+order.length);
+  totRow.getCell(1).value = 'Total';
+  months.forEach(function(m,j){ totRow.getCell(2+j).value = monthTotals[j]; totRow.getCell(2+j).alignment = {horizontal:'center'}; });
+  totRow.getCell(2+months.length).value = monthTotals.reduce(function(a,b){ return a+b; }, 0);
+  totRow.getCell(2+months.length).alignment = {horizontal:'center'};
+  for(let c=1; c<=2+months.length; c++){
+    const cell = totRow.getCell(c);
+    cell.font = {name:'Calibri', size:10, bold:true};
+    cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FFF4F4F4'}};
+    cell.border = {top:{style:'medium', color:{argb:AMBER}}};
+  }
+
+  ws.columns = [{width:24}].concat(months.map(function(){ return {width:11}; })).concat([{width:10}]);
+  ws.autoFilter = {from:{row:hdrRow, column:1}, to:{row:hdrRow+order.length, column:1+months.length}};
+}
+
+/* Same Excel export as the rest of the app (window.hacBuildXlsx) for the currently
+   selected view, PLUS: one sheet per Provision (Rental/Transfer/Hold/Pending/Cancel),
+   a Month × Project cross-tab, and a Deduction Breakdown sheet — always covering the
+   full scoped data (equip/project/month filters), regardless of which card is toggled,
+   so the export gives the full picture every time. */
+function exportFuXlsxWithDeduction(o, scoped) {
+  if(!o.rows.length) { if(typeof toast==='function') toast('Nothing to export','error'); return; }
+  const EJ = window.ExcelJS;
+  if(!EJ) { if(typeof toast==='function') toast('Excel library did not load \u2014 check the internet connection','error'); return; }
+  const wb = window.hacBuildXlsx(o, EJ);
+
+  const PROV_COLORS = {Rental:'FF3FB950', Transfer:'FF58A6FF', Hold:'FFF0A500', Pending:'FF8B949E', Cancel:'FFF85149'};
+  if(scoped.length) addFuDataSheet(wb, 'All Requests', 'HAC \u00b7 PMV \u2014 All Requests', scoped, o.cols, 'FFF0A500', buildFuProvDash(scoped, 'All'));
+  ['Rental','Transfer','Hold','Pending','Cancel'].forEach(function(p){
+    const rowsP = scoped.filter(function(r){ return r.provision === p; });
+    if(rowsP.length) addFuDataSheet(wb, p, 'HAC \u00b7 PMV \u2014 ' + p + ' Requests', rowsP, o.cols, PROV_COLORS[p], buildFuProvDash(rowsP, p));
+  });
+
+  addFuMonthProjectPivot(wb, scoped);
+
+  const dedRows = scoped.filter(fuIsDeduction);
+  if(dedRows.length) {
+    const NAVY = 'FF0D1B2E', AMBER = 'FFF0A500', PURPLE = 'FFBC8CFF';
+    const byMonth = {};
+    dedRows.forEach(function(r){ const k = fuMonthKey(r.submission_date) || '\u2014'; byMonth[k] = (byMonth[k]||0)+1; });
+    const byProject = {};
+    dedRows.forEach(function(r){ const p = (r.project||'\u2014').trim() || '\u2014'; byProject[p] = (byProject[p]||0)+1; });
+    const monthSorted = Object.entries(byMonth).sort(function(a,b){ return b[1]-a[1]; })
+      .map(function(pair){ return [pair[0]==='\u2014' ? '\u2014' : fuMonthLabel(pair[0]), pair[1]]; });
+    const projSorted = Object.entries(byProject).sort(function(a,b){ return b[1]-a[1]; });
+
+    const ws2 = wb.addWorksheet('Deduction Breakdown', {properties:{tabColor:{argb:PURPLE}}});
+    ws2.mergeCells('A1:E1');
+    const t1 = ws2.getCell('A1');
+    t1.value = '\u062e\u0635\u0645 \u0639 \u0627\u0644\u0645\u0642\u0627\u0648\u0644 \u2014 Deduction Breakdown';
+    t1.font = {name:'Calibri', size:14, bold:true, color:{argb:NAVY}};
+    ws2.getRow(1).height = 24;
+
+    function header(addr, text) {
+      const c = ws2.getCell(addr);
+      c.value = text;
+      c.font = {name:'Calibri', size:10, bold:true, color:{argb:'FFFFFFFF'}};
+      c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:NAVY}};
+    }
+    header('A3', 'Month'); header('B3', 'Deduction Count');
+    header('D3', 'Project'); header('E3', 'Deduction Count');
+
+    monthSorted.forEach(function(pair, i) {
+      const r = 4 + i;
+      ws2.getCell('A'+r).value = pair[0];
+      ws2.getCell('B'+r).value = pair[1];
+      if(i === 0) { ws2.getCell('A'+r).font = {bold:true, color:{argb:AMBER}}; ws2.getCell('B'+r).font = {bold:true, color:{argb:AMBER}}; }
+    });
+    projSorted.forEach(function(pair, i) {
+      const r = 4 + i;
+      ws2.getCell('D'+r).value = pair[0];
+      ws2.getCell('E'+r).value = pair[1];
+      if(i === 0) { ws2.getCell('D'+r).font = {bold:true, color:{argb:AMBER}}; ws2.getCell('E'+r).font = {bold:true, color:{argb:AMBER}}; }
+    });
+
+    if(monthSorted.length) {
+      ws2.addConditionalFormatting({
+        ref: 'B4:B' + (3+monthSorted.length),
+        rules: [{type:'dataBar', cfvo:[{type:'min'},{type:'max'}], color:{argb:PURPLE}, priority:1}]
+      });
+    }
+    if(projSorted.length) {
+      ws2.addConditionalFormatting({
+        ref: 'E4:E' + (3+projSorted.length),
+        rules: [{type:'dataBar', cfvo:[{type:'min'},{type:'max'}], color:{argb:PURPLE}, priority:1}]
+      });
+    }
+    ws2.columns = [{width:16},{width:18},{width:2},{width:24},{width:18}];
+  }
+
+  function two(n){ return n<10 ? '0'+n : ''+n; }
+  const d = new Date(), stamp = d.getFullYear()+'-'+two(d.getMonth()+1)+'-'+two(d.getDate());
+  const fname = String(o.title||'Export').replace(/[\\\/:*?"<>|\u00b7\u2014]+/g,' ').replace(/\s+/g,'_').replace(/^_+|_+$/g,'')+'_'+stamp+'.xlsx';
+  wb.xlsx.writeBuffer().then(function(buf) {
+    const blob = new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fname;
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  }).catch(function(err) { if(typeof toast==='function') toast('Excel export failed: '+(err&&err.message||err), 'error'); });
+}
+
 
 /* ➕ Add New Only — يقرا من الشيت الصفوف الجديدة بس (SN أكبر من آخر SN متسجل) ومايلمسش الموجود */
 function addNewFuFromExcel(input) {
@@ -5953,6 +6463,15 @@ function openSav(type){
   catch(e){ rows=(typeof FU_DATA!=='undefined'?FU_DATA:[]); }
   rows=rows.filter(function(r){ return r.provision==='Cancel'||r.provision==='Hold'; });
   if(type!=='All') rows=rows.filter(function(r){ return r.provision===type; });
+
+  /* اجعل الكارت يفلتر تابل المعدات نفسه ع نفس نوع السافينج، علشان المستخدم يشوف المعدات بعينها */
+  try{
+    if(typeof fuFilters!=='undefined'){
+      fuFilters.prov = (type==='All') ? ['Cancel','Hold'] : [type];
+      if(typeof renderFollowUpTable==='function') renderFollowUpTable();
+      var tbl=$('fu-table-body'); if(tbl) tbl.scrollIntoView({behavior:'smooth', block:'center'});
+    }
+  }catch(e){}
 
   var groups=groupByProject(rows);
   var total=groups.reduce(function(s,g){ return s+g.sav; },0);
@@ -8779,10 +9298,11 @@ window.__rd={parseWorkbook:parseWorkbook,setRows:function(r,m){ rows=r; meta=m||
   var XL_FMT={i:'#,##0',d:'#,##0.0',m:'#,##0',z:'#,##0;-#,##0;"\u2013"',dz:'#,##0.0;-#,##0.0;"\u2013"',p:'0"%"'};
   function colLetter(n){ var s='',m; while(n>0){ m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=Math.floor((n-1)/26); } return s; }
   function buildXlsx(o,EJ){
-    var cols=o.cols, rows=o.rows, nC=cols.length, nR=rows.length, first=4, last=3+nR, tot=last+1, lastCol=colLetter(nC);
+    var kpiRows=(o.kpis&&o.kpis.length)?1:0, hdrRow=3+kpiRows;
+    var cols=o.cols, rows=o.rows, nC=cols.length, nR=rows.length, first=hdrRow+1, last=hdrRow+nR, tot=last+1, lastCol=colLetter(nC);
     var wb=new EJ.Workbook(); wb.creator='HAC PMV'; wb.created=new Date();
     var ws=wb.addWorksheet(String(o.title||'Export').replace(/[\\\/\?\*\[\]:]/g,' ').slice(0,31),
-      {views:[{state:'frozen',ySplit:3,activeCell:'A4'}],properties:{tabColor:{argb:'FFF0A500'}}});
+      {views:[{state:'frozen',ySplit:hdrRow,activeCell:'A'+first}],properties:{tabColor:{argb:'FFF0A500'}}});
     var NAVY='FF0D1B2E', AMBER='FFF0A500', thinB={style:'thin',color:{argb:'FFE3E7ED'}};
     ws.mergeCells('A1:'+lastCol+'1'); ws.mergeCells('A2:'+lastCol+'2');
     var t1=ws.getCell('A1'); t1.value=o.title||''; t1.font={name:'Calibri',size:15,bold:true,color:{argb:NAVY}}; t1.alignment={vertical:'middle'};
@@ -8790,7 +9310,17 @@ window.__rd={parseWorkbook:parseWorkbook,setRows:function(r,m){ rows=r; meta=m||
     var t2=ws.getCell('A2'); t2.value=nR.toLocaleString('en-US')+' rows \u00b7 Generated '+new Date().toLocaleString()+(o.sub?' \u00b7 '+o.sub:'');
     t2.font={name:'Calibri',size:10,color:{argb:'FF666666'}}; t2.border={bottom:{style:'medium',color:{argb:AMBER}}};
     for(var c=2;c<=nC;c++) ws.getCell(2,c).border={bottom:{style:'medium',color:{argb:AMBER}}};
-    var hr=ws.getRow(3); hr.height=30;
+    if(kpiRows){
+      ws.mergeCells('A3:'+lastCol+'3');
+      var tk=ws.getCell('A3');
+      tk.value=o.kpis.map(function(k){ return k.label+': '+k.value; }).join('   \u00b7   ');
+      tk.font={name:'Calibri',size:10.5,bold:true,color:{argb:NAVY}};
+      tk.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFF6DA'}};
+      tk.alignment={vertical:'middle',horizontal:'center'};
+      tk.border={bottom:{style:'medium',color:{argb:AMBER}}};
+      ws.getRow(3).height=20;
+    }
+    var hr=ws.getRow(hdrRow); hr.height=30;
     cols.forEach(function(col,j){
       var cell=hr.getCell(j+1); cell.value=col.h;
       cell.font={name:'Calibri',size:10,bold:true,color:{argb:'FFFFFFFF'}};
@@ -8834,9 +9364,9 @@ window.__rd={parseWorkbook:parseWorkbook,setRows:function(r,m){ rows=r; meta=m||
       cell.border={top:{style:'medium',color:{argb:AMBER}}};
     });
     ws.columns=cols.map(function(col,j){ return {width:Math.max(8,Math.min(46,w[j]))}; });
-    if(nR) ws.autoFilter={from:{row:3,column:1},to:{row:last,column:nC}};
+    if(nR) ws.autoFilter={from:{row:hdrRow,column:1},to:{row:last,column:nC}};
     ws.pageSetup={paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,
-      margins:{left:.3,right:.3,top:.4,bottom:.5,header:.2,footer:.2},printTitlesRow:'3:3'};
+      margins:{left:.3,right:.3,top:.4,bottom:.5,header:.2,footer:.2},printTitlesRow:hdrRow+':'+hdrRow};
     ws.headerFooter={oddFooter:'&L&8HAC \u00b7 PMV&C&8Page &P of &N&R&8&D'};
     return wb;
   }
@@ -8874,10 +9404,12 @@ window.__rd={parseWorkbook:parseWorkbook,setRows:function(r,m){ rows=r; meta=m||
     h+='td.z{color:#bbb}td.lo{color:#d93025;font-weight:600}';
     h+='tbody tr{cursor:pointer}tbody tr:hover td{background:#fff3b0}tbody tr.hl td{background:#ffe94d !important;font-weight:600}';
     h+='tfoot td{background:#f4f4f4;font-weight:700;border-top:2px solid #f0a500;font-size:10px}';
+    h+='.kpis{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.k{border:1px solid #e0e0e0;border-left:3px solid #f0a500;border-radius:5px;padding:6px 10px;background:#fafafa;font-size:10.5px}.k b{font-weight:700}';
     h+='@media print{.bar,.flt{display:none}body{padding:6px 8px}tbody tr:hover td{background:inherit}tbody tr:nth-child(even):hover td{background:#fafafa}';
     h+='*{-webkit-print-color-adjust:exact;print-color-adjust:exact}thead{display:table-header-group}tr{page-break-inside:avoid}@page{size:A4 landscape;margin:7mm}}';
     h+='</style></head><body>';
     h+='<h1>'+esc(o.title)+'</h1><div class="sub">'+rows.length.toLocaleString('en-US')+' rows \u00b7 Generated '+esc(new Date().toLocaleString())+(o.sub?' \u00b7 '+esc(o.sub):'')+'</div>';
+    if(o.kpis && o.kpis.length) h+='<div class="kpis">'+o.kpis.map(function(k){ return '<div class="k">'+esc(k.label)+': <b>'+esc(String(k.value))+'</b></div>'; }).join('')+'</div>';
     h+='<div class="bar"><input id="gq" placeholder="Search all columns\u2026"><button class="g" id="clr">Clear</button><span id="cnt"></span><span class="sp"></span><button onclick="window.print()">\ud83d\udda8 Print / Save PDF</button></div>';
     h+='<table><thead><tr>'+cols.map(function(c){ return '<th'+(c.t==='t'?'':' class="n"')+'>'+esc(c.h)+'</th>'; }).join('')+'</tr>';
     h+='<tr class="flt">'+cols.map(function(c,j){ return '<th><input data-c="'+j+'"'+(c.t==='t'?'':' data-n="1" placeholder="&gt;100"')+'></th>'; }).join('')+'</tr></thead><tbody id="tb">';
