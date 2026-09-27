@@ -989,6 +989,7 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
                 <th>Qty</th>
                 <th>SAP</th>
                 <th>Project</th>
+                <th>Submission Date</th>
                 <th>Provision (Editable)</th>
                 <th>From</th>
                 <th>To</th>
@@ -3264,7 +3265,7 @@ function renderFollowUpTable() {
   if(clrBtn) clrBtn.style.display = hasFilter ? 'inline-flex' : 'none';
 
   if(!data.length){
-    tbody.innerHTML = '<tr><td colspan="12" class="empty">No follow-up requests matching filter</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="13" class="empty">No follow-up requests matching filter</td></tr>';
     document.getElementById('fu-table-count').textContent = '0 requests';
     return;
   }
@@ -3296,6 +3297,7 @@ function renderFollowUpTable() {
       +'<td style="font-family:\'JetBrains Mono\'">'+(r.qty||1)+'</td>'
       +'<td class="code-cell">'+(r.sap||'—')+'</td>'
       +'<td>'+(r.project||'—')+'</td>'
+      +'<td style="font-size:11px;font-family:\'JetBrains Mono\'">'+formatExcelDate(r.submission_date)+'</td>'
       +'<td>'+statusSelect+'</td>'
       +'<td style="font-size:11px;font-family:\'JetBrains Mono\'">'+formatExcelDate(r.date_from)+'</td>'
       +'<td style="font-size:11px;font-family:\'JetBrains Mono\'">'+formatExcelDate(r.date_to)+'</td>'
@@ -3530,6 +3532,15 @@ function saveFuEquipment() {
 /* ─── Last price lookup: pull from Rental Database, resolving Plant via the
    project's history there, so the follow-up screen can negotiate on the spot. ─── */
 function fuEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+/* Used only for the Follow-Up export (PDF/Excel): reformats a date into month/day/year,
+   e.g. '2026-01-14' -> '01/14/2026'. Reuses formatExcelDate to normalize Excel serials
+   or odd strings into 'YYYY-MM-DD' first. */
+function fuFmtMDY(val){
+  const s = formatExcelDate(val);
+  if(!s || s === '\u2014') return s;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  return m ? (m[2]+'/'+m[3]+'/'+m[1]) : s;
+}
 function fuFmtInt(n){ return Math.round(Number(n)||0).toLocaleString('en-US'); }
 function fuShowLastPrice(id){
   var r = FU_DATA.find(function(x){ return x.id === id; });
@@ -3653,7 +3664,8 @@ function exportFuPDF(kind) {
   const cols = [
     {h:'#',g:function(r,i){return i+1;},t:'t'},{h:'Equipment',g:f('equipment'),t:'t'},{h:'Capacity',g:f('capacity'),t:'t'},
     {h:'Qty',g:function(r){return r.qty;},t:'i',s:true},{h:'SAP',g:f('sap'),t:'t'},{h:'Project',g:f('project'),t:'t'},
-    {h:'Provision',g:f('provision'),t:'t'},{h:'From',g:f('date_from'),t:'t'},{h:'To',g:f('date_to'),t:'t'},
+    {h:'Submission Date',g:function(r){return fuFmtMDY(r.submission_date);},t:'t'},
+    {h:'Provision',g:f('provision'),t:'t'},{h:'From',g:function(r){return fuFmtMDY(r.date_from);},t:'t'},{h:'To',g:function(r){return fuFmtMDY(r.date_to);},t:'t'},
     {h:'Days',g:function(r){return r.days;},t:'i',s:true},{h:'Notes',g:f('notes'),t:'t'}];
   const opts = {title:'HAC \u00b7 PMV \u2014 Equipment Follow-Up Export',cols:cols,rows:data,kpis:kpis};
   if(kind === 'xlsx') { exportFuXlsxWithDeduction(opts, scoped); return; }
