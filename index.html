@@ -3676,7 +3676,79 @@ function fuColLetter(n){ var s='',m; while(n>0){ m=(n-1)%26; s=String.fromCharCo
 
 /* Adds one more formatted data sheet (navy header, zebra rows, autofilter, totals row)
    to an existing workbook — used for the per-provision (Rental/Transfer/Hold/Pending/Cancel) tabs. */
-function addFuDataSheet(wb, sheetName, title, rows, cols, tabColorArgb, dash) {
+/* ─── Same idea as addFuBreakdownBlock, but for Master Owned: Project / O.D / Category
+   (instead of Month / Equipment / Project), each Top 10 by unit count. ─── */
+function addMoBreakdownBlock(ws, nC, rowStart, rowsP, colorArgb, tbl) {
+  const NAVY='FF0D1B2E';
+  function topN(map, n){ return Object.entries(map).sort(function(a,b){ return b[1]-a[1]; }).slice(0, n||10); }
+  function unitsOf(r){ const q=Number(r.qty); return (q&&q>0)?q:1; }
+
+  const byProj = {};
+  rowsP.forEach(function(r){ const p = (r.project||'\u2014').trim() || '\u2014'; byProj[p] = (byProj[p]||0) + unitsOf(r); });
+  const projSorted = topN(byProj, 10).map(function(p){ return [p[0], Math.round(p[1]), p[0]]; });
+
+  const byOd = {};
+  rowsP.forEach(function(r){ const o = (r.od||'\u2014').trim() || '\u2014'; byOd[o] = (byOd[o]||0) + unitsOf(r); });
+  const odSorted = topN(byOd, 10).map(function(p){ return [p[0], Math.round(p[1]), p[0]]; });
+
+  const byCat = {};
+  rowsP.forEach(function(r){ const c = (r.cat||'\u2014').trim() || '\u2014'; byCat[c] = (byCat[c]||0) + unitsOf(r); });
+  const catSorted = topN(byCat, 10).map(function(p){ return [String(p[0]).replace(' Equipment',''), Math.round(p[1]), p[0]]; });
+
+  const byMon = {};
+  rowsP.forEach(function(r){ if(r.month) byMon[r.month] = (byMon[r.month]||0) + unitsOf(r); });
+  const monSorted = Object.keys(byMon).sort().map(function(m){
+    const x=/^(\d{4})-(\d{2})$/.exec(m);
+    const lbl = x ? ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+x[2]-1]+'-'+x[1].slice(2) : m;
+    return [lbl, Math.round(byMon[m]), m];
+  });
+
+  const blocks = [
+    {label:'Month', data:monSorted, col: nC+2},
+    {label:'Project', data:projSorted, col: nC+5},
+    {label:'O.D', data:odSorted, col: nC+8},
+    {label:'Category', data:catSorted, col: nC+11}
+  ];
+  blocks.forEach(function(b){
+    const lc = fuColLetter(b.col), vc = fuColLetter(b.col+1);
+    const hL = ws.getCell(lc+rowStart), hV = ws.getCell(vc+rowStart);
+    hL.value = b.label; hV.value = 'Equipment';
+    [hL,hV].forEach(function(c){
+      c.font = {name:'Calibri', size:9, bold:true, color:{argb:'FFFFFFFF'}};
+      c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:NAVY}};
+    });
+    b.data.forEach(function(pair,i){
+      const r = rowStart+1+i;
+      const lcell = ws.getCell(lc+r), vcell = ws.getCell(vc+r);
+      lcell.value = pair[0]; vcell.value = pair[1];
+      /* Live mode: number = formula over the VISIBLE rows only, so it follows every Excel filter. */
+      if(tbl && tbl.idx && tbl.idx[b.label] && tbl.idx['Qty']){
+        const kc = fuColLetter(tbl.idx[b.label]), qc = fuColLetter(tbl.idx['Qty']);
+        const kr = kc+tbl.first+':'+kc+tbl.last, qr = qc+tbl.first+':'+qc+tbl.last;
+        const key = (pair[2]==='\u2014') ? '' : String(pair[2]).replace(/"/g,'""');
+        vcell.value = {
+          formula: 'SUMPRODUCT(SUBTOTAL(109,OFFSET('+qc+tbl.first+',ROW('+qr+')-ROW('+qc+tbl.first+'),0)),--(TRIM('+kr+')="'+key+'"),--('+qr+'>0))',
+          result: pair[1]
+        };
+        vcell.numFmt = '#,##0';
+      }
+      lcell.font = {name:'Calibri', size:9, bold: i===0};
+      vcell.font = {name:'Calibri', size:9, bold: i===0};
+      vcell.alignment = {horizontal:'right'};
+    });
+    if(b.data.length){
+      ws.addConditionalFormatting({
+        ref: vc+(rowStart+1)+':'+vc+(rowStart+b.data.length),
+        rules: [{type:'dataBar', cfvo:[{type:'min'},{type:'max'}], color:{argb:colorArgb||'FFF0A500'}, priority:1}]
+      });
+    }
+  });
+}
+
+window.addMoBreakdownBlock = addMoBreakdownBlock;
+
+
+function addFuDataSheet(wb, sheetName, title, rows, cols, tabColorArgb, dash, breakdownFn) {
   const NAVY='FF0D1B2E', AMBER='FFF0A500', thinB={style:'thin',color:{argb:'FFE3E7ED'}};
   const nC = cols.length, nR = rows.length;
   const hasBanner = !!(dash && dash.length);
@@ -3685,12 +3757,12 @@ function addFuDataSheet(wb, sheetName, title, rows, cols, tabColorArgb, dash) {
   const ws = wb.addWorksheet(String(sheetName).replace(/[\\\/\?\*\[\]:]/g,' ').slice(0,31),
     {views:[{state:'frozen', ySplit:hdrRow, activeCell:'A'+first}], properties:{tabColor:{argb:tabColorArgb||AMBER}}});
   ws.mergeCells('A1:'+lastCol+'1');
-  const t1 = ws.getCell('A1'); t1.value = title||sheetName;
-  t1.font = {name:'Calibri', size:13, bold:true, color:{argb:NAVY}};
+  const t1 = ws.getCell('A1'); t1.value = String(title||sheetName).replace(/^\s*HAC\s*\u00b7\s*PMV\s*\u2014\s*/,'');
+  t1.font = {name:'Calibri', size:13, bold:true, color:{argb:NAVY}}; t1.alignment = {vertical:'middle', horizontal:'center'};
   ws.getRow(1).height = 22;
   ws.mergeCells('A2:'+lastCol+'2');
-  const t2 = ws.getCell('A2'); t2.value = nR.toLocaleString('en-US')+' rows';
-  t2.font = {name:'Calibri', size:10, color:{argb:'FF666666'}};
+  const t2 = ws.getCell('A2'); t2.value = nR.toLocaleString('en-US');
+  t2.font = {name:'Calibri', size:12, bold:true, color:{argb:'FF444444'}}; t2.alignment = {vertical:'middle', horizontal:'center'};
   t2.border = {bottom:{style:'medium', color:{argb:AMBER}}};
   for(let c=2; c<=nC; c++) ws.getCell(2,c).border = {bottom:{style:'medium', color:{argb:AMBER}}};
 
@@ -3712,7 +3784,7 @@ function addFuDataSheet(wb, sheetName, title, rows, cols, tabColorArgb, dash) {
 
   const hr = ws.getRow(hdrRow); hr.height = 28;
   cols.forEach(function(col,j){
-    const cell = hr.getCell(j+1); cell.value = col.h;
+    const cell = hr.getCell(j+1); cell.value = (col.h==='#'?'S/N':col.h);
     cell.font = {name:'Calibri', size:10, bold:true, color:{argb:'FFFFFFFF'}};
     cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:NAVY}};
     cell.alignment = {vertical:'middle', horizontal:col.t==='t'?'left':'right', wrapText:true};
@@ -3758,7 +3830,9 @@ function addFuDataSheet(wb, sheetName, title, rows, cols, tabColorArgb, dash) {
 
   /* Month / Equipment / Project breakdown (Top 10 each) — placed to the right of the
      table, right under the title, now that there's no boxed Summary panel in the way. */
-  addFuBreakdownBlock(ws, nC, 2, rows, tabColorArgb);
+  const tblIdx = {}; cols.forEach(function(c,j){ if(tblIdx[c.h]===undefined) tblIdx[c.h] = j+1; });
+  (breakdownFn||addFuBreakdownBlock)(ws, nC, 2, rows, tabColorArgb, {first:first, last:last, idx:tblIdx});
+  if(wb.calcProperties) wb.calcProperties.fullCalcOnLoad = true; else wb.calcProperties = {fullCalcOnLoad:true};
   colDefs[nC] = {width:3};
   colDefs[nC+1] = {width:22};
   colDefs[nC+2] = {width:10};
@@ -3768,6 +3842,9 @@ function addFuDataSheet(wb, sheetName, title, rows, cols, tabColorArgb, dash) {
   colDefs[nC+6] = {width:3};
   colDefs[nC+7] = {width:22};
   colDefs[nC+8] = {width:10};
+  colDefs[nC+9] = {width:3};
+  colDefs[nC+10] = {width:22};
+  colDefs[nC+11] = {width:10};
 
   ws.columns = colDefs;
   ws.pageSetup = {paperSize:9, orientation:'landscape', fitToPage:true, fitToWidth:1, fitToHeight:0,
@@ -5258,6 +5335,16 @@ function pct(a,b){ return b?(a/b*100).toFixed(1)+'%':'0%'; }
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function units(r){ var q=toNum(r.qty); return (q&&q>0)?q:1; }
 function uSum(rows){ return rows.reduce(function(a,r){ return a+units(r); },0); }
+/* عدد الشهور المختلفة الموجودة فعلاً في الصفوف دي — يُستخدم عشان نحسب "متوسط لكل شهر"
+   بدل ما نجمع نفس المعدة كذا مرة (مرة لكل شهر) لو أكتر من شهر شغال في نفس الوقت. */
+function moMonthsCount(rows){ return new Set(rows.map(function(r){ return r.month; })).size || 1; }
+/* Fleet Equipment / By Status units: لو شهر واحد محدد بالظبط، يتعرض زي ما هو (رقم حقيقي لشهر واحد).
+   لو "الكل" (مفيش شهر محدد) أو أكتر من شهر، يتعرض كمتوسط لكل شهر بدل مجموع مضخّم. */
+function moAvgUnits(rows, rawSum){
+  if(moFilter.month.length === 1) return rawSum;
+  var mc = moMonthsCount(rows);
+  return mc ? rawSum / mc : rawSum;
+}
 function colSum(rows,k){ return rows.reduce(function(a,r){ return a+(toNum(r[k])||0); },0); }
 function cost(rows){ return colSum(rows,'totalCost'); }
 function fuel(rows){ return colSum(rows,'totalFuel'); }
@@ -5566,8 +5653,9 @@ function moRenderKpis(){
   var lostM=lost(idleRows), idleU=uSum(idleRows), idleD=lostDays(idleRows);
   var done=base.filter(function(r){ return (toNum(r.worked)||0)>0; });
 
-  document.getElementById('mo-k-units').textContent=abbr(u);
-  document.getElementById('mo-k-units').title=full(u)+' units';
+  var uDisp=moAvgUnits(base,u), singleMonth=(moFilter.month.length===1);
+  document.getElementById('mo-k-units').textContent=abbr(uDisp);
+  document.getElementById('mo-k-units').title=(singleMonth?full(uDisp)+' units':full(uDisp)+' units avg/month (total '+full(u)+' across '+moMonthsCount(base)+' month(s))');
   document.getElementById('mo-k-units-sub').textContent=full(base.length)+' rows · '+new Set(base.map(function(r){return r.equipment;})).size+' types';
   var pg=grp(base,'project'), pKeys=Object.keys(pg), odKeys=Object.keys(grp(base,'od'));
   var topP=pKeys.sort(function(a,b){ return pg[b].units-pg[a].units; })[0];
@@ -5752,10 +5840,12 @@ function fuelAssets(rows,n){
 
 function moRenderStatusCards(){
   var base=moBase('status'), g=grp(base,'status'), tot=uSum(base);
+  var singleMonth=(moFilter.month.length===1), mc=moMonthsCount(base);
   document.getElementById('mo-status-cards').innerHTML=STATUSES.map(function(st){
     var d=g[st]||{units:0,lost:0,idle:0};
-    return '<div class="dash-card'+(moFilter.status===st?' active':'')+'" data-status="'+esc(st)+'" title="'+full(d.units)+' units · Standby Cost '+full(d.lost)+' EGP">'
-      +'<div class="mo-val" style="font-size:22px;font-family:\'JetBrains Mono\',monospace;font-weight:700;color:'+STATUS_COLORS[st]+'">'+abbr(d.units)+'</div>'
+    var uDisp=singleMonth?d.units:(mc?d.units/mc:d.units);
+    return '<div class="dash-card'+(moFilter.status===st?' active':'')+'" data-status="'+esc(st)+'" title="'+(singleMonth?full(d.units)+' units':full(uDisp)+' units avg/month (total '+full(d.units)+')')+' · Standby Cost '+full(d.lost)+' EGP">'
+      +'<div class="mo-val" style="font-size:22px;font-family:\'JetBrains Mono\',monospace;font-weight:700;color:'+STATUS_COLORS[st]+'">'+abbr(uDisp)+'</div>'
       +'<div class="dash-card-label">'+esc(st)+'</div>'
       +'<div class="mo-sub">'+pct(d.units,tot)+' · '+abbr(d.lost)+' EGP standby</div></div>';
   }).join('');
@@ -6027,7 +6117,7 @@ function moDeleg(id,attr,fn){
 document.getElementById('mo-months').addEventListener('click',function(e){
   if(e.target.getAttribute('data-month-all')){ moFilter.month=[]; moRender(); }
 });
-moDeleg('mo-months','data-month',function(v){ var i=moFilter.month.indexOf(v); if(i>=0)moFilter.month.splice(i,1); else moFilter.month.push(v); moRender(); });
+moDeleg('mo-months','data-month',function(v){ moFilter.month=(moFilter.month.length===1&&moFilter.month[0]===v)?[]:[v]; moRender(); });
 moDeleg('mo-audit','data-month2',function(v){ moFilter.month=(moFilter.month.length===1&&moFilter.month[0]===v)?[]:[v]; moRender(); });
 moDeleg('mo-status-cards','data-status',function(v){ moFilter.status=(moFilter.status===v)?null:v; moRender(); });
 moDeleg('mo-cat-cards','data-cat',function(v){ moFilter.cat=(moFilter.cat===v)?null:v; moRender(); });
@@ -6065,7 +6155,7 @@ document.getElementById('mo-btn-table').addEventListener('click',function(){ moT
 document.getElementById('mo-btn-audit').addEventListener('click',function(){ moAuditOpen=!moAuditOpen; document.getElementById('mo-audit').style.display=moAuditOpen?'block':'none'; this.classList.toggle('accent',moAuditOpen); if(moAuditOpen) moRenderAudit(); });
 document.getElementById('mo-btn-refresh').addEventListener('click',function(){ moLoadDataset(true); });
 document.getElementById('mo-btn-export-pdf').addEventListener('click',function(){ moExportPDF(); });
-document.getElementById('mo-btn-export-xlsx').addEventListener('click',function(){ moExportPDF('xlsx'); });
+document.getElementById('mo-btn-export-xlsx').addEventListener('click',moExportXlsxDashboard);
 document.getElementById('mo-btn-director').addEventListener('click',moDirectorReport);
 document.getElementById('mo-btn-projects').addEventListener('click',function(){ if(window.pmOpen) window.pmOpen('mo'); });
 document.getElementById('mo-btn-import').addEventListener('click',function(){ document.getElementById('mo-file-input').click(); });
@@ -6091,7 +6181,7 @@ function moExport(){
   var rows=searchRows(moBase(null));
   if(!rows.length){ if(typeof toast==='function') toast('Nothing to export','error'); return; }
   var out=rows.map(function(r,i){
-    return {'#':i+1,'Hiring Month':r.month,'Hiring Date':r.hiring,'Profit Center':r.pc,'O.D':r.od,'Project':r.project,
+    return {'S/N':i+1,'Hiring Month':r.month,'Hiring Date':r.hiring,'Profit Center':r.pc,'O.D':r.od,'Project':r.project,
       'Eq.Category':r.cat,'Eq.Code':r.code,'Equipment':r.equipment,'Model / Capacity':r.model,
       'Actual Working Days':r.worked,'STANDBY (DAYS)':r.standby,'Under Repair (Days)':r.repair,
       'Daily Rate (Unit Price)':r.unitPrice,'Standby Cost':lostOf(r),'Money Made (Total Cost)':r.totalCost,
@@ -6121,6 +6211,82 @@ function moExportPDF(kind){
     {h:'Util%',g:f('utl'),t:'t'},{h:'Status',g:f('status'),t:'t'}];
   window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 Master Owned Equipment Export',cols:cols,rows:rows}, kind);
 }
+
+/* ═════ Export Excel — Dashboard (same idea as the Follow-Up export):
+   one sheet for the current view + one sheet per Status (Working / Standby / Under Repair /
+   Not Available) + an "All" sheet, each with a slim Total banner line (no boxed Summary panel)
+   and Project / O.D / Category Top-10 breakdown blocks to the right of the table. ═════ */
+function moExportXlsxDashboard(){
+  var rows=searchRows(moBase(null));         // current view (respects every active filter + search)
+  var scoped=moBase('status');                // full scope ignoring only the Status filter — basis for per-status + All sheets
+  if(!rows.length){ if(typeof toast==='function') toast('Nothing to export','error'); return; }
+  var EJ=window.ExcelJS;
+  if(!EJ){ if(typeof toast==='function') toast('Excel library did not load \u2014 check the internet connection','error'); return; }
+
+  function f(k){ return function(r){ return r[k]; }; }
+  var cols=[
+    {h:'#',g:function(r,i){return i+1;},t:'t'},{h:'Month',g:f('month'),t:'t'},{h:'Hiring Date',g:f('hiring'),t:'t'},{h:'Profit Center',g:f('pc'),t:'t'},
+    {h:'O.D',g:f('od'),t:'t'},{h:'Project',g:f('project'),t:'t'},{h:'Category',g:f('cat'),t:'t'},{h:'Code',g:f('code'),t:'t'},
+    {h:'Equipment',g:f('equipment'),t:'t'},{h:'Model/Cap',g:f('model'),t:'t'},
+    {h:'Worked',g:function(r){return toNum(r.worked);},t:'i',s:true},{h:'Standby',g:function(r){return toNum(r.standby);},t:'i',s:true},{h:'Repair',g:function(r){return toNum(r.repair);},t:'i',s:true},
+    {h:'Unit Price',g:function(r){return toNum(r.unitPrice);},t:'m'},{h:'Standby Cost',g:function(r){return lostOf(r);},t:'z',s:true},
+    {h:'Money Made',g:function(r){return toNum(r.totalCost);},t:'m',s:true},{h:'OT/Day',g:function(r){return toNum(r.otPerDay);},t:'dz'},{h:'OT Cost',g:function(r){return toNum(r.costOt);},t:'z',s:true},
+    {h:'Qty',g:function(r){return units(r);},t:'i',s:true},{h:'Avail',g:f('avail'),t:'t'},{h:'Fuel L',g:function(r){return toNum(r.totalFuel);},t:'i',s:true},
+    {h:'Util%',g:f('utl'),t:'t'},{h:'Status',g:f('status'),t:'t'}];
+
+  var kCounts={Working:0,Standby:0,'Under Repair':0,'Not Available':0};
+  scoped.forEach(function(r){ if(kCounts[r.status]!==undefined) kCounts[r.status]++; });
+  var kMonths=Object.keys(scoped.reduce(function(o,r){ if(r.month) o[r.month]=1; return o; },{})).sort();
+  var kpis=[
+    {label:'Total Equipment', value: scoped.length},
+    {label:'Avg Equipment / Month', value: Math.round(scoped.length/(kMonths.length||1))},
+    {label:'Working', value: kCounts.Working},
+    {label:'Standby', value: kCounts.Standby},
+    {label:'Under Repair', value: kCounts['Under Repair']},
+    {label:'Not Available', value: kCounts['Not Available']}
+  ];
+  var opts={title:'HAC \u00b7 PMV \u2014 Master Owned Equipment Export', cols:cols, rows:rows, kpis:kpis};
+  var wb=window.hacBuildXlsx(opts, EJ);
+
+  function moMonLabel(m){
+    var x=/^(\d{4})-(\d{2})$/.exec(String(m||''));
+    if(!x) return String(m||'\u2014');
+    return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+x[2]-1]+'-'+x[1].slice(2);
+  }
+  function moDash(rowsP){
+    var n=uSum(rowsP), money=cost(rowsP), lostM=lost(rowsP);
+    var mk=Object.keys(rowsP.reduce(function(o,r){ if(r.month) o[r.month]=1; return o; },{})).sort();
+    var mc=mk.length||1;
+    var byProj={};
+    rowsP.forEach(function(r){ var p=(r.project||'\u2014').trim()||'\u2014'; byProj[p]=(byProj[p]||0)+units(r); });
+    var topProj=Object.entries(byProj).sort(function(a,b){ return b[1]-a[1]; })[0];
+    return [
+      {label:'Total Equipment', value:Math.round(n)},
+      {label:'Avg Equipment / Month', value:Math.round(n/mc)},
+      {label:'Money Made', value:Math.round(money)},
+      {label:'Standby Cost', value:Math.round(lostM)},
+      {label:'Top Project', value: topProj ? (topProj[0]+' ('+Math.round(topProj[1])+')') : '\u2014'}
+    ];
+  }
+
+  var STATUS_TAB_COLORS={Working:'FF3FB950',Standby:'FFFFA657','Under Repair':'FFF85149','Not Available':'FF8B949E'};
+  if(scoped.length) window.addFuDataSheet(wb, 'All', 'HAC \u00b7 PMV \u2014 All Equipment', scoped, cols, 'FFF0A500', moDash(scoped), window.addMoBreakdownBlock);
+  STATUSES.forEach(function(st){
+    var rowsP=scoped.filter(function(r){ return r.status===st; });
+    if(rowsP.length) window.addFuDataSheet(wb, st, 'HAC \u00b7 PMV \u2014 '+st+' Equipment', rowsP, cols, STATUS_TAB_COLORS[st], moDash(rowsP), window.addMoBreakdownBlock);
+  });
+
+  function two(n){ return n<10?'0'+n:''+n; }
+  var d=new Date(), stamp=d.getFullYear()+'-'+two(d.getMonth()+1)+'-'+two(d.getDate());
+  var fname='Master_Owned_Export_'+stamp+'.xlsx';
+  wb.xlsx.writeBuffer().then(function(buf){
+    var blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fname;
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1500);
+  }).catch(function(err){ if(typeof toast==='function') toast('Excel export failed: '+(err&&err.message||err),'error'); });
+}
+
 function moDirectorReport(){
   var rows=moBase(null);
   if(!rows.length){ if(typeof toast==='function') toast('No data','error'); return; }
@@ -7540,10 +7706,39 @@ function mrExportPDF(kind){
     return {txt:'', num:NaN, cls:''};
   }
   var sumIdx={}; ['qty','totalPrice','otCost','totalDeduct','fuel'].forEach(function(k){ sumIdx[k]=1; });
-  if(kind==='xlsx'){   // same columns / same sums as the PDF, written as a formatted Excel table
-    window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 Master Rental Export',rows:rows,cols:cols.map(function(c){
+  if(kind==='xlsx'){   // same look as the Master Owned export: KPI line (Total Equipment / Avg per month) + Month / Project / O.D / Category breakdown blocks
+    var EJ=window.ExcelJS;
+    if(!EJ||typeof window.hacBuildXlsx!=='function'){ tt('Excel library did not load \u2014 check the internet connection','error'); return; }
+    var m=metrics(rows);
+    var byProj={};
+    rows.forEach(function(r){ var q=N(r.qty); if(q>0){ var p=S(r.project)||'\u2014'; byProj[p]=(byProj[p]||0)+q; } });
+    var topP=Object.entries(byProj).sort(function(a,b){ return b[1]-a[1]; })[0];
+    function fx(n){ return Math.round(n).toLocaleString('en-US'); }
+    var xcols=cols.map(function(c){
       return {h:c[0], t:c[2], s:!!sumIdx[c[1]], g:function(r,i){ return c[1]==='#'?(i+1):r[c[1]]; }};
-    })},'xlsx');
+    });
+    var wb=window.hacBuildXlsx({title:'HAC \u00b7 PMV \u2014 Master Rental Export', cols:xcols, rows:rows, kpis:[
+      {label:'Total Equipment', value:fx(m.units)},
+      {label:'Avg Equipment / Month', value:fx(m.avgUnits)},
+      {label:'Total Value', value:fx(m.totalValue)},
+      {label:'Deductions', value:fx(m.deduct)},
+      {label:'Top Project', value: topP ? (topP[0]+' ('+fx(topP[1])+')') : '\u2014'}
+    ]}, EJ);
+    var ws=wb.worksheets[0], nC=xcols.length;
+    var shim=rows.filter(function(r){ return N(r.qty)>0; }).map(function(r){
+      return {qty:N(r.qty), month:S(r.month), project:S(r.project), od:S(r.od), cat:S(r.category)};
+    });
+    var ridx={}; xcols.forEach(function(c,j){ if(ridx[c.h]===undefined) ridx[c.h]=j+1; });
+    if(typeof window.addMoBreakdownBlock==='function') window.addMoBreakdownBlock(ws, nC, 2, shim, 'FFF0A500', {first:5, last:4+rows.length, idx:ridx});
+    wb.calcProperties = {fullCalcOnLoad:true};
+    [3,22,10,3,22,10,3,22,10,3,22,10].forEach(function(w,k){ ws.getColumn(nC+1+k).width=w; });
+    var d=new Date(), stamp=d.getFullYear()+'-'+two(d.getMonth()+1)+'-'+two(d.getDate());
+    wb.xlsx.writeBuffer().then(function(buf){
+      var blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+      var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='Master_Rental_Export_'+stamp+'.xlsx';
+      document.body.appendChild(a); a.click();
+      setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1500);
+    }).catch(function(err){ tt('Excel export failed: '+(err&&err.message||err),'error'); });
     return;
   }
 
@@ -9313,14 +9508,14 @@ window.__rd={parseWorkbook:parseWorkbook,setRows:function(r,m){ rows=r; meta=m||
     var kpiRows=(o.kpis&&o.kpis.length)?1:0, hdrRow=3+kpiRows;
     var cols=o.cols, rows=o.rows, nC=cols.length, nR=rows.length, first=hdrRow+1, last=hdrRow+nR, tot=last+1, lastCol=colLetter(nC);
     var wb=new EJ.Workbook(); wb.creator='HAC PMV'; wb.created=new Date();
-    var ws=wb.addWorksheet(String(o.title||'Export').replace(/[\\\/\?\*\[\]:]/g,' ').slice(0,31),
+    var ws=wb.addWorksheet(String(o.title||'Export').replace(/^\s*HAC\s*\u00b7\s*PMV\s*\u2014\s*/,'').replace(/[\\\/\?\*\[\]:]/g,' ').slice(0,31),
       {views:[{state:'frozen',ySplit:hdrRow,activeCell:'A'+first}],properties:{tabColor:{argb:'FFF0A500'}}});
     var NAVY='FF0D1B2E', AMBER='FFF0A500', thinB={style:'thin',color:{argb:'FFE3E7ED'}};
     ws.mergeCells('A1:'+lastCol+'1'); ws.mergeCells('A2:'+lastCol+'2');
-    var t1=ws.getCell('A1'); t1.value=o.title||''; t1.font={name:'Calibri',size:15,bold:true,color:{argb:NAVY}}; t1.alignment={vertical:'middle'};
+    var t1=ws.getCell('A1'); t1.value=String(o.title||'').replace(/^\s*HAC\s*\u00b7\s*PMV\s*\u2014\s*/,''); t1.font={name:'Calibri',size:15,bold:true,color:{argb:NAVY}}; t1.alignment={vertical:'middle',horizontal:'center'};
     ws.getRow(1).height=26;
-    var t2=ws.getCell('A2'); t2.value=nR.toLocaleString('en-US')+' rows \u00b7 Generated '+new Date().toLocaleString()+(o.sub?' \u00b7 '+o.sub:'');
-    t2.font={name:'Calibri',size:10,color:{argb:'FF666666'}}; t2.border={bottom:{style:'medium',color:{argb:AMBER}}};
+    var t2=ws.getCell('A2'); t2.value=nR.toLocaleString('en-US')+(o.sub?' \u00b7 '+o.sub:'');
+    t2.font={name:'Calibri',size:12,bold:true,color:{argb:'FF444444'}}; t2.alignment={vertical:'middle',horizontal:'center'}; t2.border={bottom:{style:'medium',color:{argb:AMBER}}};
     for(var c=2;c<=nC;c++) ws.getCell(2,c).border={bottom:{style:'medium',color:{argb:AMBER}}};
     if(kpiRows){
       ws.mergeCells('A3:'+lastCol+'3');
@@ -9334,7 +9529,7 @@ window.__rd={parseWorkbook:parseWorkbook,setRows:function(r,m){ rows=r; meta=m||
     }
     var hr=ws.getRow(hdrRow); hr.height=30;
     cols.forEach(function(col,j){
-      var cell=hr.getCell(j+1); cell.value=col.h;
+      var cell=hr.getCell(j+1); cell.value=(col.h==='#'?'S/N':col.h);
       cell.font={name:'Calibri',size:10,bold:true,color:{argb:'FFFFFFFF'}};
       cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:NAVY}};
       cell.alignment={vertical:'middle',horizontal:col.t==='t'?'left':'right',wrapText:true};
@@ -9420,10 +9615,10 @@ window.__rd={parseWorkbook:parseWorkbook,setRows:function(r,m){ rows=r; meta=m||
     h+='@media print{.bar,.flt{display:none}body{padding:6px 8px}tbody tr:hover td{background:inherit}tbody tr:nth-child(even):hover td{background:#fafafa}';
     h+='*{-webkit-print-color-adjust:exact;print-color-adjust:exact}thead{display:table-header-group}tr{page-break-inside:avoid}@page{size:A4 landscape;margin:7mm}}';
     h+='</style></head><body>';
-    h+='<h1>'+esc(o.title)+'</h1><div class="sub">'+rows.length.toLocaleString('en-US')+' rows \u00b7 Generated '+esc(new Date().toLocaleString())+(o.sub?' \u00b7 '+esc(o.sub):'')+'</div>';
+    h+='<h1 style="text-align:center">'+esc(String(o.title).replace(/^\s*HAC\s*\u00b7\s*PMV\s*\u2014\s*/,''))+'</h1><div class="sub" style="text-align:center;font-weight:700">'+rows.length.toLocaleString('en-US')+(o.sub?' \u00b7 '+esc(o.sub):'')+'</div>';
     if(o.kpis && o.kpis.length) h+='<div class="kpis">'+o.kpis.map(function(k){ return '<div class="k">'+esc(k.label)+': <b>'+esc(String(k.value))+'</b></div>'; }).join('')+'</div>';
     h+='<div class="bar"><input id="gq" placeholder="Search all columns\u2026"><button class="g" id="clr">Clear</button><span id="cnt"></span><span class="sp"></span><button onclick="window.print()">\ud83d\udda8 Print / Save PDF</button></div>';
-    h+='<table><thead><tr>'+cols.map(function(c){ return '<th'+(c.t==='t'?'':' class="n"')+'>'+esc(c.h)+'</th>'; }).join('')+'</tr>';
+    h+='<table><thead><tr>'+cols.map(function(c){ return '<th'+(c.t==='t'?'':' class="n"')+'>'+esc(c.h==='#'?'S/N':c.h)+'</th>'; }).join('')+'</tr>';
     h+='<tr class="flt">'+cols.map(function(c,j){ return '<th><input data-c="'+j+'"'+(c.t==='t'?'':' data-n="1" placeholder="&gt;100"')+'></th>'; }).join('')+'</tr></thead><tbody id="tb">';
     rows.forEach(function(r,i){
       var cs=cols.map(function(c){ return cell(c.g(r,i),c.t); });
