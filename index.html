@@ -8655,7 +8655,7 @@ var PRO={tab:'overview',cat:'all',dim:'category'};
 var COL={o:'#3fb950',r:'#58a6ff',ot:'#bc8cff',f:'#ffa657',bad:'#f85149',gold:'#f0a500'};
 var TH={text:'var(--text,#c9d1d9)',mut:'var(--text-muted,#8b949e)',grid:'var(--border,#30363d)'};
 function setTheme(print){TH.text=print?'#1a1a1a':'var(--text,#c9d1d9)';TH.mut=print?'#666':'var(--text-muted,#8b949e)';TH.grid=print?'#d8d8d8':'var(--border,#30363d)';}
-var TABS=[['overview','Overview'],['od','O.D'],['projects','Projects'],['equip','Equipment'],['fuel','Fuel'],['ot','Overtime'],['insights','Insights & Advice']];
+var TABS=[['overview','Overview'],['report','Equipment Report'],['od','O.D'],['projects','Projects'],['equip','Equipment'],['fuel','Fuel'],['ot','Overtime'],['insights','Insights & Advice']];
 
 /* ── helpers ── */
 function N(v){var n=parseFloat(v);return isNaN(n)?0:n;}
@@ -8678,8 +8678,8 @@ function toast(m,t){try{if(typeof window.toast==='function')window.toast(m,t);}c
 function lostOf(r){var sb=N(r.standby);if(!sb||sb<=10)return 0;var up=N(r.unitPrice);if(!up){var w=N(r.worked),c=N(r.totalCost);up=(w&&c)?c/w:0;}return sb*up*1.2;}
 function capRow(eq,model,pw){var c=null;try{if(typeof capParse==='function')c=capParse(model,eq)||capParse(pw,eq)||capParse(eq,eq);}catch(e){}return c||'';}
 function eqc(x){return x.eq+(x.cap?' '+x.cap:'');}
-function normO(r){var q=N(r.qty);return {src:'O',od:(r.od||'').trim()||'(no O.D)',project:(r.project||'').trim()||'(no project)',pk:pkey(r.project),cat:cname(r.cat),ck:ckey(r.cat),eq:(r.equipment||'').trim()||'(n/a)',model:r.model||'',cap:capRow(r.equipment,r.model,r.power||r.mainCap||r.maincap),code:r.code||'',month:mon(r.month),units:q>0?q:0,cost:N(r.totalCost),fuel:N(r.totalFuel),ot:N(r.costOt),days:N(r.worked),standby:N(r.standby),util:has(r.utl)?utl(r.utl):null,lost:lostOf(r),deduct:0,vendor:''};}
-function normR(r){var q=N(r.qty);return {src:'R',od:(r.od||'').trim()||'(no O.D)',project:(r.project||'').trim()||'(no project)',pk:pkey(r.project),cat:cname(r.category),ck:ckey(r.category),eq:(r.equipment||'').trim()||'(n/a)',model:r.model||'',cap:capRow(r.equipment,r.model,r.maincap||r.mainCap),code:r.sap||r.plant||'',month:mon(r.month),units:q>0?q:0,cost:N(r.totalPrice),fuel:N(r.fuel),ot:N(r.otCost),days:N(r.days),standby:0,util:has(r.util)?N(r.util):null,lost:0,deduct:N(r.totalDeduct),vendor:(r.subcon||'').trim()||'(n/a)'};}
+function normO(r){var q=N(r.qty);return {src:'O',od:(r.od||'').trim()||'(no O.D)',project:(r.project||'').trim()||'(no project)',pk:pkey(r.project),cat:cname(r.cat),ck:ckey(r.cat),eq:(r.equipment||'').trim()||'(n/a)',model:r.model||'',cap:capRow(r.equipment,r.model,r.power||r.mainCap||r.maincap),code:r.code||'',month:mon(r.month),units:q>0?q:0,cost:N(r.totalCost),fuel:N(r.totalFuel),ot:N(r.costOt),days:N(r.worked),standby:N(r.standby),util:has(r.utl)?utl(r.utl):null,lost:lostOf(r),deduct:0,vendor:'',bm:(has(r.bm)&&N(r.bm)>0)?utl(r.bm):null,mc:String(r.mainCap||r.maincap||r.power||'').trim()};}
+function normR(r){var q=N(r.qty);return {src:'R',od:(r.od||'').trim()||'(no O.D)',project:(r.project||'').trim()||'(no project)',pk:pkey(r.project),cat:cname(r.category),ck:ckey(r.category),eq:(r.equipment||'').trim()||'(n/a)',model:r.model||'',cap:capRow(r.equipment,r.model,r.maincap||r.mainCap),code:r.sap||r.plant||'',month:mon(r.month),units:q>0?q:0,cost:N(r.totalPrice),fuel:N(r.fuel),ot:N(r.otCost),days:N(r.days),standby:0,util:has(r.util)?N(r.util):null,lost:0,deduct:N(r.totalDeduct),vendor:(r.subcon||'').trim()||'(n/a)',mc:String(r.maincap||r.mainCap||r.power||'').trim()};}
 function data(){
   var X=window.__cmpx||null;
   var rawO=(window.MO&&typeof MO.data==='function')?MO.data():[], rawR=(window.MR&&typeof MR.data==='function')?MR.data():[];
@@ -9205,6 +9205,293 @@ window.cmpDirectorReport=function(){
   w.document.write(h);w.document.close();
 };
 
+
+/* ═══ Equipment Report — Owned vs Rental per equipment + capacity, unit breakdown, Arabic alerts ═══ */
+(function(){
+  if(document.getElementById('rp-css'))return;
+  var st=document.createElement('style');st.id='rp-css';
+  st.textContent='.rp-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between}'
+  +'.rp-th{display:flex;gap:12px;flex-wrap:wrap;align-items:center;font-size:11px;color:var(--text-muted);margin-top:8px}.rp-th input{width:52px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:3px 6px;text-align:right}'
+  +'.rp-kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin-bottom:14px}'
+  +'.rp-k{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px}.rp-k .t{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}'
+  +'.rp-k .v{font-family:"JetBrains Mono",monospace;font-size:15px;font-weight:700}.rp-k .s{font-size:10px;color:var(--text-muted);margin-top:4px}'
+  +'.rp-o{color:#3fb950}.rp-r{color:#58a6ff}'
+  +'.rp-al{border:1px solid var(--border);border-right:4px solid #ffa657;border-radius:8px;padding:10px 12px;margin-bottom:8px;background:var(--surface);direction:rtl;text-align:right;cursor:pointer}.rp-al.c{border-right-color:#f85149}.rp-al:hover{border-color:var(--accent)}'
+  +'.rp-al .h{display:flex;gap:8px;align-items:center;font-size:12px;font-weight:700}.rp-al .i{font-size:12px;margin-top:4px}.rp-al .a{font-size:12px;margin-top:4px;color:#3fb950}.rp-al .go{font-size:10px;color:var(--text-muted);margin-top:4px}'
+  +'.rp-chip{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(255,166,87,.18);color:#ffa657}.rp-al.c .rp-chip{background:rgba(248,81,73,.18);color:#f85149}'
+  +'#rp-wrap{overflow:auto;max-height:76vh;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);margin-bottom:14px}'
+  +'.rp-t{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}'
+  +'.rp-t th{position:sticky;top:0;z-index:3;background:var(--surface2);color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:.4px;padding:0 8px;height:27px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);text-align:center;white-space:nowrap}'
+  +'.rp-t thead tr.h2 th{top:27px;z-index:3}.rp-t th.fc{left:0;z-index:6;text-align:left;min-width:250px}'
+  +'.rp-t td{padding:6px 8px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);white-space:nowrap;background:var(--surface)}.rp-t td.n{text-align:right;font-family:"JetBrains Mono",monospace}'
+  +'.rp-t td.fc{position:sticky;left:0;z-index:2;min-width:250px;max-width:300px;overflow:hidden;text-overflow:ellipsis;border-right:2px solid var(--border)}'
+  +'.rp-t tr.cat td{background:color-mix(in srgb,#58a6ff 14%,var(--surface));font-weight:700}'
+  +'.rp-t tr.eq td{font-weight:600;cursor:pointer}.rp-t tr.eq:hover td{background:color-mix(in srgb,var(--accent) 8%,var(--surface))}'
+  +'.rp-t tr.cp td{cursor:pointer;background:color-mix(in srgb,#8b949e 9%,var(--surface))}.rp-t tr.cp:hover td{background:color-mix(in srgb,var(--accent) 8%,var(--surface))}'
+  +'.rp-t tr.un td{font-size:11px;color:var(--text-muted);background:color-mix(in srgb,#8b949e 4%,var(--surface))}'
+  +'.rp-t tr.gt td{background:var(--surface3,#2a2f36);font-weight:700;border-top:2px solid var(--accent);position:sticky;bottom:0;z-index:2}.rp-t tr.gt td.fc{z-index:4}'
+  +'.rp-t tr.hit td{outline:2px solid var(--accent);outline-offset:-2px}'
+  +'.rp-t td.g{color:#3fb950;font-weight:700}.rp-t td.y{color:#e3b341;font-weight:700;background:color-mix(in srgb,#e3b341 14%,var(--surface))}.rp-t td.rd{color:#f85149;font-weight:700;background:color-mix(in srgb,#f85149 16%,var(--surface))}'
+  +'.rp-b{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap}.rp-b.s0{background:rgba(63,185,80,.15);color:#3fb950}.rp-b.s1{background:rgba(227,179,65,.2);color:#e3b341}.rp-b.s2{background:rgba(248,81,73,.2);color:#f85149}'
+  +'.rp-tg{display:inline-block;width:14px;color:var(--accent)}';
+  document.head.appendChild(st);
+})();
+var TH_KEY='hac_cmp_rpt_th2',TH_DEF={ug:5,ot:10,fg:30,cg:50};
+function thLoad(){var t={};try{t=JSON.parse(localStorage.getItem(TH_KEY)||'{}')||{};}catch(e){}var o={};Object.keys(TH_DEF).forEach(function(k){o[k]=N(t[k])>0?N(t[k]):TH_DEF[k];});return o;}
+window.cmpRptTH=function(el){var t=thLoad();t[el.getAttribute('data-th')]=N(el.value);try{localStorage.setItem(TH_KEY,JSON.stringify(t));}catch(e){}render();};
+function isDeduct(x){return /deduct/i.test(x.cat)||/deduct/i.test(x.eq);}
+function capOf(x){
+  var eq=x.eq,c=null;
+  try{
+    if(typeof capParse==='function')c=capParse(x.mc,eq)||capParse(x.model,eq)||capParse(eq,eq);
+    if(!c&&x.mc&&!/^[-\u2013\u2014\s]*$/.test(x.mc)){if(/^\d+(\.\d+)?$/.test(x.mc))c=x.mc+(/generator/i.test(eq)?' KVA':(/crane/i.test(eq)?' Ton':''));else c=x.mc;}
+  }catch(e){}
+  return c||'—';
+}
+/* No. of equipment = distinct equipment codes in the period (rows without code: peak month quantity) */
+function uCount(rows){var codes={},pm={},n=0;rows.forEach(function(x){if(!(x.units>0))return;var c=String(x.code||'').trim();if(c){if(!codes[c]){codes[c]=1;n++;}}else{pm[x.month]=(pm[x.month]||0)+x.units;}});var mx=0;Object.keys(pm).forEach(function(k){if(pm[k]>mx)mx=pm[k];});return n+mx;}
+function med(a){a=a.filter(function(v){return v>0;}).sort(function(x,y){return x-y;});var n=a.length;return n?(n%2?a[(n-1)/2]:(a[n/2-1]+a[n/2])/2):0;}
+function rpct(v,dp){return v===null||v===undefined||isNaN(v)?'—':(+v).toFixed(dp===undefined?1:dp)+'%';}
+function sevTxt(s){return s===2?'حرج':(s===1?'راجع':'سليم');}
+function uniq(a){return a.filter(function(v,i){return a.indexOf(v)===i;});}
+function unitsOf(rows,side){
+  var m={},arr=[];
+  rows.forEach(function(x,i){
+    if(!(x.units>0)&&!String(x.code||'').trim())return;
+    var code=String(x.code||'').trim(),k=code||('#'+side+i),u=m[k];
+    if(!u){u=m[k]={code:code||'(بدون كود)',side:side,pj:{},cost:0,ot:0,fuel:0,days:0,standby:0,us:0,un:0,fl:[],sev:0,iss:[]};arr.push(u);}
+    u.pj[x.project]=1;u.cost+=x.cost;u.ot+=x.ot;u.fuel+=x.fuel;u.days+=x.days;u.standby+=x.standby;if(x.util!==null){u.us+=x.util;u.un++;}
+  });
+  arr.forEach(function(u){u.util=u.un?u.us/u.un:null;var p=Object.keys(u.pj);u.project=p.slice(0,2).join(' / ')+(p.length>2?' +'+(p.length-2):'');});
+  return arr;
+}
+function alertsOf(g,th){
+  var a=[],O=g.O,R=g.R,bm=g.bm,w=O.cost+R.cost,lbl=g.lbl;
+  function push(sev,tag,issue,action,ex){var x={sev:sev,tag:tag,eq:lbl,cat:g.cat,ck:g.key,issue:issue,action:action,w:w};if(ex)for(var k in ex)x[k]=ex[k];a.push(x);}
+  [['O','المملوك',O],['R','المؤجر',R]].forEach(function(s){
+    var S=s[2];if(bm===null||!(S.n_>0)||S.util===null)return;
+    var gap=bm-S.util;if(gap<=0)return;var crit=gap>th.ug;
+    push(crit?2:1,'استخدام','استخدام '+s[1]+' '+S.util.toFixed(0)+'% أقل من البنش ماركت '+bm.toFixed(0)+'% بفرق '+gap.toFixed(1)+' نقطة ('+S.n_+' وحدة).'+(s[0]==='O'&&O.lost>0?' تكلفة الستاند باي '+FULL(O.lost)+' جنيه.':''),
+      crit?(s[0]==='O'?(R.n_>0?'وزّع الوحدات المملوكة الواقفة على المشاريع قبل ما تستأجر تاني — فيه '+R.n_+' وحدة إيجار شغالة في نفس الوقت.':'انقل الوحدات الزايدة لمشروع محتاج أو قلّل العدد.'):'رجّع الوحدات المؤجرة الزايدة أو فاوض المورّد على إيجار يومي/بالساعة بدل الشهري.'):'قريب من البنش ماركت — تابعه وحاول ترفع ساعات التشغيل.');
+  });
+  [['المملوك',O],['المؤجر',R]].forEach(function(s){
+    var S=s[1];if(!(S.cost>0&&S.ot>=5000))return;var p=S.ot/S.cost*100;
+    if(p>=th.ot)push(p>=2*th.ot?2:1,'أوفر تايم','الأوفر تايم ('+s[0]+') '+FULL(S.ot)+' جنيه = '+p.toFixed(0)+'% من تكلفة '+s[0]+' (الحد '+th.ot+'%).','اعرف سبب الأوفر تايم، وقارن بين إضافة وردية/معدة وبين دفع الأوفر تايم، واشترط موافقة مسبقة عليه.');
+  });
+  if(O.n_>0&&R.n_>0&&O.fuel>0&&R.fuel>0&&Math.max(O.fuel,R.fuel)>=200){
+    var fo=O.fuel/O.n_,fr=R.fuel/R.n_,hi=Math.max(fo,fr),lo=Math.min(fo,fr),p2=(hi/lo-1)*100,own=fo>=fr;
+    if(p2>=th.fg)push(p2>=2*th.fg?2:1,'سولار','السولار للوحدة '+FULL(hi)+' لتر في '+(own?'المملوك':'المؤجر')+' مقابل '+FULL(lo)+' لتر في '+(own?'المؤجر':'المملوك')+' لنفس السعة (أعلى بـ '+p2.toFixed(0)+'%).','راجع كشوف السولار لـ'+(own?'المملوك':'المؤجر')+': الدوران على الفاضي، التسريب، السرقة، قراءات العداد، ومطابقة السولار مع ساعات التشغيل.');
+  }
+  [['O','المملوكة'],['R','المؤجرة']].forEach(function(sd){
+    var us=g.units.filter(function(u){return u.side===sd[0];});
+    if(us.filter(function(u){return u.cost>0;}).length<3)return;
+    var mc=med(us.map(function(u){return u.cost;})),mf=med(us.map(function(u){return u.fuel;}));
+    us.forEach(function(u){
+      if(mc>0&&u.cost>=mc*(1+th.cg/100)&&u.cost-mc>=10000){
+        var sv=(u.cost/mc-1)*100>=2*th.cg?2:1;u.fl.push('تكلفة');u.sev=Math.max(u.sev,sv);
+        var is='الوحدة '+u.code+' ('+u.project+') تكلفتها '+FULL(u.cost)+' جنيه = '+(u.cost/mc).toFixed(1)+'× وسيط الوحدات '+sd[1]+' لنفس السعة ('+FULL(mc)+' جنيه) — شغلت '+FULL(u.days)+' يوم'+(u.util!==null?' واستخدام '+u.util.toFixed(0)+'%':'')+'.';
+        u.iss.push(is);push(sv,'تكلفة',is,'افتح تفاصيل الوحدة وراجع: سعر اليوم، الأوفر تايم، أيام الستاند باي، وهل تستاهل تكمل ولا تتبدل.',{code:u.code,w:u.cost});
+      }
+      if(mf>0&&u.fuel>=mf*(1+th.fg/100)&&u.fuel-mf>=200){
+        var sv2=(u.fuel/mf-1)*100>=2*th.fg?2:1;u.fl.push('سولار');u.sev=Math.max(u.sev,sv2);
+        var is2='الوحدة '+u.code+' ('+u.project+') استهلكت '+FULL(u.fuel)+' لتر مقابل وسيط '+FULL(mf)+' لتر للوحدات '+sd[1]+' لنفس السعة (أعلى بـ '+((u.fuel/mf-1)*100).toFixed(0)+'%).';
+        u.iss.push(is2);push(sv2,'سولار',is2,'راجع كشف سولار الوحدة: دوران على الفاضي، تسريب، سرقة، قراءة العداد، ومطابقة السولار مع ساعات التشغيل.',{code:u.code,w:u.fuel*10});
+      }
+    });
+  });
+  return a;
+}
+function rptBuild(d){
+  var th=thLoad(),o=d.o.filter(function(x){return !isDeduct(x);}),r=d.r.filter(function(x){return !isDeduct(x);});
+  var excl=(d.o.length-o.length)+(d.r.length-r.length),em={};
+  function add(x,s){
+    var cap=capOf(x),ek=x.eq.toLowerCase(),e=em[ek]||(em[ek]={key:ek,eq:x.eq,cat:x.cat,o:[],r:[],caps:{}});e[s].push(x);
+    var c=e.caps[cap]||(e.caps[cap]={key:ek+'|'+cap,eq:x.eq,cat:x.cat,cap:cap,o:[],r:[]});c[s].push(x);
+  }
+  o.forEach(function(x){add(x,'o');});r.forEach(function(x){add(x,'r');});
+  function bmOf(rows){var b=rows.map(function(x){return x.bm;}).filter(function(v){return v!==null&&v>0;});return b.length?b.reduce(function(a,c){return a+c;},0)/b.length:null;}
+  function fin(g){g.O=agg(g.o);g.R=agg(g.r);g.O.n_=uCount(g.o);g.R.n_=uCount(g.r);}
+  var T={o:o,r:r};fin(T);var totFuel=T.O.fuel+T.R.fuel,al=[],flat=[];
+  var eqs=Object.keys(em).map(function(k){
+    var e=em[k];fin(e);e.bm=bmOf(e.o);
+    e.capList=Object.keys(e.caps).map(function(ck){
+      var c=e.caps[ck];fin(c);c.bm=bmOf(c.o);if(c.bm===null)c.bm=e.bm;c.lbl=e.eq+(c.cap!=='—'?' ('+c.cap+')':'');
+      c.units=unitsOf(c.o,'O').concat(unitsOf(c.r,'R'));c.al=alertsOf(c,th);
+      var sh=totFuel>0?(c.O.fuel+c.R.fuel)/totFuel*100:0;
+      if(sh>=20){var weak=c.al.some(function(x){return x.tag==='استخدام'||x.tag==='أوفر تايم';});
+        c.al.push({sev:weak?2:1,tag:'سولار',eq:c.lbl,cat:c.cat,ck:c.key,w:c.O.cost+c.R.cost,issue:'بيستهلك '+sh.toFixed(0)+'% من سولار الفليت كله ('+FULL(c.O.fuel+c.R.fuel)+' لتر)'+(weak?' مع استخدام ضعيف أو أوفر تايم عالي.':'.'),action:weak?'أولوية مراجعة: سولار عالي مع أداء ضعيف — راجع رقابة السولار وهل الشغل يبرر الاستهلاك.':'أكبر مستهلك للسولار — خليه تحت المراجعة الدورية.'});}
+      c.sev=c.al.reduce(function(a,b){return Math.max(a,b.sev);},0);al=al.concat(c.al);flat.push(c);return c;
+    }).sort(function(a,b){return (b.O.cost+b.R.cost)-(a.O.cost+a.R.cost);});
+    e.sev=e.capList.reduce(function(a,b){return Math.max(a,b.sev);},0);
+    e.tags=uniq([].concat.apply([],e.capList.map(function(c){return c.al.map(function(x){return x.tag;});})));
+    return e;
+  });
+  al.sort(function(a,b){return b.sev-a.sev||b.w-a.w;});
+  var cats={};eqs.forEach(function(e){var c=cats[e.cat]||(cats[e.cat]={cat:e.cat,eqs:[],o:[],r:[]});c.eqs.push(e);c.o=c.o.concat(e.o);c.r=c.r.concat(e.r);});
+  var cl=Object.keys(cats).map(function(k){var c=cats[k];fin(c);c.eqs.sort(function(a,b){return (b.O.cost+b.R.cost)-(a.O.cost+a.R.cost);});return c;}).sort(function(a,b){return (b.O.cost+b.R.cost)-(a.O.cost+a.R.cost);});
+  var fl2=[];cl.forEach(function(c){c.eqs.forEach(function(e){e.capList.forEach(function(g){fl2.push(g);});});});
+  return {eqs:eqs,flat:fl2,cats:cl,T:T,th:th,al:al,excl:excl,crit:al.filter(function(x){return x.sev===2;}).length,warn:al.filter(function(x){return x.sev===1;}).length,
+    noBm:uniq(fl2.filter(function(g){return g.bm===null&&g.O.n_>0;}).map(function(g){return g.lbl;}))};
+}
+function summaryLines(T){
+  var tu=T.O.n_+T.R.n_,tc=T.O.cost+T.R.cost,tf=T.O.fuel+T.R.fuel,to=T.O.ot+T.R.ot,au=agg(T.o.concat(T.r)).util;
+  return [['No. of Equipment',T.O.n_,T.R.n_,tu,'n'],['Average Equipment Utilization %',T.O.util,T.R.util,au,'p'],['Overtime Cost (EGP)',T.O.ot,T.R.ot,to,'n'],['Cost incl. Overtime (EGP)',T.O.cost,T.R.cost,tc,'n'],
+    ['Overtime as % of Cost',T.O.cost?T.O.ot/T.O.cost*100:null,T.R.cost?T.R.ot/T.R.cost*100:null,tc?to/tc*100:null,'p'],['Fuel Consumption (L)',T.O.fuel,T.R.fuel,tf,'n'],['Fuel per Unit (L)',T.O.n_?T.O.fuel/T.O.n_:null,T.R.n_?T.R.fuel/T.R.n_:null,tu?tf/tu:null,'n']];
+}
+function sfmt(v,k){return v===null||v===undefined?'—':(k==='p'?rpct(v):FULL(v));}
+/* utilization colour: green >= benchmark · yellow = below by up to ug pts · red = below by more than ug pts */
+function uCls(u,bm,th){if(u===null||u===undefined||bm===null||bm===undefined)return '';var gap=bm-u;return gap<=0?'g':(gap<=th.ug?'y':'rd');}
+function stBadge(sev,tags,tip){return '<span class="rp-b s'+sev+'" title="'+E(tip||'')+'">'+sevTxt(sev)+(tags&&tags.length?' · '+tags.join(' · '):'')+'</span>';}
+function cells(O,R,bm,th,nOverride){
+  var uo=uCls(O.util,bm,th),ur=uCls(R.util,bm,th);
+  return '<td class="n rp-o">'+FULL(O.n_)+'</td><td class="n rp-r">'+FULL(R.n_)+'</td><td class="n">'+(bm===null||bm===undefined?'—':rpct(bm,0))+'</td><td class="n '+uo+'">'+rpct(O.util,0)+'</td><td class="n '+ur+'">'+rpct(R.util,0)+'</td><td class="n">'+FULL(O.ot)+'</td><td class="n">'+FULL(R.ot)+'</td><td class="n">'+FULL(O.cost)+'</td><td class="n">'+FULL(R.cost)+'</td><td class="n">'+FULL(O.fuel)+'</td><td class="n">'+FULL(R.fuel)+'</td>';
+}
+function unitRow(u,g,th){
+  var O=u.side==='O',z='<td class="n"></td>',v=function(x){return '<td class="n">'+(x===null?'':FULL(x))+'</td>';};
+  var ut='<td class="n '+uCls(u.util,g.bm,th)+'">'+rpct(u.util,0)+'</td>';
+  return '<tr class="un" data-key="u:'+E(g.key+'|'+u.side+u.code)+'"><td class="fc" style="padding-right:8px;padding-left:46px" title="'+E(u.project)+'">'+(O?'🟢 ':'🔵 ')+E(u.code)+' · '+E(u.project)+'</td>'
+   +(O?'<td class="n rp-o">1</td>'+z:z+'<td class="n rp-r">1</td>')+z+(O?ut+z:z+ut)+(O?v(u.ot)+z:z+v(u.ot))+(O?v(u.cost)+z:z+v(u.cost))+(O?v(u.fuel)+z:z+v(u.fuel))
+   +'<td style="text-align:center">'+(u.fl.length?stBadge(u.sev,u.fl,u.iss.join(' | ')):'')+'</td></tr>';
+}
+function viewReport(d){
+  var R=rptBuild(d),T=R.T,th=R.th,open=PRO.rptOpen||(PRO.rptOpen={}),h='';
+  h+='<div class="cx-card"><div class="rp-bar"><div><div style="font-size:15px;font-weight:700">Equipment Report — Owned vs Rental (by capacity)</div><div style="font-size:11px;color:var(--text-muted)">Follows the Month / O.D / Project filters · Benchmark = B.M from Master Owned · Click any equipment / capacity row for the breakdown · “Deduct” excluded'+(R.excl?' ('+R.excl+' rows)':'')+'</div></div>'
+   +'<div style="display:flex;gap:8px"><button class="btn-sm accent" data-act="rpt-print">📄 PDF / Print</button><button class="btn-sm" data-act="rpt-xlsx">📊 Excel</button></div></div>'
+   +'<div class="rp-th"><b>Alert limits:</b><label>Util critical when below BM by more than <input type="number" min="1" data-th="ug" value="'+th.ug+'" onchange="window.cmpRptTH(this)"> pts (yellow below that)</label><label>Overtime above <input type="number" min="1" data-th="ot" value="'+th.ot+'" onchange="window.cmpRptTH(this)"> % of cost</label><label>Fuel above peers by <input type="number" min="1" data-th="fg" value="'+th.fg+'" onchange="window.cmpRptTH(this)"> %</label><label>Unit cost above peers by <input type="number" min="1" data-th="cg" value="'+th.cg+'" onchange="window.cmpRptTH(this)"> %</label></div></div>';
+  var sm=summaryLines(T),share=(T.O.cost+T.R.cost)?T.R.cost/(T.O.cost+T.R.cost)*100:0;
+  h+='<div class="rp-kpis">'
+   +'<div class="rp-k"><div class="t">Equipment</div><div class="v"><span class="rp-o">'+FULL(T.O.n_)+'</span> / <span class="rp-r">'+FULL(T.R.n_)+'</span></div><div class="s">Owned / Rental</div></div>'
+   +'<div class="rp-k"><div class="t">Avg Utilization</div><div class="v"><span class="rp-o">'+rpct(T.O.util,0)+'</span> / <span class="rp-r">'+rpct(T.R.util,0)+'</span></div><div class="s">Owned / Rental</div></div>'
+   +'<div class="rp-k"><div class="t">Cost incl. Overtime</div><div class="v">'+F(T.O.cost+T.R.cost)+'</div><div class="s">Rental share '+rpct(share,0)+'</div></div>'
+   +'<div class="rp-k"><div class="t">Overtime</div><div class="v">'+F(T.O.ot+T.R.ot)+'</div><div class="s">'+rpct(sm[4][3],1)+' of cost</div></div>'
+   +'<div class="rp-k"><div class="t">Fuel</div><div class="v">'+FULL(T.O.fuel+T.R.fuel)+' L</div><div class="s">'+FULL(sm[6][3])+' L per unit</div></div>'
+   +'<div class="rp-k" style="border-color:'+(R.crit?'#f85149':(R.warn?'#e3b341':'#3fb950'))+'"><div class="t">Needs your attention</div><div class="v"><span style="color:#f85149">'+R.crit+' حرج</span> · <span style="color:#e3b341">'+R.warn+' راجع</span></div><div class="s">اضغط على أي تنبيه لفتح تفاصيله</div></div></div>';
+  if(R.al.length){
+    var lim=PRO.rptAll?R.al.length:6;
+    h+='<div class="cx-card"><div style="font-size:13px;font-weight:700;margin-bottom:10px;direction:rtl;text-align:right">⚠ ابدأ بالبنود دي</div>';
+    R.al.slice(0,lim).forEach(function(x){h+='<div class="rp-al'+(x.sev===2?' c':'')+'" data-act="rpt-go" data-k="'+E(x.ck)+'"><div class="h"><span class="rp-chip">'+x.tag+'</span>'+E(x.eq)+'<span style="color:var(--text-muted);font-weight:400">· '+E(x.cat)+'</span></div><div class="i">'+E(x.issue)+'</div><div class="a">← '+E(x.action)+'</div><div class="go">اضغط لعرض التفاصيل في الجدول</div></div>';});
+    if(R.al.length>6)h+='<button class="btn-sm" data-act="rpt-more">'+(PRO.rptAll?'عرض أول 6 فقط':'عرض كل التنبيهات ('+R.al.length+')')+'</button>';
+    h+='</div>';
+  }else h+='<div class="cx-card" style="color:#3fb950;font-weight:700;direction:rtl;text-align:right">✅ مفيش حاجة عدّت الحدود المسموحة.</div>';
+  var tb='<table class="rp-t"><thead><tr><th rowspan="2" class="fc">Equipment / Capacity</th><th colspan="2">No. of Equipment</th><th rowspan="2">Bench-<br>mark</th><th colspan="2">Utilization</th><th colspan="2">Overtime (EGP)</th><th colspan="2">Cost incl. OT (EGP)</th><th colspan="2">Fuel (L)</th><th rowspan="2">Status</th></tr><tr class="h2"><th>Owned</th><th>Rental</th><th>Owned</th><th>Rental</th><th>Owned</th><th>Rental</th><th>Owned</th><th>Rental</th><th>Owned</th><th>Rental</th></tr></thead><tbody>';
+  R.cats.forEach(function(c){
+    tb+='<tr class="cat"><td class="fc">'+E(c.cat)+'</td>'+cells(c.O,c.R,null,th)+'<td></td></tr>';
+    c.eqs.forEach(function(e){
+      var eo=!!open['e:'+e.key];
+      tb+='<tr class="eq" data-act="rpt-tog" data-k="e:'+E(e.key)+'" data-key="e:'+E(e.key)+'"><td class="fc"><span class="rp-tg">'+(eo?'▾':'▸')+'</span>'+E(e.eq)+' <span style="color:var(--text-muted);font-weight:400;font-size:10px">('+e.capList.length+' سعة)</span></td>'+cells(e.O,e.R,e.bm,th)+'<td style="text-align:center">'+stBadge(e.sev,e.tags,'')+'</td></tr>';
+      if(eo)e.capList.forEach(function(g){
+        var co=!!open['c:'+g.key];
+        tb+='<tr class="cp" data-act="rpt-tog" data-k="c:'+E(g.key)+'" data-key="c:'+E(g.key)+'"><td class="fc" style="padding-left:26px"><span class="rp-tg">'+(co?'▾':'▸')+'</span>'+(g.cap==='—'?'سعة غير محددة':'⚙ '+E(g.cap))+'</td>'+cells(g.O,g.R,g.bm,th)+'<td style="text-align:center">'+stBadge(g.sev,uniq(g.al.map(function(x){return x.tag;})),g.al.map(function(x){return x.issue;}).join(' | '))+'</td></tr>';
+        if(co)g.units.slice().sort(function(a,b){return b.cost-a.cost;}).forEach(function(u){tb+=unitRow(u,g,th);});
+      });
+    });
+  });
+  tb+='<tr class="gt"><td class="fc">Grand Total</td>'+cells(T.O,T.R,null,th)+'<td></td></tr></tbody></table>';
+  h+='<div id="rp-wrap">'+tb+'</div>';
+  h+='<div class="cx-card" style="overflow-x:auto;padding:0"><table class="rp-t" style="min-width:560px"><thead><tr><th class="fc" style="position:static">Summary and Conclusion</th><th style="position:static">Owned</th><th style="position:static">Rental</th><th style="position:static">Total / Average</th></tr></thead><tbody>'
+   +sm.map(function(r){return '<tr><td class="fc" style="position:static"><b>'+r[0]+'</b></td><td class="n rp-o">'+sfmt(r[1],r[4])+'</td><td class="n rp-r">'+sfmt(r[2],r[4])+'</td><td class="n">'+sfmt(r[3],r[4])+'</td></tr>';}).join('')+'</tbody></table></div>';
+  if(R.noBm.length)h+='<div style="font-size:11px;color:var(--text-muted);direction:rtl;text-align:right">ℹ مفيش بنش ماركت (B.M) في Master Owned لـ: '+E(R.noBm.slice(0,12).join('، '))+(R.noBm.length>12?' …':'')+' — الاستخدام مش بيتقيّم لها.</div>';
+  return h;
+}
+function rptGo(k){
+  var o=PRO.rptOpen||(PRO.rptOpen={}),ek=k.split('|')[0];o['e:'+ek]=true;o['c:'+k]=true;render();
+  setTimeout(function(){var rows=document.querySelectorAll('#rp-wrap tr[data-key]');for(var i=0;i<rows.length;i++){if(rows[i].getAttribute('data-key')==='c:'+k){rows[i].scrollIntoView({block:'center',behavior:'smooth'});rows[i].classList.add('hit');(function(r){setTimeout(function(){r.classList.remove('hit');},2500);})(rows[i]);break;}}},60);
+}
+function rptFilterText(){var X=window.__cmpx&&window.__cmpx.state||{};return [X.month&&X.month!=='all'?'Month: '+X.month:'',X.od&&X.od!=='all'?'O.D: '+X.od:'',X.projectSearch?'Project: '+X.projectSearch:''].filter(Boolean).join(' · ')||'All months · All O.D · All projects';}
+function rptOut(kind){
+  setTheme(false);var d=data();
+  if(!d.o.length&&!d.r.length){toast('No data to export','error');return;}
+  var R=rptBuild(d),f=rptFilterText();
+  if(kind==='xlsx')rptXlsx(R,f);else rptPrint(R,f);
+}
+function notesAr(R){
+  var th=R.th;
+  return ['البنش ماركت مأخوذ من عمود B.M في Master Owned (متوسطه لكل معدة وسعة). لو معدة مالهاش بنش ماركت، استخدامها مش بيتقيّم.',
+    'الاستخدام: أخضر = وصل للبنش ماركت أو أعلى · أصفر = أقل منه بحد أقصى '+th.ug+' نقط · أحمر (حرج) = أقل منه بأكتر من '+th.ug+' نقط.',
+    'المقارنة بتتم داخل نفس المعدة ونفس السعة (مثلاً ونش 50 طن مقابل ونش 50 طن) عشان الونش الكبير ماينقارنش بالصغير.',
+    'الأوفر تايم: بيتنبّه له لو زاد عن '+th.ot+'% من تكلفة الجانب (مملوك أو مؤجر)، وحرج عند '+(2*th.ot)+'%.',
+    'السولار: بيتنبّه له لو سولار الوحدة في جانب أعلى من الجانب التاني بأكتر من '+th.fg+'%، أو وحدة استهلاكها أعلى من وسيط الوحدات المماثلة بنفس النسبة، أو معدة بتستهلك 20% أو أكتر من سولار الفليت.',
+    'التكلفة: وحدة تكلفتها أعلى من وسيط الوحدات المماثلة (نفس المعدة والسعة والجانب) بأكتر من '+th.cg+'% (حرج عند '+(2*th.cg)+'%)، بشرط 3 وحدات على الأقل للمقارنة.',
+    'عدد المعدات = عدد أكواد المعدات المختلفة في الفترة المختارة. التكلفة شاملة الأوفر تايم. فئة Deduct مستبعدة'+(R.excl?' ('+R.excl+' صف)':'')+'.'
+  ].concat(R.noBm.length?['معدات بدون بنش ماركت: '+R.noBm.join('، ')]:[]);
+}
+function rptPrint(R,f){
+  var T=R.T,th=R.th,sm=summaryLines(T),n=function(v){return v===null||v===undefined?'':Math.round(v).toLocaleString('en');},pc=function(v,dp){return v===null||v===undefined||isNaN(v)?'':(+v).toFixed(dp===undefined?0:dp)+'%';};
+  var css='@page{size:A4 landscape;margin:8mm}*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;font-size:9px;color:#111;margin:0}h1{font-size:17px;margin:2px 0}h2{font-size:12px;margin:12px 0 5px;color:#1f4e5f;border-bottom:2px solid #1f4e5f;padding-bottom:2px}.sub{font-size:10px;color:#444}.k{display:flex;gap:6px;margin:8px 0}.k div{flex:1;border:1px solid #bbb;border-radius:4px;padding:5px 7px}.k b{display:block;font-size:12px}.k span{font-size:8px;color:#666;text-transform:uppercase}'
+   +'table{width:100%;border-collapse:collapse;margin-bottom:6px}th{background:#1f4e5f;color:#fff;padding:3px 4px;border:1px solid #1f4e5f;font-size:8px}td{padding:2.5px 4px;border:1px solid #bbb}td.n{text-align:right}tr.cat td{background:#e3edf2;font-weight:700}tr.gt td{background:#cfdbe2;font-weight:700;border-top:2px solid #1f4e5f}td.ind{padding-left:12px}.o{color:#1a7f37}.r{color:#0b62c4}.g{color:#1a7f37;font-weight:700}.y{background:#fff3cd;color:#8a6d00;font-weight:700}.rd{background:#f8d7da;color:#c62828;font-weight:700}'
+   +'.s0{color:#1a7f37}.s1{color:#8a6d00;font-weight:700}.s2{color:#c62828;font-weight:700}thead{display:table-header-group}tr{page-break-inside:avoid}.pb{page-break-before:always}.box{border:2px solid '+(R.crit?'#c62828':(R.warn?'#e69138':'#1a7f37'))+';border-radius:5px;padding:6px 9px;margin:6px 0}.ar{direction:rtl;text-align:right}.ar td,.ar th{text-align:right}.ac{color:#1a7f37;font-weight:700}ul{margin:3px 16px;padding:0}li{margin-bottom:3px}';
+  var h='<!DOCTYPE html><html><head><meta charset="utf-8"><title>PMV Equipment Report</title><style>'+css+'</style></head><body>';
+  h+='<div style="font-size:10px;font-weight:700">H.A Construction — Support Division, PMV Department</div><h1>PMV Project Report — Equipment (Owned vs Rental)</h1><div class="sub">'+E(f)+' · '+new Date().toLocaleDateString('en-GB')+'</div>';
+  h+='<div class="k"><div><span>Equipment (Owned / Rental)</span><b>'+n(T.O.n_)+' / '+n(T.R.n_)+'</b></div><div><span>Avg utilization (O / R)</span><b>'+pc(T.O.util)+' / '+pc(T.R.util)+'</b></div><div><span>Cost incl. overtime</span><b>EGP '+n(T.O.cost+T.R.cost)+'</b></div><div><span>Overtime</span><b>EGP '+n(T.O.ot+T.R.ot)+' ('+pc(sm[4][3],1)+')</b></div><div><span>Fuel</span><b>'+n(T.O.fuel+T.R.fuel)+' L</b></div></div>';
+  h+='<div class="box ar"><b>ملخص القرار: </b>'+(R.al.length?'<span class="s2">'+R.crit+' بند حرج</span> و<span class="s1">'+R.warn+' بند للمراجعة</span>. أهم الأولويات:<ul>'+R.al.slice(0,3).map(function(x){return '<li><b>'+E(x.eq)+'</b> ['+x.tag+'] — '+E(x.issue)+' <span class="ac">← '+E(x.action)+'</span></li>';}).join('')+'</ul>':'<span class="s0">مفيش حاجة عدّت الحدود المسموحة.</span>')+'</div>';
+  h+='<table><thead><tr><th rowspan="2" style="text-align:left">Equipment / Capacity</th><th colspan="2">No. of Equipment</th><th rowspan="2">Benchmark</th><th colspan="2">Utilization</th><th colspan="2">Overtime (EGP)</th><th colspan="2">Cost incl. OT (EGP)</th><th colspan="2">Fuel (L)</th><th rowspan="2">الحالة</th></tr><tr><th>Owned</th><th>Rental</th><th>Owned</th><th>Rental</th><th>Owned</th><th>Rental</th><th>Owned</th><th>Rental</th><th>Owned</th><th>Rental</th></tr></thead><tbody>';
+  function nums(c){return '<td class="n o">'+n(c.O.n_)+'</td><td class="n r">'+n(c.R.n_)+'</td>';}
+  R.cats.forEach(function(c){
+    h+='<tr class="cat"><td>'+E(c.cat)+'</td>'+nums(c)+'<td></td><td class="n">'+pc(c.O.util)+'</td><td class="n">'+pc(c.R.util)+'</td><td class="n">'+n(c.O.ot)+'</td><td class="n">'+n(c.R.ot)+'</td><td class="n">'+n(c.O.cost)+'</td><td class="n">'+n(c.R.cost)+'</td><td class="n">'+n(c.O.fuel)+'</td><td class="n">'+n(c.R.fuel)+'</td><td></td></tr>';
+    c.eqs.forEach(function(e){e.capList.forEach(function(g){var tg=uniq(g.al.map(function(x){return x.tag;})).join('، ');
+      h+='<tr><td class="ind">'+E(g.lbl)+'</td>'+nums(g)+'<td class="n">'+(g.bm===null?'':pc(g.bm))+'</td><td class="n '+uCls(g.O.util,g.bm,th)+'">'+pc(g.O.util)+'</td><td class="n '+uCls(g.R.util,g.bm,th)+'">'+pc(g.R.util)+'</td><td class="n">'+n(g.O.ot)+'</td><td class="n">'+n(g.R.ot)+'</td><td class="n">'+n(g.O.cost)+'</td><td class="n">'+n(g.R.cost)+'</td><td class="n">'+n(g.O.fuel)+'</td><td class="n">'+n(g.R.fuel)+'</td><td class="s'+g.sev+'">'+sevTxt(g.sev)+(tg?' · '+tg:'')+'</td></tr>';});});
+  });
+  h+='<tr class="gt"><td>Grand Total</td>'+nums(T)+'<td></td><td class="n">'+pc(T.O.util)+'</td><td class="n">'+pc(T.R.util)+'</td><td class="n">'+n(T.O.ot)+'</td><td class="n">'+n(T.R.ot)+'</td><td class="n">'+n(T.O.cost)+'</td><td class="n">'+n(T.R.cost)+'</td><td class="n">'+n(T.O.fuel)+'</td><td class="n">'+n(T.R.fuel)+'</td><td></td></tr></tbody></table>';
+  h+='<h2>Summary and Conclusion</h2><table style="width:60%"><thead><tr><th style="text-align:left">Item</th><th>Owned</th><th>Rental</th><th>Total / Average</th></tr></thead><tbody>'+sm.map(function(r){var fm=function(v){return v===null||v===undefined?'':(r[4]==='p'?pc(v,1):n(v));};return '<tr><td><b>'+r[0]+'</b></td><td class="n">'+fm(r[1])+'</td><td class="n">'+fm(r[2])+'</td><td class="n">'+fm(r[3])+'</td></tr>';}).join('')+'</tbody></table>';
+  h+='<div class="pb"></div><div class="ar"><h2>الملاحظات والتوصيات — المطلوب عمله</h2>';
+  if(R.al.length)h+='<table><thead><tr><th>م</th><th>الأولوية</th><th>المعدة / السعة</th><th>المشكلة</th><th>الإجراء المطلوب</th></tr></thead><tbody>'+R.al.map(function(x,i){return '<tr><td>'+(i+1)+'</td><td class="s'+x.sev+'">'+(x.sev===2?'حرج':'راجع')+'<br>'+x.tag+'</td><td><b>'+E(x.eq)+'</b><br>'+E(x.cat)+(x.code?'<br>كود: '+E(x.code):'')+'</td><td>'+E(x.issue)+'</td><td class="ac">'+E(x.action)+'</td></tr>';}).join('')+'</tbody></table>';
+  else h+='<p class="s0"><b>مفيش بند عدّى الحدود المسموحة — مفيش إجراء مطلوب.</b></p>';
+  h+='<h2>طريقة قراءة التقرير</h2><ul>'+notesAr(R).map(function(t){return '<li>'+E(t)+'</li>';}).join('')+'</ul></div>';
+  h+='<script>window.onload=function(){setTimeout(function(){window.print();},350)}<\/script></body></html>';
+  var w=window.open('','_blank');if(!w){toast('Allow pop-ups to open the PDF','error');return;}w.document.write(h);w.document.close();
+}
+function rptXlsx(R,f){
+  if(typeof ExcelJS==='undefined'){toast('Excel engine not loaded','error');return;}
+  var T=R.T,th=R.th,wb=new ExcelJS.Workbook();wb.creator='HAC PMV';
+  var HF={type:'pattern',pattern:'solid',fgColor:{argb:'FF1F4E5F'}};
+  function fill(c,argb){c.fill={type:'pattern',pattern:'solid',fgColor:{argb:argb}};}
+  function head(ws,t,last){ws.mergeCells('A1:'+last+'1');ws.getCell('A1').value='H.A Construction — Support Division, PMV Department';ws.getCell('A1').font={bold:true,size:11};ws.mergeCells('A2:'+last+'2');ws.getCell('A2').value=t;ws.getCell('A2').font={bold:true,size:14};ws.mergeCells('A3:'+last+'3');ws.getCell('A3').value=f+' · '+new Date().toLocaleDateString('en-GB');ws.getCell('A3').font={italic:true,color:{argb:'FF555555'}};}
+  var pv=function(v){return v===null||v===undefined?null:v/100;},rd=function(v){return Math.round(v||0);};
+  /* sheet 1 — equipment + capacity */
+  var ws=wb.addWorksheet('Equipment Report',{views:[{state:'frozen',xSplit:2,ySplit:5}],pageSetup:{orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,paperSize:9}});
+  head(ws,'PMV Project Report — Equipment (Owned vs Rental, by capacity)','O');
+  var cols=['Equipment','Capacity','Eq Category','Owned No.','Rental No.','Benchmark %','Util Owned %','Util Rental %','OT Owned (EGP)','OT Rental (EGP)','Cost Owned (EGP)','Cost Rental (EGP)','Fuel Owned (L)','Fuel Rental (L)','الحالة'];
+  var rows=R.flat.map(function(g){return [g.eq,g.cap,g.cat,g.O.n_,g.R.n_,pv(g.bm),pv(g.O.util),pv(g.R.util),rd(g.O.ot),rd(g.R.ot),rd(g.O.cost),rd(g.R.cost),rd(g.O.fuel),rd(g.R.fuel),sevTxt(g.sev)+(g.al.length?' · '+uniq(g.al.map(function(x){return x.tag;})).join('، '):'')];});
+  if(rows.length){
+    ws.addTable({name:'EquipmentReport',ref:'A5',headerRow:true,totalsRow:false,style:{theme:'TableStyleMedium2',showRowStripes:true},columns:cols.map(function(c){return {name:c,filterButton:true};}),rows:rows});
+    R.flat.forEach(function(g,i){var r=6+i;
+      [6,7,8].forEach(function(c){ws.getCell(r,c).numFmt='0%';});[4,5,9,10,11,12,13,14].forEach(function(c){ws.getCell(r,c).numFmt='#,##0';});
+      [[7,g.O.util],[8,g.R.util]].forEach(function(p){var k=uCls(p[1],g.bm,th),c=ws.getCell(r,p[0]);if(k==='rd'){fill(c,'FFF8D7DA');c.font={bold:true,color:{argb:'FFC62828'}};}else if(k==='y'){fill(c,'FFFFF3CD');c.font={bold:true,color:{argb:'FF8A6D00'}};}else if(k==='g'){fill(c,'FFD4EDDA');}});
+      ws.getCell(r,15).font={bold:true,color:{argb:g.sev===2?'FFC62828':(g.sev===1?'FF8A6D00':'FF1A7F37')}};});
+    var gr=6+rows.length,tr=ws.getRow(gr);
+    ['Grand Total','','',T.O.n_,T.R.n_,null,pv(T.O.util),pv(T.R.util),rd(T.O.ot),rd(T.R.ot),rd(T.O.cost),rd(T.R.cost),rd(T.O.fuel),rd(T.R.fuel),''].forEach(function(v,i){var c=tr.getCell(i+1);c.value=v;c.font={bold:true};fill(c,'FFCFDBE2');c.border={top:{style:'medium'},bottom:{style:'medium'}};if(i===5||i===6||i===7)c.numFmt='0%';else if(i>2&&i<14)c.numFmt='#,##0';});
+  }
+  [24,14,18,10,10,11,12,12,15,15,16,16,14,14,26].forEach(function(w,i){ws.getColumn(i+1).width=w;});
+  ws.getRow(5).height=30;ws.getRow(5).alignment={wrapText:true,vertical:'middle',horizontal:'center'};
+  /* sheet 2 — unit breakdown */
+  var s2=wb.addWorksheet('Units Breakdown',{views:[{state:'frozen',xSplit:2,ySplit:5}]});head(s2,'Units Breakdown — كل وحدة بالكود والسعة','N');
+  var uc=['Equipment','Capacity','Eq Category','Type','Code','Project','Working Days','Util %','Standby Days','Cost incl. OT (EGP)','OT (EGP)','Fuel (L)','Cost vs Peers ×','الحالة'];
+  var ur=[],uref=[];
+  R.flat.forEach(function(g){['O','R'].forEach(function(sd){var us=g.units.filter(function(u){return u.side===sd;}),m=us.filter(function(u){return u.cost>0;}).length>=3?med(us.map(function(u){return u.cost;})):0;
+    us.sort(function(a,b){return b.cost-a.cost;}).forEach(function(u){ur.push([g.eq,g.cap,g.cat,sd==='O'?'Owned':'Rental',u.code,u.project,rd(u.days),pv(u.util),rd(u.standby),rd(u.cost),rd(u.ot),rd(u.fuel),m?Math.round(u.cost/m*10)/10:null,u.fl.length?sevTxt(u.sev)+' · '+u.fl.join('، '):'']);uref.push(u);});});});
+  if(ur.length){
+    s2.addTable({name:'UnitsBreakdown',ref:'A5',headerRow:true,totalsRow:false,style:{theme:'TableStyleMedium2',showRowStripes:true},columns:uc.map(function(c){return {name:c,filterButton:true};}),rows:ur});
+    uref.forEach(function(u,i){var r=6+i;s2.getCell(r,8).numFmt='0%';[7,9,10,11,12].forEach(function(c){s2.getCell(r,c).numFmt='#,##0';});s2.getCell(r,13).numFmt='0.0"×"';if(u.fl.length){var c=s2.getCell(r,14);c.font={bold:true,color:{argb:u.sev===2?'FFC62828':'FF8A6D00'}};fill(c,u.sev===2?'FFF8D7DA':'FFFFF3CD');}});
+  }
+  [24,14,18,9,16,34,12,9,12,16,12,12,12,22].forEach(function(w,i){s2.getColumn(i+1).width=w;});s2.getRow(5).height=30;s2.getRow(5).alignment={wrapText:true,vertical:'middle',horizontal:'center'};
+  /* sheet 3 — summary */
+  var s3=wb.addWorksheet('Summary');head(s3,'Summary and Conclusion','D');
+  var h3=s3.getRow(5);['Item','Owned','Rental','Total / Average'].forEach(function(v,i){var c=h3.getCell(i+1);c.value=v;c.font={bold:true,color:{argb:'FFFFFFFF'}};c.fill=HF;c.alignment={horizontal:'center'};});
+  summaryLines(T).forEach(function(r,i){var x=s3.getRow(6+i);x.getCell(1).value=r[0];x.getCell(1).font={bold:true};[1,2,3].forEach(function(k){var c=x.getCell(k+1),v=r[k];c.value=(v===null||v===undefined)?null:(r[4]==='p'?v/100:Math.round(v));c.numFmt=r[4]==='p'?'0.0%':'#,##0';});});
+  [34,16,16,18].forEach(function(w,i){s3.getColumn(i+1).width=w;});
+  /* sheet 4 — recommendations (Arabic) */
+  var s4=wb.addWorksheet('التوصيات',{views:[{rightToLeft:true,state:'frozen',ySplit:5}]});head(s4,'الملاحظات والتوصيات — المطلوب عمله','E');
+  if(R.al.length){
+    s4.addTable({name:'Recommendations',ref:'A5',headerRow:true,totalsRow:false,style:{theme:'TableStyleMedium2',showRowStripes:true},columns:['م','الأولوية','المعدة / السعة','المشكلة','الإجراء المطلوب'].map(function(c){return {name:c,filterButton:true};}),rows:R.al.map(function(x,i){return [i+1,(x.sev===2?'حرج':'راجع')+' · '+x.tag,x.eq+(x.code?' — كود '+x.code:''),x.issue,x.action];})});
+    R.al.forEach(function(x,i){var r=6+i;s4.getRow(r).alignment={wrapText:true,vertical:'top',horizontal:'right'};var c=s4.getCell(r,2);c.font={bold:true,color:{argb:x.sev===2?'FFC62828':'FF8A6D00'}};fill(c,x.sev===2?'FFF8D7DA':'FFFFF3CD');});
+  }else{s4.getCell('A5').value='مفيش بند عدّى الحدود المسموحة — مفيش إجراء مطلوب.';}
+  [6,18,34,60,60].forEach(function(w,i){s4.getColumn(i+1).width=w;});
+  /* sheet 5 — notes (Arabic) */
+  var s5=wb.addWorksheet('ملاحظات',{views:[{rightToLeft:true}]});head(s5,'طريقة قراءة التقرير','A');
+  notesAr(R).forEach(function(t,i){var c=s5.getCell(5+i,1);c.value='• '+t;c.alignment={wrapText:true,vertical:'top',horizontal:'right'};});s5.getColumn(1).width=130;
+  wb.xlsx.writeBuffer().then(function(buf){var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));a.download='PMV_Equipment_Report.xlsx';document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},500);toast('Excel exported','success');});
+}
+
 /* ═══ tabs engine ═══ */
 function renderTabs(){
   var t=document.getElementById('cmp-tabs');if(!t)return;
@@ -9220,7 +9507,7 @@ function render(){
   var d=data(),html=filterBar(d);
   if(!d.rawO.length&&!d.rawR.length)html+='<div class="cmp-no-data" style="margin-top:50px;font-size:15px">⚠️ No data loaded yet.<br><br><span style="font-size:12px">Import data in Master Owned then Master Rental.</span></div>';
   else if(!d.o.length&&!d.r.length)html+='<div class="cmp-no-data">No data under the current filters.</div>';
-  else html+=({od:viewOD,projects:viewProjects,equip:viewEquip,fuel:viewFuel,ot:viewOT,insights:viewInsights})[PRO.tab](d);
+  else html+=({od:viewOD,projects:viewProjects,equip:viewEquip,fuel:viewFuel,ot:viewOT,insights:viewInsights,report:viewReport})[PRO.tab](d);
   pro.innerHTML=html;
 }
 function act(a,k,el){
@@ -9234,6 +9521,11 @@ function act(a,k,el){
   if(a==='dim'){PRO.dim=k;render();return;}
   if(a==='drill'){drillOpen(k);return;}
   if(a==='report'){window.cmpDirectorReport();return;}
+  if(a==='rpt-print'){rptOut('print');return;}
+  if(a==='rpt-xlsx'){rptOut('xlsx');return;}
+  if(a==='rpt-more'){PRO.rptAll=!PRO.rptAll;render();return;}
+  if(a==='rpt-tog'){PRO.rptOpen=PRO.rptOpen||{};PRO.rptOpen[k]=!PRO.rptOpen[k];render();return;}
+  if(a==='rpt-go'){rptGo(k);return;}
   if(a==='sort'){var p=k.split('|');sortTable(el,p[0],+p[1]);return;}
 }
 function bind(root){
