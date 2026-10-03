@@ -9248,8 +9248,16 @@ function capOf(x){
   }catch(e){}
   return c||'—';
 }
-/* No. of equipment = distinct equipment codes in the period (rows without code: peak month quantity) */
-function uCount(rows){var codes={},pm={},n=0;rows.forEach(function(x){if(!(x.units>0))return;var c=String(x.code||'').trim();if(c){if(!codes[c]){codes[c]=1;n++;}}else{pm[x.month]=(pm[x.month]||0)+x.units;}});var mx=0;Object.keys(pm).forEach(function(k){if(pm[k]>mx)mx=pm[k];});return n+mx;}
+/* No. of equipment = distinct equipment codes in the period (rows without code: peak month quantity).
+   Rental rows: the SAP/plant value is a contract/material code shared by many machines, so it can NOT identify a unit —
+   each rental line (equipment + model + capacity + project + vendor) is counted once at its peak monthly quantity. */
+function rLine(x){return [x.eq,x.model,x.cap,x.pk,x.vendor].join('|').toLowerCase();}
+function uCount(rows){var codes={},pm={},ln={},n=0;rows.forEach(function(x){if(!(x.units>0))return;
+  if(x.src==='R'){var k=rLine(x),l=ln[k]||(ln[k]={});l[x.month]=(l[x.month]||0)+x.units;return;}
+  var c=String(x.code||'').trim();if(c){if(!codes[c]){codes[c]=1;n++;}}else{pm[x.month]=(pm[x.month]||0)+x.units;}});
+  var mx=0;Object.keys(pm).forEach(function(k){if(pm[k]>mx)mx=pm[k];});
+  Object.keys(ln).forEach(function(k){var m2=0;Object.keys(ln[k]).forEach(function(mm){if(ln[k][mm]>m2)m2=ln[k][mm];});n+=m2;});
+  return n+mx;}
 function med(a){a=a.filter(function(v){return v>0;}).sort(function(x,y){return x-y;});var n=a.length;return n?(n%2?a[(n-1)/2]:(a[n/2-1]+a[n/2])/2):0;}
 function rpct(v,dp){return v===null||v===undefined||isNaN(v)?'—':(+v).toFixed(dp===undefined?1:dp)+'%';}
 function sevTxt(s){return s===2?'حرج':(s===1?'راجع':'سليم');}
@@ -9257,8 +9265,10 @@ function uniq(a){return a.filter(function(v,i){return a.indexOf(v)===i;});}
 function unitsOf(rows,side){
   var m={},arr=[];
   rows.forEach(function(x,i){
-    if(!(x.units>0)&&!String(x.code||'').trim())return;
-    var code=String(x.code||'').trim(),k=code||('#'+side+i),u=m[k];
+    var isR=(x.src==='R');
+    if(isR?!(x.units>0):(!(x.units>0)&&!String(x.code||'').trim()))return;
+    var code=String(x.code||'').trim(),k=isR?rLine(x):(code||('#'+side+i)),u=m[k];
+    if(isR)code=(code?code+' · ':'')+x.eq+((x.vendor&&x.vendor!=='(n/a)')?' · '+x.vendor:'');
     if(!u){u=m[k]={code:code||'(بدون كود)',side:side,pj:{},cost:0,ot:0,fuel:0,days:0,standby:0,us:0,un:0,fl:[],sev:0,iss:[]};arr.push(u);}
     u.pj[x.project]=1;u.cost+=x.cost;u.ot+=x.ot;u.fuel+=x.fuel;u.days+=x.days;u.standby+=x.standby;if(x.util!==null){u.us+=x.util;u.un++;}
   });
