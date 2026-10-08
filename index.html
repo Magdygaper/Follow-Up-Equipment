@@ -5679,7 +5679,7 @@ function moCheckFresh(){
   moLastChk=Date.now();
   db.collection(MO_COL).doc(DS).get().then(function(snap){
     var m=snap.exists?snap.data():null, cm=moMeta;
-    var same=!!(m&&cm&&m.updatedAtMs===cm.updatedAtMs&&m.rowCount===cm.rowCount);
+    var same=(!m&&!cm)||!!(m&&cm&&m.updatedAtMs===cm.updatedAtMs&&m.rowCount===cm.rowCount);   /* empty on both sides = in sync (was reloading+toasting forever when dataset is deleted) */
     if(!same) moLoadDataset(true,true);
   }).catch(function(){});
 }
@@ -7263,7 +7263,13 @@ function load(force){
   return MR_META.get().then(function(snap){
     var v = snap.exists ? (snap.data().v||0) : null;
     var cv=null; try{ cv=JSON.parse(localStorage.getItem(LS+'_v')||'null'); }catch(e){}
-    if(v!=null && DATA.length && (v===MEM_V || (cv!=null && v===cv))){ MEM_V=v; return DATA; }
+    if(v!=null && DATA.length && (v===MEM_V || (cv!=null && v===cv))){
+      /* version unchanged — but data may have been deleted straight from the Firestore console (no version bump): verify with a 1-doc read */
+      return db.collection(COL).limit(1).get().then(function(q){
+        if(q.empty){ DATA=[]; EXIST={}; MEM_V=null; try{ localStorage.removeItem(LS); localStorage.removeItem(LS+'_v'); }catch(e){} index(); if($('mr-body')) render(); return DATA; }
+        MEM_V=v; return DATA;
+      }).catch(function(){ MEM_V=v; return DATA; });
+    }
     return mrFullLoad(v);
   }).catch(function(){ return DATA.length?DATA:mrFullLoad(null); });
 }
