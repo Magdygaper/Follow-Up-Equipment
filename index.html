@@ -5634,7 +5634,7 @@ auth.onAuthStateChanged(function(u){
   if(!u){ setAdminUI(false); return; }
   moIsAdmin=(typeof ADMINS!=='undefined')&&ADMINS.indexOf(u.email)>=0;
   setAdminUI(moIsAdmin);
-  if(!moLoaded){ moLoaded=true; moLoadDataset(false); }
+  if(!moLoaded){ moLoaded=true; moLoadDataset(false,true); }   /* background auto-load on login: no toast */
 });
 function setAdminUI(on){
   ['mo-btn-import','mo-btn-combined','mo-btn-smart-update','mo-btn-smart-add','mo-btn-wipe','mo-btn-add-month','mo-btn-del-month','mo-import-row'].forEach(function(id){
