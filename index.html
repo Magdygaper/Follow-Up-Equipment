@@ -2,6 +2,21 @@
 <html lang="en" dir="ltr">
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="robots" content="noindex,nofollow">
+<script>
+/* HAC SECURITY GUARD: runs first. Edit ALLOWED_HOSTS if the portal moves to another domain. */
+(function(){
+var ALLOWED_HOSTS=['magdygaper.github.io','localhost','127.0.0.1'];
+var framed=false;try{framed=window.top!==window.self;}catch(e){framed=true;}
+var bad=location.protocol==='file:'||ALLOWED_HOSTS.indexOf(location.hostname)<0||framed;
+if(bad){
+  window.__HAC_BLOCKED=true;
+  document.documentElement.innerHTML='<head><meta charset="utf-8"><title>HAC \u00b7 PMV</title></head><body style="margin:0;background:#0d1117;color:#e6edf3;font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center"><div style="max-width:420px;padding:32px"><div style="color:#f0a500;letter-spacing:3px;font-size:12px;margin-bottom:10px">HAC \u00b7 PMV</div><h2 style="margin:0 0 12px">Please open the official portal link</h2><p style="color:#8b949e;line-height:1.6">This page cannot run from a saved copy.<br>\u0645\u0646 \u0641\u0636\u0644\u0643 \u0627\u0641\u062a\u062d \u0627\u0644\u0628\u0648\u0631\u062a\u0627\u0644 \u0645\u0646 \u0627\u0644\u0631\u0627\u0628\u0637 \u0627\u0644\u0631\u0633\u0645\u064a.</p></div></body>';
+  try{window.stop();}catch(e){}
+}
+})();
+</script>
+
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-src https://*.firebaseapp.com; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -2258,8 +2273,7 @@ function watchForKick() {
       cleanupViewerPresence();
       db.collection('kicked_viewers').doc(viewerSessionId).delete().catch(function(e){});
       sessionStorage.removeItem('viewer_name');
-      alert('⚠\ufe0f تم إنهاء جلستك بواسطة الأدمن. هيتم تسجيل خروجك الآن.');
-      location.reload();
+      window.hacKickLock();
     }
   }, function(err) {
     console.log('Kick listener error:', err);
@@ -5773,7 +5787,7 @@ function moRenderKpis(){
   document.getElementById('mo-k-ot-sub').textContent='EGP · '+pct(otM,money)+' of Money Made';
   var _fw=moFW(base), _a=document.getElementById('mo-k-fw'), _b=document.getElementById('mo-k-fw-sub');
   if(_a) _a.textContent=_fw.list.length;
-  if(_b) _b.textContent=_fw.counts.zero+' zero · 🔴'+_fw.counts.red+' · 🟡'+_fw.counts.yellow+' · '+_fw.counts.low+' low'+(_fw.otOk.length?' · ✔'+_fw.otOk.length+' OT-ok':'');
+  if(_b) _b.textContent=_fw.counts.zero+' zero · 🔴'+_fw.counts.red+' · '+_fw.counts.low+' low'+(_fw.otOk.length?' · ✔'+_fw.otOk.length+' OT-ok':'');
   document.querySelectorAll('.mo-kpi').forEach(function(el){ el.classList.toggle('on',moDrill===el.getAttribute('data-kpi')); });
 }
 function moFW(rows){
@@ -6737,7 +6751,7 @@ function moMonthAdd(){
   inp.click();
 }
 
-window.MO={ data:function(){return moData;}, reload:function(force){ return moLoadDataset(force!==false); },
+window.MO={ setFilter:function(f){moFilter.month=f.month?[f.month]:[];moFilter.od=f.od||null;moFilter.cat=null;moFilter.proj=f.proj||null;moFilter.status=null;moFilter.q=f.q||'';if(moData.length)moRender();}, data:function(){return moData;}, reload:function(force){ return moLoadDataset(force!==false); },
   /* helpers exposed for Combined Import (they live inside this IIFE) */
   normKey:normKey, toNum:toNum, mapHeaders:moMapHeaders, normalizeRow:moNormalizeRow,
   deriveStatus:deriveStatus, assignKeys:assignKeys, writeDataset:moWriteDataset,
@@ -7591,7 +7605,7 @@ function render(){
     +kpi('TOTAL DEDUCT',fmtMoney(m.deduct),'savings & penalties achieved','var(--green)','top','deduct',fmtInt(m.deduct)+' EGP')
     +kpi('OVERTIME COST',fmtMoney(m.otCost),'overtime cost accrued','var(--hold)','top','ot',fmtInt(m.otCost)+' EGP')
     +kpi('FUEL',fmtInt(m.fuel)+' L','total diesel consumed','var(--text)','top','fuel',fmtInt(m.fuel)+' L')
-    +(function(){ var w=mrFW(rows); var k=kpi('FUEL WATCHLIST',w.list.length,w.counts.zero+' zero · 🔴'+w.counts.red+' · 🟡'+w.counts.yellow+' · '+w.counts.low+' low'+(w.otOk.length?' · ✔'+w.otOk.length+' OT-ok':''),'#f85149','fw','x'); return FW_OPEN?k.replace('class="mr-kpi"','class="mr-kpi on"'):k; })()
+    +(function(){ var w=mrFW(rows); var k=kpi('FUEL WATCHLIST',w.list.length,w.counts.zero+' zero · 🔴'+w.counts.red+' · '+w.counts.low+' low'+(w.otOk.length?' · ✔'+w.otOk.length+' OT-ok':''),'#f85149','fw','x'); return FW_OPEN?k.replace('class="mr-kpi"','class="mr-kpi on"'):k; })()
     +kpi('UTILIZATION',m.utilCnt?fmtNum(m.utilAvg,1)+'%':'-',m.utilCnt?'avg utilization ('+fmtInt(m.utilCnt)+' records)':'no values','var(--green)','top','util')
     +'</div>';
   if(FW_OPEN) h+='<div class="mo-drill" style="display:block;margin:12px 0">'+window.hacFWPanel(mrFW(rows),'mr','data-act="fw"')+'</div>';
@@ -8122,7 +8136,7 @@ function mrReplaceAll(recs){
   });
 }
 window.MR={ import:doImport, importMode:doImportMode, wipe:doWipe, load:load, render:render, data:function(){return DATA;}, bumpVersion:mrBumpVersion,
-  buildIndexFromHeader:mrBuildIndexFromHeader, buildRecsFromRows:mrBuildRecsFromRows, replaceAll:mrReplaceAll };
+  buildIndexFromHeader:mrBuildIndexFromHeader, buildRecsFromRows:mrBuildRecsFromRows, replaceAll:mrReplaceAll, setFilter:function(f){F.month=f.month||null;F.od=f.od||null;F.proj=f.proj||null;F.cat=null;F.q=f.q||'';render();} };
 
 if(document.readyState!=='loading') initStandaloneRental(); else document.addEventListener('DOMContentLoaded',initStandaloneRental);
 var tries=0, iv=setInterval(function(){ tries++; initStandaloneRental(); if($('nav-masterrental')&&$('page-masterrental')) clearInterval(iv); if(tries>30) clearInterval(iv); },500);
@@ -8399,6 +8413,59 @@ window.cmpFilterPanel=function(o){
 };
 window.cmpSetOdSel=function(v){CMP.od=v||'all';cmpRender();};
 window.cmpClearAll=function(){CMP.month='all';CMP.od='all';CMP.projectSearch='';try{if(typeof window.__cmpExtraReset==='function')window.__cmpExtraReset();}catch(e){}cmpRender();};
+window.cmpGoPage=function(rental){
+  var txt=rental?'Master Rental':'Master Owned',nav=[].filter.call(document.querySelectorAll('.nav-item'),function(n){return n.textContent.replace(/\s+/g,' ').indexOf(txt)>=0;})[0]||null;
+  showPage(rental?'masterrental':'masterowned',nav);
+  var b=document.getElementById('cmp-back');if(!b){b=document.createElement('button');b.id='cmp-back';b.className='btn-sm accent';b.textContent='← رجوع للمقارنة';b.style.cssText='position:fixed;bottom:18px;right:18px;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.4)';
+    b.onclick=function(){b.style.display='none';var n=document.getElementById('nav-comparison');showPage('comparison',n);cmpRender();};
+    document.body.appendChild(b);}
+  b.style.display='';
+};
+window.cmpOpenUnit=function(side,rc,rq,rp,rv,dy,fu){
+  var rental=side==='R',M=rental?window.MR:window.MO;
+  if(!M||!M.setFilter){if(typeof toast==='function')toast('الصفحة دي لسه محمّلتش — جرّب بعد ثانية','error');return;}
+  window.__cmpMark={side:side,rc:String(rc||'').trim(),rq:String(rq||'').trim(),rp:String(rp||'').trim(),rv:String(rv||'').trim(),dy:+dy||0,fu:+fu||0,only:true,scrolled:false};
+  M.setFilter(rental?{proj:rp||null,q:String((rv&&rv!=='(n/a)')?rv:(rq||rc||'')).toLowerCase()}:{q:rc||rq||''});
+  cmpGoPage(rental);
+  setTimeout(window.cmpApplyMark,60);
+};
+(function(){
+  var st=document.createElement('style');
+  st.textContent='@keyframes cmpMarkPulse{0%,100%{box-shadow:inset 0 0 0 2px rgba(240,165,0,.95),0 0 6px rgba(240,165,0,.35)}50%{box-shadow:inset 0 0 0 2px rgba(240,165,0,.95),0 0 18px rgba(240,165,0,.8)}}'
+   +'tr.cmp-mark td{background:rgba(240,165,0,.28)!important;color:var(--text)!important;font-weight:700}'
+   +'tr.cmp-mark td:first-child{box-shadow:inset 5px 0 0 #f0a500}'
+   +'tr.cmp-mark{animation:cmpMarkPulse 1.6s ease-in-out infinite}';
+  document.head.appendChild(st);
+  var T=null,chip=null;
+  function norm(x){return String(x||'').replace(/\s+/g,' ').trim().toLowerCase();}
+  function num(x){return parseFloat(String(x||'').replace(/,/g,''))||0;}
+  function chipUpd(m,n){
+    if(!m){if(chip)chip.style.display='none';return;}
+    if(!chip){chip=document.createElement('button');chip.id='cmp-only';chip.className='btn-sm';chip.style.cssText='position:fixed;bottom:18px;right:190px;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.4)';
+      chip.onclick=function(){var k=window.__cmpMark;if(!k)return;k.only=!k.only;window.cmpApplyMark();};document.body.appendChild(chip);}
+    chip.style.display='';chip.textContent=m.only?('المولد ده بس ('+n+') — اضغط لعرض الكل'):'عرض الكل — اضغط للمولد ده بس';
+  }
+  window.cmpApplyMark=function(){
+    var m=window.__cmpMark;if(!m)return;
+    var rows=[].slice.call(m.side==='R'?document.querySelectorAll('#mr-body table.mr-tbl tbody tr'):document.querySelectorAll('#mo-tbody tr'));
+    var noV=(!m.rv||m.rv==='(n/a)');
+    function base(tr){var c=tr.children;
+      if(m.side==='R')return c.length>11&&(!m.rq||norm(c[1].textContent)===norm(m.rq))&&(!m.rp||norm(c[4].textContent)===norm(m.rp))&&(noV||norm(c[5].textContent)===norm(m.rv));
+      return c.length>4&&(m.rc?norm(c[3].textContent)===norm(m.rc):norm(c[4].textContent)===norm(m.rq));}
+    var hit=rows.filter(base);
+    if(m.side==='R'&&(m.dy||m.fu)){
+      var strict=hit.filter(function(tr){var c=tr.children;return Math.abs(num(c[7].textContent)-m.dy)<=0.06&&Math.abs(num(c[11].textContent)-m.fu)<=Math.max(1,m.fu*0.002);});
+      if(strict.length)hit=strict;
+    }
+    var first=null;
+    rows.forEach(function(tr){var ok=hit.indexOf(tr)>=0;tr.classList.toggle('cmp-mark',ok);tr.style.display=(m.only&&!ok)?'none':'';if(ok&&!first)first=tr;});
+    chipUpd(m,hit.length);
+    if(first&&!m.scrolled){m.scrolled=true;try{first.scrollIntoView({block:'center'});}catch(e){}}
+  };
+  new MutationObserver(function(){if(!window.__cmpMark)return;clearTimeout(T);T=setTimeout(window.cmpApplyMark,40);}).observe(document.body,{childList:true,subtree:true});
+  document.addEventListener('click',function(e){var t=e.target;if(t&&t.closest&&(t.closest('.nav-item')||t.closest('#cmp-back'))){window.__cmpMark=null;chipUpd(null);[].forEach.call(document.querySelectorAll('tr.cmp-mark,#mo-tbody tr,#mr-body table.mr-tbl tbody tr'),function(tr){tr.classList.remove('cmp-mark');tr.style.display='';});}},true);
+})();
+if(!window.__cmpDbl){window.__cmpDbl=1;document.addEventListener('dblclick',function(e){var tr=e.target.closest&&e.target.closest('tr.un[data-side]');if(!tr)return;try{window.getSelection().removeAllRanges();}catch(x){}cmpOpenUnit(tr.getAttribute('data-side'),tr.getAttribute('data-uc'),tr.getAttribute('data-uq'),tr.getAttribute('data-up'),tr.getAttribute('data-uv'),tr.getAttribute('data-ud'),tr.getAttribute('data-uf'));});}
 document.addEventListener('input',function(e){
   var t=e.target; if(!t||!t.getAttribute||t.getAttribute('data-fp')!=='1') return;
   var pos=t.selectionStart, id=t.id;
@@ -9027,11 +9094,16 @@ function fwItems(d){
 function viewFW(d){
   if(typeof window.hacFuelWatch!=='function')return '<div class="cmp-no-data">Fuel Watchlist module not loaded.</div>';
   var fw=window.HAC_FW_fc=window.hacFuelWatch(fwItems(d));
-  function sc(s,t){return fw.list.filter(function(x){return x.side===s&&(t==='red'?(x.type==='high'&&x.sev===2):t==='yel'?(x.type==='high'&&x.sev===1):x.type==='zero'||x.type==='low');}).length;}
-  var side=strip([kpi('🔴 Red alerts',sc('O','red'),sc('R','red')),kpi('🟡 Yellow alerts',sc('O','yel'),sc('R','yel')),kpi('Zero-work / low-fuel flags',sc('O','z'),sc('R','z')),kpiOne('Cleared by overtime',fw.otOk.length,'#3fb950','≈'+FULL(fw.otOkL)+' L allowed for OT hours')]);
-  return '<div class="cx-card"><div class="cx-h"><span>Fuel Watchlist — Owned + Rental (L/Hr reference, overtime-aware)</span></div>'
-    +side+'<div class="mo-tiles">'+window.hacFWTilesHtml(fw)+'</div><div class="mo-hint" style="margin-bottom:10px">🟢 Owned · 🔵 Rental — اضغط على أي معدة لعرض الكابستي والتفاصيل وحساب الأوفر تايم</div>'
-    +'<div class="mo-3col">'+window.hacFWColsHtml(fw,'fc')+'</div></div>';
+  function n(f){return fw.list.filter(f).length;}
+  var red=n(function(x){return x.type==='high'&&x.sev===2;}),yel=n(function(x){return x.type==='high'&&x.sev===1;}),zl=n(function(x){return x.type==='zero'||x.type==='low';});
+  function rc(t,v,sub,tone){return '<div class="cx-rc '+tone+'" style="cursor:default"><div class="t">'+t+'</div><div class="v">'+v+'</div><div class="s">'+sub+'</div></div>';}
+  var s='<div class="cx-rcs">'+rc('🔴 سولار أعلى بكتير من المتوقع',red,'زيادة 100% أو أكتر',red?'bad':'ok')+rc('🟡 سولار أعلى من المتوقع',yel,'زيادة بين 60% و100%',yel?'warn':'ok')+rc('⚠️ سولار من غير شغل / سولار قليل',zl,'مشبوهة — راجع العداد والشغل',zl?'warn':'ok')+rc('✔ اتغطّت بالأوفر تايم',fw.otOk.length,'مش تنبيه — الأوفر تايم بيبرّر الفرق','ok')+'</div>';
+  var rows=fw.list.map(function(x,i){return {x:x,i:i};}).sort(function(a,b){return (b.x.gap||0)-(a.x.gap||0);}).slice(0,15);
+  function why(x){return x.type==='zero'?'سولار من غير شغل':x.type==='low'?'سولار قليل على شغل كتير':(x.sev===2?'🔴 ':'🟡 ')+'أعلى من المتوقع '+window.hacDev(x);}
+  var tb='<div class="cmp-table-wrap"><table class="cmp-table cx-tb"><thead><tr><th>المعدة</th><th>المشكلة</th><th class="num">سولار (L)</th><th class="num">أيام شغل</th></tr></thead><tbody>'
+   +(rows.map(function(r){var x=r.x;return '<tr data-fw="'+r.i+'" data-fwsrc="fc" style="cursor:pointer"><td>'+(x.side==='O'?'🟢 ':'🔵 ')+E(x.label)+'</td><td>'+why(x)+'</td><td class="num">'+FULL(x.fuel)+'</td><td class="num">'+FULL(x.worked)+'</td></tr>';}).join('')||'<tr><td colspan="4" class="cmp-no-data">✅ مفيش حاجة مشبوهة</td></tr>')+'</tbody></table></div>';
+  s+=card('أخطر 15 معدة سولار (🟢 Owned · 🔵 Rental) — اضغط على أي واحدة للتفاصيل',tb);
+  return s+'<details class="cx-more"><summary>تفاصيل أكتر + إزاي التنبيه بيتحسب</summary><div style="margin-top:10px">'+window.hacFWExtra(fw,'fc')+'</div></details>';
 }
 
 /* ── Overtime ── */
@@ -9364,6 +9436,9 @@ window.cmpDirectorReport=function(){
   +'.rp-t tr.un td.y{color:#ffd24d;font-weight:800;background:color-mix(in srgb,#e3b341 26%,var(--surface));box-shadow:inset 0 0 0 1px rgba(227,179,65,.55)}'
   +'.rp-t tr.un td.rd{color:#ff7b72;font-weight:800;background:color-mix(in srgb,#f85149 30%,var(--surface));box-shadow:inset 0 0 0 1px rgba(248,81,73,.6);text-shadow:0 0 8px rgba(248,81,73,.55)}'
   +'.rp-t tr.un.f1 td.fc{color:var(--text);font-weight:600;box-shadow:inset 4px 0 0 #e3b341}.rp-t tr.un.f2 td.fc{color:var(--text);font-weight:700;box-shadow:inset 4px 0 0 #f85149}'
+  +'@keyframes rpCellRd{0%,100%{box-shadow:inset 0 0 0 1px rgba(248,81,73,.6),0 0 0 rgba(248,81,73,0)}50%{box-shadow:inset 0 0 0 2px rgba(248,81,73,.95),0 0 12px rgba(248,81,73,.75)}}'
+  +'@keyframes rpCellY{0%,100%{box-shadow:inset 0 0 0 1px rgba(227,179,65,.55),0 0 0 rgba(227,179,65,0)}50%{box-shadow:inset 0 0 0 2px rgba(227,179,65,.95),0 0 10px rgba(227,179,65,.65)}}'
+  +'.rp-t tr.un td.rd{animation:rpCellRd 1.8s ease-in-out infinite}.rp-t tr.un td.y{animation:rpCellY 2.4s ease-in-out infinite}'
   +'.rp-t td.g{color:#3fb950;font-weight:700}.rp-t td.y{color:#e3b341;font-weight:700;background:color-mix(in srgb,#e3b341 14%,var(--surface))}.rp-t td.rd{color:#f85149;font-weight:700;background:color-mix(in srgb,#f85149 16%,var(--surface))}'
   +'.rp-b{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap}.rp-b.s0{background:rgba(63,185,80,.15);color:#3fb950}.rp-b.s1{background:rgba(227,179,65,.2);color:#e3b341}.rp-b.s2{background:rgba(248,81,73,.2);color:#f85149}'
   +'.rp-b-click{cursor:pointer}.rp-b-click:hover{filter:brightness(1.25)}'
@@ -9407,22 +9482,37 @@ function uDays(rows){var t=0;rows.forEach(function(x){if(x.days>0)t+=x.days*(x.u
 function sevTxt(s){return s===2?'Critical':(s===1?'Review':'OK');}
 function tipTrim(s){s=String(s||'');return s.length>160?s.slice(0,157)+'…':s;}
 function uniq(a){return a.filter(function(v,i){return a.indexOf(v)===i;});}
+function fwRow(x){
+  if(x.__fw!==undefined)return x.__fw;
+  var r=null;
+  try{
+    if(typeof window.hacFuelWatch==='function'&&typeof window.hacFuelRef==='function'){
+      var O=x.src==='O',rf=window.hacFuelRef(x.eqRaw||x.eq,x.model,O?x.mcRaw:undefined);
+      if(rf.v>0){
+        var it=window.hacFuelWatch([{id:x.code,label:'',equip:x.eqRaw||x.eq,model:x.model,cap:'',worked:x.days,fuel:x.fuel,strict:!O,hours:x.hrs,otDays:x.otd,ref:rf.v,refSrc:rf.src,side:x.src}]).list[0];
+        if(it&&it.type==='high'&&it.sev===2)r={fuel:it.fuel,exp:it.fuel-it.gap,gap:it.gap,dev:it.dev,ref:it.refHr,hours:it.hours};
+      }
+    }
+  }catch(e){}
+  return x.__fw=r;
+}
 function unitsOf(rows,side){
   var m={},arr=[];
   rows.forEach(function(x,i){
     var isR=(x.src==='R');
     if(isR?!(x.units>0):(!(x.units>0)&&!String(x.code||'').trim()))return;
-    var code=String(x.code||'').trim(),k=isR?rLine(x):(code||('#'+side+i)),u=m[k];
-    if(isR)code=(code?code+' · ':'')+x.eq+((x.vendor&&x.vendor!=='(n/a)')?' · '+x.vendor:'');
-    if(!u){u=m[k]={code:code||'(بدون كود)',side:side,pj:{},cost:0,ot:0,fuel:0,days:0,ud:0,standby:0,us:0,un:0,fl:[],sev:0,iss:[]};arr.push(u);}
-    u.pj[x.project]=1;u.cost+=x.cost;u.ot+=x.ot;u.fuel+=x.fuel;u.days+=x.days;u.ud+=(x.days>0?x.days*(x.units>0?x.units:1):0);u.standby+=x.standby;if(x.util!==null){u.us+=x.util;u.un++;}
+    var code=String(x.code||'').trim(),k=isR?('r#'+i):(code||('#'+side+i)),u=m[k];
+    if(isR)code=(code?code+' · ':'')+x.eq+((x.vendor&&x.vendor!=='(n/a)')?' · '+x.vendor:'')+(x.month?' · '+String(x.month).slice(0,7):'')+(x.days>0?' · '+(+x.days).toFixed(1)+'d':'');
+    if(!u){u=m[k]={code:code||'(بدون كود)',rc:String(x.code||'').trim(),rq:String(x.eq||''),rp:String(x.project||''),rv:String(x.vendor||''),q:0,side:side,pj:{},cost:0,ot:0,fuel:0,days:0,ud:0,standby:0,us:0,un:0,fl:[],sev:0,iss:[]};arr.push(u);}
+    u.pj[x.project]=1;u.q+=(x.units>0?x.units:0);u.cost+=x.cost;u.ot+=x.ot;u.fuel+=x.fuel;u.days+=x.days;u.ud+=(x.days>0?x.days*(x.units>0?x.units:1):0);u.standby+=x.standby;if(x.util!==null){u.us+=x.util;u.un++;}
+    var fw=fwRow(x);if(fw){u.fwGap=(u.fwGap||0)+fw.gap;(u.fwL=u.fwL||[]).push({m:String(x.month||'').slice(0,7),f:fw});}
   });
   arr.forEach(function(u){u.util=u.un?u.us/u.un:null;var p=Object.keys(u.pj);u.project=p.slice(0,2).join(' / ')+(p.length>2?' +'+(p.length-2):'');});
   return arr;
 }
 function alertsOf(g,th){
   var a=[],O=g.O,R=g.R,bm=g.bm,w=O.cost+R.cost,lbl=g.lbl;
-  function push(sev,tag,issue,action,ex){var x={sev:sev,tag:tag,eq:lbl,cat:g.cat,ck:g.key,issue:issue,action:action,w:w,side:'B'};if(ex)for(var k in ex)x[k]=ex[k];a.push(x);}
+  function push(sev,tag,issue,action,ex){if(sev<2)return;var x={sev:sev,tag:tag,eq:lbl,cat:g.cat,ck:g.key,issue:issue,action:action,w:w,side:'B'};if(ex)for(var k in ex)x[k]=ex[k];a.push(x);}
   [['O','المملوك',O],['R','المؤجر',R]].forEach(function(s){
     var S=s[2];if(bm===null||!(S.n_>0)||S.util===null)return;
     var gap=bm-S.util;if(gap<=0)return;var crit=gap>th.ug;
@@ -9433,25 +9523,23 @@ function alertsOf(g,th){
     var S=s[1];if(!(S.cost>0&&S.ot>=5000))return;var p=S.ot/S.cost*100;
     if(p>=th.ot)push(p>=2*th.ot?2:1,'أوفر تايم','الأوفر تايم ('+s[0]+') '+FULL(S.ot)+' جنيه = '+p.toFixed(0)+'% من تكلفة '+s[0]+' (الحد '+th.ot+'%).','اعرف سبب الأوفر تايم، وقارن بين إضافة وردية/معدة وبين دفع الأوفر تايم، واشترط موافقة مسبقة عليه.',{side:s[2]});
   });
-  if(O.ud>0&&R.ud>0&&O.fuel>0&&R.fuel>0&&Math.max(O.fuel,R.fuel)>=200){
-    var fo=O.fuel/O.ud,fr=R.fuel/R.ud,hi=Math.max(fo,fr),lo=Math.min(fo,fr),p2=(hi/lo-1)*100,own=fo>=fr;
-    if(p2>=th.fg)push(p2>=2*th.fg?2:1,'سولار','السولار لكل يوم تشغيل '+hi.toFixed(1)+' لتر في '+(own?'المملوك':'المؤجر')+' مقابل '+lo.toFixed(1)+' لتر في '+(own?'المؤجر':'المملوك')+' لنفس السعة (أعلى بـ '+p2.toFixed(0)+'%).','راجع كشوف السولار لـ'+(own?'المملوك':'المؤجر')+': الدوران على الفاضي، التسريب، السرقة، قراءات العداد، ومطابقة السولار مع ساعات التشغيل.',{side:own?'O':'R'});
-  }
+  /* السولار: بس من شيت Fuel_Per_Hour_Reference (لتر/ساعة × الساعات) — أحمر لو الفعلي أعلى من المتوقع بـ +100%. مفيش مقارنة تجميعية. */
+  g.units.forEach(function(u){
+    if(!(u.fwGap>0))return;
+    u.fl.push('سولار');u.sev=2;(u.fs=u.fs||{})['سولار']=2;
+    var is2='الوحدة '+u.code+' ('+u.project+') — سولار فوق المرجع: '+u.fwL.slice(0,3).map(function(q){var f=q.f;return (q.m?q.m+': ':'')+FULL(f.fuel)+' لتر فعلي مقابل '+FULL(f.exp)+' متوقع ('+f.ref.toFixed(2)+' لتر/ساعة × '+FULL(f.hours)+' ساعة) = +'+FULL(f.gap)+' لتر ('+(f.dev>0?'+':'')+Math.round(f.dev)+'%)';}).join(' | ')+(u.fwL.length>3?' | +'+(u.fwL.length-3)+' شهور كمان':'')+'.';
+    u.iss.push(is2);push(2,'سولار',is2,'راجع كشف سولار الوحدة: دوران على الفاضي، تسريب، سرقة، قراءة العداد، ومطابقة السولار مع ساعات التشغيل.',{code:u.code,w:u.fwGap*10,side:u.side});
+  });
   [['O','المملوكة'],['R','المؤجرة']].forEach(function(sd){
     var us=g.units.filter(function(u){return u.side===sd[0];});
     if(us.filter(function(u){return u.cost>0;}).length<3)return;
-    var mc=med(us.map(function(u){return u.cost;})),mf=med(us.filter(function(u){return u.ud>0;}).map(function(u){return u.fuel/u.ud;}));
+    var mc=med(us.map(function(u){return u.cost;})),mcd=med(us.filter(function(u){return u.ud>0;}).map(function(u){return u.cost/u.ud;})),mf=med(us.filter(function(u){return u.ud>0;}).map(function(u){return u.fuel/u.ud;}));
     us.forEach(function(u){
-      if(mc>0&&u.cost>=mc*(1+th.cg/100)&&u.cost-mc>=10000){
-        var sv=(u.cost/mc-1)*100>=2*th.cg?2:1;u.fl.push('تكلفة');u.sev=Math.max(u.sev,sv);(u.fs=u.fs||{})['تكلفة']=sv;
-        var is='الوحدة '+u.code+' ('+u.project+') تكلفتها '+FULL(u.cost)+' جنيه = '+(u.cost/mc).toFixed(1)+'× وسيط الوحدات '+sd[1]+' لنفس السعة ('+FULL(mc)+' جنيه) — شغلت '+FULL(u.days)+' يوم'+(u.util!==null?' واستخدام '+u.util.toFixed(0)+'%':'')+'.';
+      var cref=sd[0]==='R'?(u.ud>0?mcd*u.ud:0):mc;
+      if(cref>0&&u.cost>=cref*(1+2*th.cg/100)&&u.cost-cref>=10000){
+        var sv=(u.cost/cref-1)*100>=2*th.cg?2:1;u.fl.push('تكلفة');u.sev=Math.max(u.sev,sv);(u.fs=u.fs||{})['تكلفة']=sv;
+        var is='الوحدة '+u.code+' ('+u.project+') تكلفتها '+FULL(u.cost)+' جنيه = '+(u.cost/cref).toFixed(1)+'× وسيط الوحدات '+sd[1]+' لنفس السعة ('+FULL(cref)+' جنيه) — شغلت '+FULL(u.days)+' يوم'+(u.util!==null?' واستخدام '+u.util.toFixed(0)+'%':'')+'.';
         u.iss.push(is);push(sv,'تكلفة',is,'افتح تفاصيل الوحدة وراجع: سعر اليوم، الأوفر تايم، أيام الستاند باي، وهل تستاهل تكمل ولا تتبدل.',{code:u.code,w:u.cost,side:sd[0]});
-      }
-      var fd=u.ud>0?u.fuel/u.ud:0;
-      if(mf>0&&fd>=mf*(1+th.fg/100)&&(fd-mf)*u.ud>=200){
-        var sv2=(fd/mf-1)*100>=2*th.fg?2:1;u.fl.push('سولار');u.sev=Math.max(u.sev,sv2);(u.fs=u.fs||{})['سولار']=sv2;
-        var is2='الوحدة '+u.code+' ('+u.project+') استهلكت '+fd.toFixed(1)+' لتر/يوم تشغيل ('+FULL(u.fuel)+' لتر في '+FULL(u.ud)+' يوم) مقابل وسيط '+mf.toFixed(1)+' لتر/يوم للوحدات '+sd[1]+' لنفس السعة (أعلى بـ '+((fd/mf-1)*100).toFixed(0)+'%).';
-        u.iss.push(is2);push(sv2,'سولار',is2,'راجع كشف سولار الوحدة: دوران على الفاضي، تسريب، سرقة، قراءة العداد، ومطابقة السولار مع ساعات التشغيل.',{code:u.code,w:u.fuel*10,side:sd[0]});
       }
     });
   });
@@ -9513,7 +9601,7 @@ function summaryLines(T){
 }
 function sfmt(v,k){return v===null||v===undefined?'—':(k==='p'?rpct(v):FULL(v));}
 /* utilization colour: green >= benchmark · yellow = below by up to ug pts · red = below by more than ug pts */
-function uCls(u,bm,th){if(u===null||u===undefined||bm===null||bm===undefined)return '';var gap=bm-u;return gap<=0?'g':(gap<=th.ug?'y':'rd');}
+function uCls(u,bm,th){if(u===null||u===undefined||bm===null||bm===undefined)return '';var gap=bm-u;return gap<=0?'g':(gap<=th.ug?'':'rd');}
 function stBadge(sev,tags,tip,nobm){
   if(nobm&&!(tags&&tags.length))return '<span class="rp-b s3" title="No benchmark — count shown, utilization not evaluated">No B.M</span>';
   var label=(sev===2&&tags&&tags.length)?tags.join(' · '):(sevTxt(sev)+(tags&&tags.length?' · '+tags.join(' · '):''));
@@ -9539,13 +9627,13 @@ function cells(O,R,bm,th,al){
 }
 function unitCls(u,g,th){
   var fs=u.fs||{},ut=uCls(u.util,g.bm,th),tags=u.fl.slice(),sev=u.sev||0,tip=u.iss.slice(),al=g.al||[],o=u.side;
-  if(ut==='rd'||ut==='y'){tags.push('استخدام');sev=Math.max(sev,ut==='rd'?2:1);tip.push('استخدام الوحدة '+u.util.toFixed(0)+'% أقل من البنش ماركت '+g.bm.toFixed(0)+'%.');}
+  if(ut==='rd'){tags.push('استخدام');sev=Math.max(sev,ut==='rd'?2:1);tip.push('استخدام الوحدة '+u.util.toFixed(0)+'% أقل من البنش ماركت '+g.bm.toFixed(0)+'%.');}
   /* capacity-level overtime alert on this unit's side → light the units whose own OT share is above the limit */
   var otS=0,fuS=0;al.forEach(function(x){if(x.code)return;if(x.tag==='أوفر تايم'&&x.side===o)otS=Math.max(otS,x.sev);if(x.tag==='سولار'&&(x.side===o||x.side==='B'))fuS=Math.max(fuS,x.sev);});
   var otc='',fuc=sevCls(fs['سولار']||0);
-  if(otS&&u.ot>0&&u.cost>0){var pr=u.ot/u.cost*100;if(pr>=th.ot){var s1=pr>=2*th.ot?2:1;otc=sevCls(s1);tags.push('أوفر تايم');sev=Math.max(sev,s1);tip.push('الأوفر تايم '+FULL(u.ot)+' جنيه = '+pr.toFixed(0)+'% من تكلفة الوحدة (الحد '+th.ot+'%).');}}
+  if(otS&&u.ot>0&&u.cost>0){var pr=u.ot/u.cost*100;if(pr>=2*th.ot){var s1=2;otc=sevCls(s1);tags.push('أوفر تايم');sev=Math.max(sev,s1);tip.push('الأوفر تايم '+FULL(u.ot)+' جنيه = '+pr.toFixed(0)+'% من تكلفة الوحدة (الحد '+th.ot+'%).');}}
   /* capacity-level fuel alert → light the units burning more per working day than the reference level */
-  if(fuS&&u.ud>0&&u.fuel>0){
+  if(false&&fuS&&u.ud>0&&u.fuel>0){   /* per-generator peer comparison only (alertsOf) */
     var fo=g.O.ud>0?g.O.fuel/g.O.ud:0,fr=g.R.ud>0?g.R.fuel/g.R.ud:0,ref=(fo>0&&fr>0)?Math.min(fo,fr):((g.O.ud+g.R.ud)>0?(g.O.fuel+g.R.fuel)/(g.O.ud+g.R.ud):0),fd=u.fuel/u.ud;
     if(ref>0&&fd>=ref*(1+th.fg/100)){var s2=Math.max(fuS,fs['سولار']||0);fuc=sevCls(s2);if(tags.indexOf('سولار')<0)tags.push('سولار');sev=Math.max(sev,s2);tip.push('سولار الوحدة '+fd.toFixed(1)+' لتر/يوم تشغيل مقابل '+ref.toFixed(1)+' مرجع نفس السعة.');}
   }
@@ -9554,8 +9642,8 @@ function unitCls(u,g,th){
 function unitRow(u,g,th){
   var O=u.side==='O',z='<td class="n"></td>',uc=unitCls(u,g,th),v=function(x,c){return '<td class="n'+(c?' '+c:'')+'">'+(x===null?'':FULL(x))+'</td>';};
   var ut='<td class="n '+uc.ut+'">'+rpct(u.util,0)+'</td>';
-  return '<tr class="un'+(uc.sev?' f'+uc.sev:'')+'" data-key="u:'+E(g.key+'|'+u.side+u.code)+'"><td class="fc" style="padding-right:8px;padding-left:46px" title="'+E(u.project)+'">'+(O?'🟢 ':'🔵 ')+E(u.code)+' · '+E(u.project)+'</td>'
-   +(O?'<td class="n rp-o">1</td>'+z:z+'<td class="n rp-r">1</td>')+z+(O?ut+z:z+ut)+(O?v(u.ot,uc.ot)+z:z+v(u.ot,uc.ot))+(O?v(u.cost,uc.cost)+z:z+v(u.cost,uc.cost))+(O?v(u.fuel,uc.fuel)+z:z+v(u.fuel,uc.fuel))
+  return '<tr class="un'+(uc.sev?' f'+uc.sev:'')+'" data-key="u:'+E(g.key+'|'+u.side+u.code)+'" data-side="'+u.side+'" data-uc="'+E(u.rc)+'" data-uq="'+E(u.rq)+'" data-up="'+E(u.rp)+'" data-uv="'+E(u.rv)+'" data-ud="'+(+u.days||0)+'" data-uf="'+(+u.fuel||0)+'" title="دابل كليك لفتح المولد ده في الماستر"><td class="fc" style="padding-right:8px;padding-left:46px" title="'+E(u.project)+'">'+(O?'🟢 ':'🔵 ')+E(u.code)+' · '+E(u.project)+'</td>'
+   +(O?'<td class="n rp-o">1</td>'+z:z+'<td class="n rp-r">'+FULL(u.q||1)+'</td>')+z+(O?ut+z:z+ut)+(O?v(u.ot,uc.ot)+z:z+v(u.ot,uc.ot))+(O?v(u.cost,uc.cost)+z:z+v(u.cost,uc.cost))+(O?v(u.fuel,uc.fuel)+z:z+v(u.fuel,uc.fuel))
    +'<td style="text-align:center">'+(uc.tags.length?stBadge(uc.sev,uc.tags,uc.tip.join(' | ')):'')+'</td></tr>';
 }
 var SD_LBL={O:'Master Owned',R:'Master Rental',B:'الاتنين'};
@@ -9695,7 +9783,7 @@ function viewReport(d){
       if(eo)e.capList.forEach(function(g){
         var co=!!open['c:'+g.key];
         tb+='<tr class="cp" data-act="rpt-tog" data-k="c:'+E(g.key)+'" data-key="c:'+E(g.key)+'"><td class="fc" style="padding-left:26px"><span class="rp-tg">'+(co?'▾':'▸')+'</span>'+(g.cap==='—'?'Unspecified capacity':'⚙ '+E(g.cap))+'</td>'+cells(g.O,g.R,g.bm,th,g.al)+'<td style="text-align:center">'+stBadge(g.sev,uniq(g.al.map(function(x){return x.tag;})),g.al.map(function(x){return x.issue;}).join(' | '),g.bm===null)+'</td></tr>';
-        if(co)g.units.slice().sort(function(a,b){return b.cost-a.cost;}).forEach(function(u){tb+=unitRow(u,g,th);});
+        if(co)g.units.slice().sort(function(a,b){return b.cost-a.cost;}).forEach(function(u){if(u.side==='R'&&!unitCls(u,g,th).sev)return;tb+=unitRow(u,g,th);});
       });
     });
   });
@@ -9885,6 +9973,7 @@ function rptXlsx(R,f,d){
   function unitRows(g,lvl){
     g.units.slice().sort(function(a,b){return b.cost-a.cost;}).forEach(function(u){
       var O=u.side==='O',uc=unitCls(u,g,th),z=null,cls={};
+      if(!O&&!uc.sev)return;
       cls[O?5:6]=uc.ut;cls[O?7:8]=uc.ot;cls[O?9:10]=uc.cost;cls[O?11:12]=uc.fuel;
       var v=[(O?'Owned · ':'Rental · ')+u.code+' · '+u.project,O?1:z,O?z:1,z,O?pv(u.util):z,O?z:pv(u.util),O?rd(u.ot):z,O?z:rd(u.ot),O?rd(u.cost):z,O?z:rd(u.cost),O?rd(u.fuel):z,O?z:rd(u.fuel),uc.tags.length?sevTxt(uc.sev)+' · '+uc.tags.join(' · '):''];
       v.ex=[O&&u.un?u.us/100:0,O?u.un:0,!O&&u.un?u.us/100:0,O?0:u.un];
@@ -11297,7 +11386,6 @@ window.__rd={parseWorkbook:parseWorkbook,setRows:function(r,m){ rows=r; meta=m||
       else if(hrx){
         peer=hrx.exp/i.worked; peerN=0; scope='ref'; dev=(i.fuel/hrx.exp-1)*100;
         if(i.fuel>hrx.exp*(1+HR_HIGH)){ t='high'; sev=2; gap=i.fuel-hrx.exp; }                 /* أحمر */
-        else if(i.fuel>hrx.exp*(1+HR_YEL)){ t='high'; sev=1; gap=i.fuel-hrx.exp; }             /* أصفر */
         else if(i.worked>=15 && i.fuel<hrx.exp*(1-HR_LOW)){ t='low'; gap=hrx.exp-i.fuel; }
         else if(hrx.otH>0 && i.fuel>hrx.expN*(1+HR_YEL)){
           /* أعلى من المتوقع لو حسبنا الساعات العادية بس، لكن ساعات الأوفر تايم بتغطّي الفرق → مش تنبيه، بس بنعرضها */
@@ -11306,16 +11394,7 @@ window.__rd={parseWorkbook:parseWorkbook,setRows:function(r,m){ rows=r; meta=m||
         }
       }
       else if(i.worked>0 && i.fuel>0 && i.strict && anyHrs && i.hours>0 && !hrOK){ out.weak++; }
-      else if(i.worked>0 && i.fuel>0){
-        var pm=i.model?(byModel[k+'|'+nk(i.model)]||[]):[], pt=byType[k]||[];
-        var pa=pm.length>=3?pm:(pt.length>=3?pt:null);
-        if(!pa){ out.weak++; }
-        else{
-          if(pa._med===undefined) Object.defineProperty(pa,'_med',{value:med(pa.map(function(o){return o.v;})),enumerable:false}); peer=pa._med; peerN=pa.length; peers=pa; scope=(pa===pm?'model':'type'); var lpd=i.fuel/i.worked; dev=(lpd/peer-1)*100;
-          if(lpd>peer*1.5){ t='high'; sev=(lpd>peer*2?2:1); gap=i.fuel-peer*i.worked; }
-          else if(i.worked>=15 && lpd<peer*0.5){ t='low'; gap=peer*i.worked-i.fuel; }
-        }
-      }
+      else if(i.worked>0 && i.fuel>0){ out.weak++; }   /* مفيش مرجع/ساعات في الشيت → مش بيتحكم عليها */
       if(t){ out.counts[t]++; out.liters[t]+=i.fuel; if(t==='high'){ out.extra+=gap; if(sev===2){ out.counts.red++; out.extraRed+=gap; } else { out.counts.yellow++; out.extraYel+=gap; } }
         out.list.push({id:i.id,label:i.label,type:t,sev:sev,side:i.side,otL:(hrx?hrx.otL:0),fuel:i.fuel,worked:i.worked,peer:peer,gap:gap,dev:dev,equip:i.equip,cap:i.cap||'',n:peerN,scope:scope,peers:peers,refHr:(hrx?i.ref:0),hours:(hrx?i.hours:0),otH:(hrx?hrx.otH:0),refSrc:(hrx?i.refSrc:'')}); }
     });
@@ -11325,12 +11404,12 @@ window.__rd={parseWorkbook:parseWorkbook,setRows:function(r,m){ rows=r; meta=m||
   };
   window.hacDev=function(x){ return x.type==='zero'?'—':((x.dev>0?'+':'')+Math.round(x.dev)+'%'); };
   var TL={zero:'Zero work + fuel',low:'High work, low fuel',high:'High fuel for work'};
-  var TLx=function(x){ return x.type==='high'?(x.sev===1?'🟡 Yellow — high fuel (+60%)':'🔴 Red — high fuel (+100%)'):TL[x.type]; };
+  var TLx=function(x){ return x.type==='high'?'🔴 Red — high fuel (+100%)':TL[x.type]; };
   var f0=function(n){ return Math.round(n).toLocaleString('en-US'); };
   window.hacWatchTable=function(fw,n){
     var l=fw.list.slice(0,n||12);
     var h='<h2>Fuel Watchlist — Suspicious Fuel vs Working Days</h2>';
-    h+='<div class="lang en" dir="ltr"><b>Reference-based (L/Hr):</b> 🔴 Red '+fw.counts.red+' (+'+f0(fw.extraRed)+' L) · 🟡 Yellow '+fw.counts.yellow+' (+'+f0(fw.extraYel)+' L) · Zero work + fuel '+fw.counts.zero+' · Low fuel '+fw.counts.low+' · Cleared by overtime '+fw.otOk.length+'</div>';
+    h+='<div class="lang en" dir="ltr"><b>Reference-based (L/Hr):</b> 🔴 Red '+fw.counts.red+' (+'+f0(fw.extraRed)+' L) · Zero work + fuel '+fw.counts.zero+' · Low fuel '+fw.counts.low+' · Cleared by overtime '+fw.otOk.length+'</div>';
     if(!l.length) return h+'<div class="lang en" dir="ltr">No suspicious fuel records found.</div>'+window.hacFWNotesHtml(fw);
     h+='<table><tr><th>Equipment</th><th>Flag</th><th class="n">Fuel L</th><th class="n">Work Days</th><th class="n">Expected L/day</th><th class="n">Deviation</th><th class="n">OT h</th></tr>';
     l.forEach(function(x){ h+='<tr><td>'+String(x.label).replace(/</g,'&lt;')+'</td><td>'+TLx(x)+'</td><td class="n">'+f0(x.fuel)+'</td><td class="n">'+f0(x.worked)+'</td><td class="n">'+(x.peer?f0(x.peer):'—')+'</td><td class="n">'+window.hacDev(x)+'</td><td class="n">'+(x.otH>0?f0(x.otH):'—')+'</td></tr>'; });
@@ -11360,14 +11439,13 @@ window.__rd={parseWorkbook:parseWorkbook,setRows:function(r,m){ rows=r; meta=m||
     var t=function(a,v,c,tt){ return '<div class="mo-tile"'+(tt?' title="'+esc2(tt)+'"':'')+'><div class="t">'+a+'</div><div class="v" style="color:'+c+'">'+v+'</div></div>'; };
     return t('Zero work + fuel',fw.counts.zero+' · '+f0(fw.liters.zero)+' L','#f85149')
       +t('🔴 Red (+100%)',fw.counts.red+' · +'+f0(fw.extraRed)+' L','#f85149','سولار أعلى من المتوقع (مرجع لتر/ساعة × ساعات العداد) بـ 100% أو أكتر')
-      +t('🟡 Yellow (+60%)',fw.counts.yellow+' · +'+f0(fw.extraYel)+' L','#e3b341','سولار أعلى من المتوقع بين 60% و100%')
       +t('High work, low fuel',fw.counts.low,'#f0a500')
       +t('Cleared by OT / اتغطّت بالأوفر تايم',fw.otOk.length+' · '+f0(fw.otOkL)+' L','#3fb950','وحدات كانت هتتنبّه لو الساعات العادية بس، لكن ساعات الأوفر تايم بتبرّر الفرق')
-      +t('Flagged',fw.list.length,'#58a6ff')+t('Weak comparison / مقارنة ضعيفة',fw.weak,'#8b949e');
+      +t('Flagged',fw.list.length,'#58a6ff')+t('Not judged / مفيش مرجع أو ساعات',fw.weak,'#8b949e');
   };
   window.hacFWColsHtml=function(fw,src){
     var col=function(h,b){ return '<div style="min-width:0"><div class="mo-col-h">'+h+'</div>'+b+'</div>'; };
-    return col('Zero work + fuel',window.hacFWCol(fw,src,'zero','#f85149'))+col('Low fuel for high work',window.hacFWCol(fw,src,'low','#f0a500'))+col('High fuel for work (🔴 red / 🟡 yellow)',window.hacFWCol(fw,src,'high','#ffa657'))+window.hacFWExtra(fw,src);
+    return col('Zero work + fuel',window.hacFWCol(fw,src,'zero','#f85149'))+col('Low fuel for high work',window.hacFWCol(fw,src,'low','#f0a500'))+col('High fuel for work (🔴 red)',window.hacFWCol(fw,src,'high','#ffa657'))+window.hacFWExtra(fw,src);
   };
   /* وحدات اتغطّت بالأوفر تايم + الملاحظات (بتتحط تحت الأعمدة الثلاثة) */
   window.hacFWExtra=function(fw,src){
@@ -11477,6 +11555,73 @@ window.__rd={parseWorkbook:parseWorkbook,setRows:function(r,m){ rows=r; meta=m||
     d.addEventListener('click',function(e){ if(e.target===d||e.target.id==='hacfwx') d.remove(); });
     document.body.appendChild(d);
   };
+})();
+</script>
+
+<!-- ===== SECURITY LAYER: watermark (typed name), viewer deterrents, idle logout, hard kick lock ===== -->
+<style>
+#hac-wm{position:fixed;inset:0;pointer-events:none;z-index:2147483000;opacity:.16;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body.is-viewer :not(input):not(textarea):not(select):not([contenteditable]){-webkit-user-select:none;user-select:none}
+body.hac-locked #app,body.hac-locked #auth-screen,body.hac-locked .modal-overlay,body.hac-locked .breakdown-overlay{display:none !important}
+#hac-lock{position:fixed;inset:0;z-index:2147483600;background:#0d1117;color:#e6edf3;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Arial,sans-serif}
+</style>
+<script>
+(function(){
+'use strict';
+if(window.__HAC_BLOCKED)return;
+var IDLE_MIN=30, KICK_LOCK_MIN=60;
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+var curUser=null,lastTxt='';
+function label(u){var n='';try{n=sessionStorage.getItem('viewer_name')||'';}catch(e){}return n||(u&&u.email)||'user';}
+function wm(user){
+  curUser=user;var el=document.getElementById('hac-wm');
+  if(!user){if(el)el.remove();lastTxt='';return;}
+  var txt=esc(label(user)+'  \u00b7  '+new Date().toISOString().slice(0,10));
+  if(el&&txt===lastTxt)return;lastTxt=txt;
+  if(!el){el=document.createElement('div');el.id='hac-wm';document.body.appendChild(el);}
+  var svg="<svg xmlns='http://www.w3.org/2000/svg' width='380' height='220'><text x='20' y='130' transform='rotate(-24 190 110)' font-family='Arial' font-size='15' font-weight='600' fill='#8b949e'>"+txt+"</text></svg>";
+  el.style.backgroundImage='url("data:image/svg+xml,'+encodeURIComponent(svg)+'")';
+}
+setInterval(function(){if(curUser)wm(curUser);},1500);
+
+/* ---- hard kick lock ---- */
+function lockLeft(){try{return (+localStorage.getItem('hac_kick_until')||0)-Date.now();}catch(e){return 0;}}
+function showLock(){
+  document.body.classList.add('hac-locked');wm(null);
+  var mins=Math.max(1,Math.ceil(lockLeft()/60000));
+  var el=document.getElementById('hac-lock');
+  if(!el){el=document.createElement('div');el.id='hac-lock';document.body.appendChild(el);}
+  el.innerHTML='<div style="max-width:440px;padding:32px"><div style="color:#f0a500;letter-spacing:3px;font-size:12px;margin-bottom:10px">HAC \u00b7 PMV</div><h2 style="margin:0 0 12px">Session ended by administrator</h2><p style="color:#8b949e;line-height:1.7">Your access was closed. Contact the portal administrator to regain access.<br>\u062a\u0645 \u0625\u0646\u0647\u0627\u0621 \u062c\u0644\u0633\u062a\u0643 \u0628\u0648\u0627\u0633\u0637\u0629 \u0627\u0644\u0623\u062f\u0645\u0646. \u0645\u0646 \u0641\u0636\u0644\u0643 \u062a\u0648\u0627\u0635\u0644 \u0645\u0639\u0647.</p><p style="color:#484f58;font-size:12px">'+mins+' min</p></div>';
+}
+function lockNow(){try{firebase.auth().signOut();}catch(e){}}
+window.hacKickLock=function(){try{localStorage.setItem('hac_kick_until',String(Date.now()+KICK_LOCK_MIN*60000));}catch(e){}showLock();lockNow();};
+if(lockLeft()>0){showLock();lockNow();}
+
+/* ---- viewer deterrents ---- */
+function isViewer(){return document.body.classList.contains('is-viewer');}
+function inField(t){return t&&t.closest&&t.closest('input,textarea,select,[contenteditable]');}
+document.addEventListener('contextmenu',function(e){if(isViewer()&&!inField(e.target))e.preventDefault();});
+['copy','cut','dragstart','selectstart'].forEach(function(n){document.addEventListener(n,function(e){if(isViewer()&&!inField(e.target))e.preventDefault();});});
+document.addEventListener('keydown',function(e){
+  if(!isViewer())return;
+  var k=(e.key||'').toLowerCase(),c=e.ctrlKey||e.metaKey;
+  if(e.key==='F12'||(c&&(k==='s'||k==='u'))||(c&&e.shiftKey&&(k==='i'||k==='j'||k==='c'))){e.preventDefault();e.stopPropagation();}
+},true);
+document.addEventListener('keyup',function(e){if(isViewer()&&e.key==='PrintScreen'){try{navigator.clipboard.writeText('HAC \u00b7 PMV \u2014 confidential');}catch(x){}}});
+
+/* ---- idle logout ---- */
+var timer=null;
+function resetIdle(){
+  clearTimeout(timer);
+  try{if(!firebase.auth().currentUser)return;}catch(e){return;}
+  timer=setTimeout(function(){try{if(typeof toast==='function')toast('Signed out after '+IDLE_MIN+' min of inactivity','error');}catch(e){}try{doLogout();}catch(e){lockNow();}},IDLE_MIN*60*1000);
+}
+['mousemove','keydown','click','scroll','touchstart'].forEach(function(n){document.addEventListener(n,resetIdle,{passive:true});});
+try{firebase.auth().onAuthStateChanged(function(u){
+  if(lockLeft()>0){showLock();if(u)lockNow();return;}
+  wm(u);resetIdle();
+});}catch(e){}
+try{console.log('%cHAC \u00b7 PMV','color:#f0a500;font-size:18px;font-weight:700');console.log('Confidential. Access is logged.');}catch(e){}
 })();
 </script>
 </body>
