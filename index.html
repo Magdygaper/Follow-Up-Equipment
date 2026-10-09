@@ -2270,10 +2270,10 @@ function watchForKick() {
   if (!viewerSessionId || isAdmin) return;
   _listen('kick', db.collection('kicked_viewers').doc(viewerSessionId).onSnapshot(function(doc) {
     if (doc.exists) {
-      cleanupViewerPresence();
-      db.collection('kicked_viewers').doc(viewerSessionId).delete().catch(function(e){});
-      sessionStorage.removeItem('viewer_name');
-      window.hacKickLock();
+      var kickedId = viewerSessionId;
+      try { db.collection('kicked_viewers').doc(kickedId).delete().catch(function(e){}); } catch(e){}
+      try { window.hacKickLock(); } catch(e){ try{ document.body.innerHTML=''; location.reload(); }catch(x){} }
+      try { cleanupViewerPresence(); } catch(e){}
     }
   }, function(err) {
     console.log('Kick listener error:', err);
@@ -11558,9 +11558,8 @@ window.__rd={parseWorkbook:parseWorkbook,setRows:function(r,m){ rows=r; meta=m||
 })();
 </script>
 
-<!-- ===== SECURITY LAYER: watermark (typed name), viewer deterrents, idle logout, hard kick lock ===== -->
+<!-- ===== SECURITY LAYER: viewer deterrents, idle logout, hard kick lock ===== -->
 <style>
-#hac-wm{position:fixed;inset:0;pointer-events:none;z-index:2147483000;opacity:.16;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 body.is-viewer :not(input):not(textarea):not(select):not([contenteditable]){-webkit-user-select:none;user-select:none}
 body.hac-locked #app,body.hac-locked #auth-screen,body.hac-locked .modal-overlay,body.hac-locked .breakdown-overlay{display:none !important}
 #hac-lock{position:fixed;inset:0;z-index:2147483600;background:#0d1117;color:#e6edf3;display:flex;align-items:center;justify-content:center;text-align:center;font-family:Arial,sans-serif}
@@ -11570,24 +11569,12 @@ body.hac-locked #app,body.hac-locked #auth-screen,body.hac-locked .modal-overlay
 'use strict';
 if(window.__HAC_BLOCKED)return;
 var IDLE_MIN=30, KICK_LOCK_MIN=60;
-function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
-var curUser=null,lastTxt='';
-function label(u){var n='';try{n=sessionStorage.getItem('viewer_name')||'';}catch(e){}return n||(u&&u.email)||'user';}
-function wm(user){
-  curUser=user;var el=document.getElementById('hac-wm');
-  if(!user){if(el)el.remove();lastTxt='';return;}
-  var txt=esc(label(user)+'  \u00b7  '+new Date().toISOString().slice(0,10));
-  if(el&&txt===lastTxt)return;lastTxt=txt;
-  if(!el){el=document.createElement('div');el.id='hac-wm';document.body.appendChild(el);}
-  var svg="<svg xmlns='http://www.w3.org/2000/svg' width='380' height='220'><text x='20' y='130' transform='rotate(-24 190 110)' font-family='Arial' font-size='15' font-weight='600' fill='#8b949e'>"+txt+"</text></svg>";
-  el.style.backgroundImage='url("data:image/svg+xml,'+encodeURIComponent(svg)+'")';
-}
-setInterval(function(){if(curUser)wm(curUser);},1500);
+
 
 /* ---- hard kick lock ---- */
 function lockLeft(){try{return (+localStorage.getItem('hac_kick_until')||0)-Date.now();}catch(e){return 0;}}
 function showLock(){
-  document.body.classList.add('hac-locked');wm(null);
+  document.body.classList.add('hac-locked');
   var mins=Math.max(1,Math.ceil(lockLeft()/60000));
   var el=document.getElementById('hac-lock');
   if(!el){el=document.createElement('div');el.id='hac-lock';document.body.appendChild(el);}
@@ -11619,7 +11606,7 @@ function resetIdle(){
 ['mousemove','keydown','click','scroll','touchstart'].forEach(function(n){document.addEventListener(n,resetIdle,{passive:true});});
 try{firebase.auth().onAuthStateChanged(function(u){
   if(lockLeft()>0){showLock();if(u)lockNow();return;}
-  wm(u);resetIdle();
+  resetIdle();
 });}catch(e){}
 try{console.log('%cHAC \u00b7 PMV','color:#f0a500;font-size:18px;font-weight:700');console.log('Confidential. Access is logged.');}catch(e){}
 })();
