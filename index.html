@@ -1328,7 +1328,7 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
 <div class="modal-overlay" id="fleet-import-modal">
   <div class="modal" style="width:480px;max-width:95vw;">
     <div class="modal-title">📥 Import Excel — اختار الـ Fleet</div>
-    <div style="font-size:13px;color:var(--text-muted);margin-bottom:20px;">بيقرأ من شيت <strong>All_Data</strong> ويفلتر بالـ Country column تلقائياً</div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:20px;"><strong>Egypt</strong> = HAC Egypt + Others + TBM Support + Welding Machines + Tunnelling (كلهم مصر) — باقي الدول من تابها، و<strong>All Countries</strong> بتقرأ الكل</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;">
       <button onclick="confirmFleetImport('all')" style="background:rgba(240,165,0,.12);border:1px solid var(--accent);color:var(--accent);padding:14px;border-radius:var(--radius);cursor:pointer;font-size:13px;font-weight:700;text-align:center;transition:all .2s;" onmouseover="this.style.background='rgba(240,165,0,.22)'" onmouseout="this.style.background='rgba(240,165,0,.12)'">
         🌍<br><span style="font-size:12px;">All Countries</span>
@@ -1589,7 +1589,7 @@ function _hacWipeLocal(){
   try{ sessionStorage.clear(); }catch(e){}
 }
 
-const OD_MAP = {"Bab Masr":"Eng. Mostafa Morsi","El Bank El Araby":"Eng. Mostafa Morsi","Kayan":"Eng. Mostafa Morsi","Luxor":"Eng. Mostafa Morsi","Mansoura 2":"Eng. Mostafa Morsi","R05":"Eng. Mostafa Morsi","SCB":"Eng. Mostafa Morsi","Al Shohadaa Central hospital":"Eng. Tamer Hagag","Alamein Station":"Eng. Tamer Hagag","Haptowen":"Eng. Tamer Hagag","Locanda":"Eng. Tamer Hagag","Naser Institute":"Eng. Tamer Hagag","Silver Sand":"Eng. Tamer Hagag","Sofitel Hotel":"Eng. Tamer Hagag","Soul":"Eng. Tamer Hagag","swan Lake - 2":"Eng. Tamer Hagag","Wadi Natroun":"Eng. Tamer Hagag","Abou Oweikal":"Eng. Ahmed Nezar","Abou Qir JV":"Eng. Ahmed Nezar","Alex Tram":"Eng. Ahmed Nezar","El Ayaat Project":"Eng. Ahmed Nezar","intake mostakbal Misr":"Eng. Ahmed Nezar","Metro Line 4":"Eng. Ahmed Nezar","Mostakbal Masr Zone (G)":"Eng. Ahmed Nezar","Safaga Port":"Eng. Ahmed Nezar","Sokhna Port":"Eng. Ahmed Nezar","TBM - Metro L4":"Eng. Ahmed Nezar","Toshka":"Eng. Ahmed Nezar","Benban 200 MW":"Eng. Hany Fayd","El Dabaa":"Eng. Hany Fayd","marasy":"Eng. Essam Ibrahim","Ras Elhekma":"Eng. Waled Fahmy","Allam Block ( 10th of ramadan )":"Eng. Mohamed Mostafa","Allam Block ( Safaga Port )":"Eng. Mohamed Mostafa","hassan allam complex":"Eng. Mohamed Mostafa","Heavy Transportation Workshop":"Eng. Mohamed Mostafa","Scaffolding":"Eng. Mohamed Mostafa","Ware House( 10th of ramadan )":"Eng. Mohamed Mostafa","10th OF RAMADAN":"Eng. Mohamed Mostafa","Sant Catreen":"Eng. Abdelaziz Ibrahim","Cairo Festival":"Eng. Hamdy Swillam","Hard 350":"Eng. Hamdy Swillam","Mansoura 1":"Eng. Hamdy Swillam","Mavida Garden":"Eng. Hamdy Swillam","Allam steel":"Eng. Salah Shaker","New Capital Tran-Hub":"Eng. Mohamed Salem","Afrexim Bank":"Eng. Islam El Sayed","Al Alamen Towers JV":"Eng. Mohamed Abdellatif","Mac Factory":"Eng. Mohamed Salem","U - Section Alex":"Eng. Ahmed Nezar"};
+const OD_MAP = {"Bab Masr":"Eng. Mostafa Morsi","El Bank El Araby":"Eng. Mostafa Morsi","Kayan":"Eng. Mostafa Morsi","Luxor":"Eng. Mostafa Morsi","Mansoura 2":"Eng. Mostafa Morsi","R05":"Eng. Mostafa Morsi","SCB":"Eng. Mostafa Morsi","Al Shohadaa Central hospital":"Eng. Tamer Hagag","Alamein Station":"Eng. Tamer Hagag","Haptowen":"Eng. Tamer Hagag","Locanda":"Eng. Tamer Hagag","Naser Institute":"Eng. Tamer Hagag","Silver Sand":"Eng. Tamer Hagag","Sofitel Hotel":"Eng. Tamer Hagag","Soul":"Eng. Tamer Hagag","swan Lake - 2":"Eng. Tamer Hagag","Wadi Natroun":"Eng. Tamer Hagag","Abou Oweikal":"Eng. Ahmed Nezar","Abou Qir JV":"Eng. Ahmed Nezar","Alex Tram":"Eng. Ahmed Nezar","El Ayaat Project":"Eng. Ahmed Nezar","intake mostakbal Misr":"Eng. Ahmed Nezar","Metro Line 4":"Eng. Ahmed Nezar","Mostakbal Masr Zone (G)":"Eng. Ahmed Nezar","Safaga Port":"Eng. Ahmed Nezar","Sokhna Port":"Eng. Ahmed Nezar","TBM - Metro L4":"Eng. Ahmed Nezar","Toshka":"Eng. Ahmed Nezar","Benban 200 MW":"Eng. Hany Fayd","El Dabaa":"Eng. Hany Fayd","marasy":"Eng. Essam Ibrahim","Ras Elhekma":"Eng. Waled Fahmy","Allam Block ( 10th of ramadan )":"Eng. Mohamed Mostafa","Allam Block ( Safaga Port )":"Eng. Mohamed Mostafa","hassan allam complex":"Eng. Mohamed Mostafa","Heavy Transportation Workshop":"Eng. Mohamed Mostafa","Scaffolding":"Eng. Mohamed Mostafa","Ware House( 10th of ramadan )":"Eng. Mohamed Mostafa","10th OF RAMADAN":"Eng. Mohamed Mostafa","Sant Catreen":"Eng. Abdelaziz Ibrahim","Cairo Festival":"Eng. Hamdy Swillam","Hard 350":"Eng. Hamdy Swillam","Mansoura 1":"Eng. Hamdy Swillam","Mavida Garden":"Eng. Hamdy Swillam","Allam steel":"Eng. Salah Shaker","New Capital Tran-Hub":"Eng. Tamer Hagag","Afrexim Bank":"Eng. Islam El Sayed","Al Alamen Towers JV":"Eng. Mohamed Abdellatif","Mac Factory":"Eng. Tamer Hagag","U - Section Alex":"Eng. Ahmed Nezar","Head office":"Eng. Mohamed Mostafa","New Delta Phase 2":"Eng. Ahmed Nezar","Ramsis Post":"Eng. Tamer Hagag","Speed train depots Minya":"Eng. Ahmed Nezar"};
 const CAT_COLORS = {"Earthmoving Equipment":"#f0a500","Compaction Equipment":"#58a6ff","Power & Utilities":"#3fb950","Concrete Equipment":"#e05c00","Lifting Equipment":"#a371f7","Ground Engineering":"#39d353","Special Equipment":"#ff7b72","Pumping Equipment":"#ffa657"};
 
 let currentUser=null, isAdmin=false;
@@ -1634,7 +1634,7 @@ function switchFleet(fleet, btn) {
 function openFleetPicker(){
   const counts = {};
   allEquipment.forEach(function(e){
-    if(_isTunnelling(e)) { counts.tunnelling = (counts.tunnelling||0)+1; return; }
+    if(_isTunnelling(e)) { counts.tunnelling = (counts.tunnelling||0)+1; if((e.fleet||'egypt')==='egypt') counts.egypt = (counts.egypt||0)+1; return; }
     if(_isFoundation(e)) { counts.foundation = (counts.foundation||0)+1; return; }
     const f = e.fleet || 'egypt'; counts[f] = (counts[f]||0) + 1;
   });
@@ -1682,7 +1682,7 @@ function _isTunnelling(e) {
 function getFleetEquipment() {
   if(currentFleet === 'all') return allEquipment;
   if(currentFleet === 'egypt') return allEquipment.filter(function(e){
-    return (e.fleet||'egypt') === 'egypt' && !_isFoundation(e) && !_isTunnelling(e);
+    return (e.fleet||'egypt') === 'egypt' && !_isFoundation(e);
   });
   if(currentFleet === 'foundation') return allEquipment.filter(function(e){ return _isFoundation(e); });
   if(currentFleet === 'tunnelling') return allEquipment.filter(function(e){ return _isTunnelling(e); });
@@ -1691,7 +1691,7 @@ function getFleetEquipment() {
 
 function inFleet(e){
   if(currentFleet === 'all') return true;
-  if(currentFleet === 'egypt') return (e.fleet||'egypt') === 'egypt' && !_isFoundation(e) && !_isTunnelling(e);
+  if(currentFleet === 'egypt') return (e.fleet||'egypt') === 'egypt' && !_isFoundation(e);
   if(currentFleet === 'foundation') return _isFoundation(e);
   if(currentFleet === 'tunnelling') return _isTunnelling(e);
   return (e.fleet || 'egypt') === currentFleet;
@@ -1708,7 +1708,7 @@ function renderCountryCards() {
 
   const counts = {};
   allEquipment.forEach(function(e){
-    if(_isTunnelling(e)){ counts.tunnelling = (counts.tunnelling||0)+1; return; }
+    if(_isTunnelling(e)){ counts.tunnelling = (counts.tunnelling||0)+1; if((e.fleet||'egypt')==='egypt') counts.egypt = (counts.egypt||0)+1; return; }
     if(_isFoundation(e)){ counts.foundation = (counts.foundation||0)+1; return; }
     const f = (e.fleet || 'egypt'); counts[f] = (counts[f]||0) + 1;
   });
@@ -1792,7 +1792,7 @@ function jumpFleet(f) {
 function updateFleetCounts() {
   const counts = {egypt:0,ksa:0,algeria:0,uae:0,foundation:0,tunnelling:0,archive:0};
   allEquipment.forEach(function(e){
-    if(_isTunnelling(e))  { counts.tunnelling++; return; }
+    if(_isTunnelling(e))  { counts.tunnelling++; if((e.fleet||'egypt')==='egypt') counts.egypt++; return; }
     if(_isFoundation(e))  { counts.foundation++; return; }
     const f = e.fleet || 'egypt';
     if(counts[f] !== undefined) counts[f]++;
@@ -1931,6 +1931,7 @@ let currentViewerModalTab = 'live';
 
 function odFix(v){
   if(typeof v!=='string') return v;
+  if(/^\s*(eng\.?\s*)?(mohamm?ed|mohamad)\s+salem\s*$/i.test(v)) return '';
   var k=v.toLowerCase().replace(/^\s*(?:engineer|eng)[.\s]*/,'').replace(/[^a-z]/g,'');
   return (k==='eslamelsaid'||k==='eslamelsayed')?'Eng. Eslam Elsayed':v;
 }
@@ -1945,6 +1946,23 @@ function getOd0(p){
     if(key) for(const [k,v] of Object.entries(OD_MAP)) if(window.HAC.key('project',k)===key) return v;
   }
   return '';
+}
+
+function hacNormalizeOd(list){
+  // 1) project -> O.D comes from the O.D-by-Project map (one O.D per project, wins over what the row says)
+  // 2) unmapped project + row has no O.D -> use the O.D this same equipment Code already has elsewhere
+  // 3) Central Workshop never carries an O.D
+  var byCode = {};
+  list.forEach(function(e){ var c=String(e.code||'').replace(/\s+/g,'').toUpperCase(); var o=odFix(String(e.od||'').trim()); if(c && o && !byCode[c]) byCode[c]=o; });
+  list.forEach(function(e){
+    if(isCentralWorkshop(e.project)) { e.od=''; return; }
+    var m=getOd(e.project);
+    if(m) { e.od=m; return; }
+    var o=odFix(String(e.od||'').trim());
+    if(!o) { var c=String(e.code||'').replace(/\s+/g,'').toUpperCase(); o=byCode[c]||''; }
+    e.od=o;
+  });
+  return list;
 }
 
 function formatExcelDate(val) {
@@ -2305,7 +2323,7 @@ function loadData() {
     db.collection('followup').orderBy('sn', 'asc').get()
   ]).then(function(results) {
     allEquipment = results[0].docs.map(function(d){ return Object.assign({id: d.id}, d.data()); });
-    allEquipment.forEach(function(e){ if(isCentralWorkshop(e.project)) e.od = ''; });
+    hacNormalizeOd(allEquipment);
     allTransfers = results[1].docs.map(function(d){ return Object.assign({id: d.id}, d.data()); });
 
     if(!results[2].empty) {
@@ -5098,6 +5116,8 @@ window.confirmFleetImport = function(fleetValue) {
     reader.onload = function(e) {
       const wb = XLSX.read(e.target.result, {type:'binary'});
 
+      // parseFleet: reads ONE fleet from its OWN tab exactly as it is in the sheet (no All_Data mixing).
+      const parseFleet = function(fv, strict, forcedSheet) {
       // Every fleet gets a chance to use its OWN named tab first (real tab names in this workbook,
       // e.g. "Algeria Equipment", "KSA Equipment", "UAE Equipment"), so edits made in that tab are
       // actually picked up. Only if no matching tab exists do we fall back to "All_Data"
@@ -5111,10 +5131,14 @@ window.confirmFleetImport = function(fleetValue) {
         tunnelling: ['Tunnelling', 'Tunneling'],
         jv:         ['JV Equipment', 'JV']
       };
-      const ownNames = FLEET_OWN_SHEET[fleetValue] || [];
+      const ownNames = FLEET_OWN_SHEET[fv] || [];
       let sheetName = null;
+      if (forcedSheet) {
+        sheetName = wb.SheetNames.find(function(s){ return s.trim().toLowerCase() === forcedSheet.toLowerCase(); }) || null;
+        if (!sheetName) return null;
+      }
       // Pass 1: exact name match (case-insensitive)
-      for (let k = 0; k < ownNames.length; k++) {
+      for (let k = 0; !sheetName && k < ownNames.length; k++) {
         const found = wb.SheetNames.find(function(s){ return s.trim().toLowerCase() === ownNames[k].toLowerCase(); });
         if (found) { sheetName = found; break; }
       }
@@ -5128,6 +5152,7 @@ window.confirmFleetImport = function(fleetValue) {
           return ownNames.some(function(k){ return t.indexOf(k.toLowerCase()) !== -1; });
         });
       }
+      if (!sheetName && strict) return null;
       if (!sheetName) sheetName = wb.SheetNames.find(function(s){ return s.trim() === 'All_Data'; }) || wb.SheetNames[0];
       toast('📄 Reading sheet: "' + sheetName + '"');
       const ws = wb.Sheets[sheetName];
@@ -5141,7 +5166,7 @@ window.confirmFleetImport = function(fleetValue) {
           headerIdx = i; break;
         }
       }
-      if(headerIdx < 0) { toast('Header row not found ✗', 'error'); return; }
+      if(headerIdx < 0) { toast('Header row not found in "' + sheetName + '" ✗', 'error'); return null; }
 
       const headers = raw[headerIdx];
       const colIdx = {};
@@ -5194,7 +5219,7 @@ window.confirmFleetImport = function(fleetValue) {
       // chosen fleet (egypt/ksa/algeria/uae/jv/foundation/tunnelling/archive),
       // the user has already told us which fleet this whole sheet belongs to —
       // don't require a Country column (Foundation/TBM sheets don't have one).
-      const allowedCountries = fleetCountryMap[fleetValue];
+      const allowedCountries = fleetCountryMap[fv];
       const hasCountryCol = colIdxLC['country'] !== undefined;
       const COUNTRY_FLEETS = ['egypt','ksa','algeria','uae','foundation','tunnelling'];
       const dataRows = raw.slice(headerIdx + 1).filter(function(r){
@@ -5202,11 +5227,11 @@ window.confirmFleetImport = function(fleetValue) {
         if(sn === '' || sn === null || isNaN(Number(sn)) || Number(sn) <= 0) return false;
         // A country fleet was chosen but the sheet mixes countries (All_Data): keep ONLY that country's rows,
         // otherwise every KSA / UAE / Algeria row gets imported as Egypt (that is how Egypt became 1,503).
-        if(fleetValue !== 'all' && hasCountryCol && COUNTRY_FLEETS.indexOf(fleetValue) !== -1 && allowedCountries) {
+        if(fv !== 'all' && hasCountryCol && COUNTRY_FLEETS.indexOf(fv) !== -1 && allowedCountries) {
           const cv = String(r[colIdxLC['country']] || '').trim().toLowerCase();
           return allowedCountries.indexOf(cv) !== -1;
         }
-        if(fleetValue !== 'all') return true;
+        if(fv !== 'all') return true;
         if(allowedCountries === null) return true; // all
         const country = get(r, ['Country']).toLowerCase();
         return allowedCountries.some(function(c){ return country.indexOf(c) !== -1; });
@@ -5225,13 +5250,13 @@ window.confirmFleetImport = function(fleetValue) {
         const power    = get(row, POWER_KEYS) || powerByCode[codeKey(code)] || '';
         const sapCode  = get(row, ['Code Sap','Code SAP']);
         const owner    = get(row, [' Owner ','Owner']);
-        const od       = get(row, ['O.D']) || getOd(project);
+        const od       = getOd(project) || odFix(get(row, ['O.D']));
 
         // Derive fleet from Country column + category
         const cLow = country.toLowerCase();
         const catLow = (cat||'').toLowerCase();
-        let fleet = fleetValue;
-        if(fleetValue === 'all') {
+        let fleet = fv;
+        if(fv === 'all') {
           if(cLow.indexOf('ksa') !== -1 || cLow.indexOf('saudi') !== -1) fleet = 'ksa';
           else if(cLow.indexOf('alger') !== -1) fleet = 'algeria';
           else if(cLow.indexOf('uae') !== -1) fleet = 'uae';
@@ -5259,11 +5284,45 @@ window.confirmFleetImport = function(fleetValue) {
           importedAt:  new Date().toISOString()
         };
       }).filter(function(r){ return r.equipment; });
+      return {sheetName: sheetName, records: records};
+      };
+
+      // Egypt's equipment is spread over several tabs — all of them are Egypt (fleet 'egypt').
+      const EGYPT_TABS = ['HAC Egypt','Others','TBM Support','Welding Machines','Tunnelling'];
+      const ODP_SHEET = wb.SheetNames.find(function(n){ return n.trim().toLowerCase() === 'o.d by project'; });
+      if(ODP_SHEET) { // the workbook's own 'O.D by Project' tab is the authority → refresh OD_MAP
+        XLSX.utils.sheet_to_json(wb.Sheets[ODP_SHEET], {header:1, defval:''}).slice(1).forEach(function(r){
+          const od = String(r[0]||'').trim(), pj = String(r[1]||'').trim();
+          if(od && pj) OD_MAP[pj] = od;
+        });
+      }
+      const parseEgypt = function(onlyTab) {
+        const tabs = onlyTab ? [onlyTab] : EGYPT_TABS, out = [];
+        tabs.forEach(function(t){ const pr = parseFleet('egypt', true, t); if(pr && pr.records.length) out.push({fleet:'egypt', sheetName: pr.sheetName, records: pr.records}); });
+        return out;
+      };
+      const parsedFleets = [];
+      if(fleetValue === 'egypt') {
+        parseEgypt().forEach(function(x){ parsedFleets.push(x); });
+      } else if(fleetValue === 'tunnelling') {
+        parseEgypt('Tunnelling').forEach(function(x){ parsedFleets.push(x); });
+      } else if(fleetValue === 'all') {
+        parseEgypt().forEach(function(x){ parsedFleets.push(x); });
+        ['ksa','algeria','uae','foundation','jv'].forEach(function(fv){ const pr = parseFleet(fv, true); if(pr && pr.records.length) parsedFleets.push({fleet: fv, sheetName: pr.sheetName, records: pr.records}); });
+        if(!parsedFleets.length) { const pr = parseFleet('all', false); if(pr) parsedFleets.push({fleet:'all', sheetName: pr.sheetName, records: pr.records}); }
+      } else {
+        const pr = parseFleet(fleetValue, false);
+        if(pr) parsedFleets.push({fleet: fleetValue, sheetName: pr.sheetName, records: pr.records});
+      }
+      if(!parsedFleets.length) return;
+      const records = [].concat.apply([], parsedFleets.map(function(x){ return x.records; }));
+      hacNormalizeOd(records);
+      const sheetSummary = parsedFleets.map(function(x){ return x.fleet + ': "' + x.sheetName + '" = ' + x.records.length; }).join(' | ');
 
       // ➕ Add New Only: keep only rows whose Code is not registered yet in the same fleet
       // (rows with no Code are matched on equipment + brand + project + chassis). Nothing existing is touched.
       let writeRecs = records;
-      if(_pendingImportMode === 'addnew') {
+      if(_pendingImportMode === 'addnew' || _pendingImportMode === 'add') {
         const keyOf = function(x) {
           const c = String(x.code || '').replace(/\s+/g,'').toUpperCase();
           const base = c ? c : ['nocode', x.equipment, x.brand, x.project, x.chassis].map(function(v){ return String(v||'').replace(/\s+/g,' ').trim().toLowerCase(); }).join('|');
@@ -5273,7 +5332,7 @@ window.confirmFleetImport = function(fleetValue) {
         allEquipment.forEach(function(e){ have[keyOf(e)] = 1; });
         writeRecs = records.filter(function(r){ return !have[keyOf(r)]; });
         if(!writeRecs.length) { toast('مفيش معدات جديدة — كل اللي في الشيت (' + records.length + ') متسجل قبل كده'); input.value = ''; return; }
-        if(!confirm('هيتم إضافة ' + writeRecs.length + ' معدة جديدة بس (من ' + records.length + ' في الشيت) → ' + fleetLabel + '\nمن غير تعديل أو مسح أي حاجة موجودة. نكمل؟')) { input.value = ''; return; }
+        if(_pendingImportMode === 'addnew' && !confirm('هيتم إضافة ' + writeRecs.length + ' معدة جديدة بس (من ' + records.length + ' في الشيت) → ' + fleetLabel + '\nمن غير تعديل أو مسح أي حاجة موجودة. نكمل؟')) { input.value = ''; return; }
       }
 
       toast('⏳ Importing ' + writeRecs.length + ' records for ' + fleetLabel + '…');
@@ -5293,7 +5352,8 @@ window.confirmFleetImport = function(fleetValue) {
         });
       });
       chain.then(function(){
-        toast('✓ ' + writeRecs.length + ' records imported → ' + fleetLabel);
+        toast('✓ ' + writeRecs.length + ' records imported → ' + fleetLabel + ' — الشيت: ' + records.length + (writeRecs.length !== records.length ? ' (اتخطّى ' + (records.length - writeRecs.length) + ' متسجلين قبل كده)' : ' = التطبيق ✓'));
+        console.log('[Import] Sheet rows by fleet → ' + sheetSummary);
         loadData();
         input.value = '';
       }).catch(function(err){ toast('Import error: ' + err.message, 'error'); });
