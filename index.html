@@ -1173,7 +1173,6 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
           <option value="ksa">🇸🇦 Saudi Arabia</option>
           <option value="algeria">🇩🇿 Algeria</option>
           <option value="uae">🇦🇪 UAE</option>
-          <option value="jv">🤝 JV / Special</option>
           <option value="archive">📦 Archive</option>
         </select>
       </div>
@@ -1328,33 +1327,8 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
 <div class="modal-overlay" id="fleet-import-modal">
   <div class="modal" style="width:480px;max-width:95vw;">
     <div class="modal-title">📥 Import Excel — اختار الـ Fleet</div>
-    <div style="font-size:13px;color:var(--text-muted);margin-bottom:20px;"><strong>Egypt</strong> = HAC Egypt + Others + TBM Support + Welding Machines + Tunnelling (كلهم مصر) — باقي الدول من تابها، و<strong>All Countries</strong> بتقرأ الكل</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;">
-      <button onclick="confirmFleetImport('all')" style="background:rgba(240,165,0,.12);border:1px solid var(--accent);color:var(--accent);padding:14px;border-radius:var(--radius);cursor:pointer;font-size:13px;font-weight:700;text-align:center;transition:all .2s;" onmouseover="this.style.background='rgba(240,165,0,.22)'" onmouseout="this.style.background='rgba(240,165,0,.12)'">
-        🌍<br><span style="font-size:12px;">All Countries</span>
-      </button>
-      <button onclick="confirmFleetImport('egypt')" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:14px;border-radius:var(--radius);cursor:pointer;font-size:13px;font-weight:600;text-align:center;transition:all .2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
-        🇪🇬<br><span style="font-size:12px;color:var(--text-muted);">Egypt Fleet</span>
-      </button>
-      <button onclick="confirmFleetImport('ksa')" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:14px;border-radius:var(--radius);cursor:pointer;font-size:13px;font-weight:600;text-align:center;transition:all .2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
-        🇸🇦<br><span style="font-size:12px;color:var(--text-muted);">Saudi Arabia</span>
-      </button>
-      <button onclick="confirmFleetImport('algeria')" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:14px;border-radius:var(--radius);cursor:pointer;font-size:13px;font-weight:600;text-align:center;transition:all .2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
-        🇩🇿<br><span style="font-size:12px;color:var(--text-muted);">Algeria</span>
-      </button>
-      <button onclick="confirmFleetImport('uae')" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:14px;border-radius:var(--radius);cursor:pointer;font-size:13px;font-weight:600;text-align:center;transition:all .2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
-        🇦🇪<br><span style="font-size:12px;color:var(--text-muted);">UAE</span>
-      </button>
-      <button onclick="confirmFleetImport('jv')" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:14px;border-radius:var(--radius);cursor:pointer;font-size:13px;font-weight:600;text-align:center;transition:all .2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
-        🤝<br><span style="font-size:12px;color:var(--text-muted);">JV / Special</span>
-      </button>
-      <button onclick="confirmFleetImport('foundation')" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:14px;border-radius:var(--radius);cursor:pointer;font-size:13px;font-weight:600;text-align:center;transition:all .2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
-        🏗️<br><span style="font-size:12px;color:var(--text-muted);">Foundation</span>
-      </button>
-      <button onclick="confirmFleetImport('tunnelling')" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:14px;border-radius:var(--radius);cursor:pointer;font-size:13px;font-weight:600;text-align:center;transition:all .2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
-        🛠️<br><span style="font-size:12px;color:var(--text-muted);">Tunnelling (TBM)</span>
-      </button>
-    </div>
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:20px;">الخيارات دي مبنية على التابات الظاهرة في الملف اللي رفعته (التابات المخفية زي JV مش بتظهر).</div>
+    <div id="fleet-import-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;max-height:55vh;overflow:auto;"></div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="document.getElementById('fleet-import-modal').classList.remove('open'); _pendingImportInput && (_pendingImportInput.value='');">إلغاء</button>
     </div>
@@ -1675,6 +1649,8 @@ function _isFoundation(e) {
 
 function _isTunnelling(e) {
   if((e.fleet||'') === 'tunnelling') return true;
+  var tb = String(e.tab||'').trim().toLowerCase();
+  if(tb === 'tunnelling' || tb === 'tunneling' || tb === 'tbm support') return true;
   var cat = (e.category||'').toLowerCase();
   return cat.indexOf('tunnel') !== -1;
 }
@@ -2323,6 +2299,7 @@ function loadData() {
     db.collection('followup').orderBy('sn', 'asc').get()
   ]).then(function(results) {
     allEquipment = results[0].docs.map(function(d){ return Object.assign({id: d.id}, d.data()); });
+    allEquipment = allEquipment.filter(function(e){ return (e.fleet||'') !== 'jv'; });
     hacNormalizeOd(allEquipment);
     allTransfers = results[1].docs.map(function(d){ return Object.assign({id: d.id}, d.data()); });
 
@@ -5087,16 +5064,73 @@ function clearAndImport(input) {
   openFleetImportModal();
 }
 
+function hacTabFleet(name){
+  var n = String(name||'').trim().toLowerCase();
+  if(/jv|harb|scrap|sold|dashboard|all_data|all countries|all categories|index|distribute|central workshop|truck|cars|quantity|report|o\.d|eq category|stcc/.test(n)) return null;
+  if(/ksa|saudi/.test(n)) return 'ksa';
+  if(/algeria/.test(n)) return 'algeria';
+  if(/\buae\b/.test(n)) return 'uae';
+  if(/foundation/.test(n)) return 'foundation';
+  if(/^(hac egypt|egypt|others|tbm support|welding machines|tunnell?ing)/.test(n)) return 'egypt';
+  return null;
+}
+var HAC_TUN_TABS = ['Tunnelling','TBM Support'];
 function openFleetImportModal() {
-  document.getElementById('fleet-import-modal').classList.add('open');
+  var modal = document.getElementById('fleet-import-modal'), grid = document.getElementById('fleet-import-grid');
+  modal.classList.add('open');
+  grid.innerHTML = '<div style="grid-column:1/-1;color:var(--text-muted);font-size:13px;">⏳ بقرا التابات…</div>';
+  var input = _pendingImportInput, file = input && input.files && input.files[0];
+  var btn = function(label, value, strong, count){
+    var b = document.createElement('button');
+    b.style.cssText = 'background:'+(strong?'rgba(240,165,0,.12)':'var(--surface2)')+';border:1px solid '+(strong?'var(--accent)':'var(--border)')+';color:var(--text);padding:12px;border-radius:var(--radius);cursor:pointer;font-size:12px;';
+    b.innerHTML = '<div style="font-weight:600;"></div><div style="color:var(--text-muted);margin-top:4px;"></div>';
+    b.firstChild.textContent = label; b.lastChild.textContent = (count!=null ? count + ' وحدة' : '');
+    b.onclick = function(){ confirmFleetImport(value); };
+    grid.appendChild(b); return b;
+  };
+  var render = function(tabs){
+    grid.innerHTML = '';
+    var sum = function(f){ return tabs.filter(function(t){ return t.fleet===f; }).reduce(function(a,t){ return a+t.n; },0); };
+    var tun = tabs.filter(function(t){ return HAC_TUN_TABS.indexOf(t.name)>=0; }).reduce(function(a,t){ return a+t.n; },0);
+    btn('🌍 All Countries','all',true,tabs.reduce(function(a,t){ return a+t.n; },0));
+    if(sum('egypt')) btn('🇪🇬 Egypt (كل تابات مصر)','egypt',false,sum('egypt'));
+    [['ksa','🇸🇦 Saudi Arabia'],['algeria','🇩🇿 Algeria'],['uae','🇦🇪 UAE'],['foundation','🏗️ Foundation']].forEach(function(x){ if(sum(x[0])) btn(x[1],x[0],false,sum(x[0])); });
+    if(tun) btn('🛠️ Tunnelling (Tunnelling + TBM Support)','tunnelling',false,tun);
+    tabs.filter(function(t){ return t.fleet==='egypt'; }).forEach(function(t){ btn('📄 تاب: ' + t.name,'tab:'+t.name,false,t.n); });
+  };
+  var fallback = function(){ render([]); /* nothing readable: still offer the basic choices */
+    grid.innerHTML=''; [['🌍 All Countries','all',true],['🇪🇬 Egypt','egypt'],['🇸🇦 Saudi Arabia','ksa'],['🇩🇿 Algeria','algeria'],['🇦🇪 UAE','uae'],['🏗️ Foundation','foundation'],['🛠️ Tunnelling','tunnelling']].forEach(function(x){ btn(x[0],x[1],!!x[2]); }); };
+  if(!file){ fallback(); return; }
+  var rd = new FileReader();
+  rd.onload = function(e){
+    try {
+      var wb = XLSX.read(e.target.result, {type:'binary'}), meta = (wb.Workbook && wb.Workbook.Sheets) || [], tabs = [];
+      wb.SheetNames.forEach(function(name, i){
+        if(meta[i] && meta[i].Hidden) return;                 // hidden tabs (JV, HARB, Scrap…) are ignored
+        var fleet = hacTabFleet(name); if(!fleet) return;
+        var rows = XLSX.utils.sheet_to_json(wb.Sheets[name], {header:1, defval:''}), h = -1;
+        for(var r=0; r<Math.min(rows.length,12); r++){ if(rows[r].some(function(v){ var t=String(v).trim(); return t==='S.n'||t==='Equipment'; })){ h=r; break; } }
+        if(h<0) return;
+        var ie = rows[h].map(function(v){ return String(v).trim(); }).indexOf('Equipment'), n = 0;
+        rows.slice(h+1).forEach(function(r){ var sn=Number(r[0]); if(r[0]!=='' && !isNaN(sn) && sn>0 && String(r[ie]||'').trim()) n++; });
+        if(n) tabs.push({name:name.trim(), fleet:fleet, n:n});
+      });
+      tabs.length ? render(tabs) : fallback();
+    } catch(err){ fallback(); }
+  };
+  rd.onerror = fallback;
+  rd.readAsBinaryString(file);
 }
 
 window.confirmFleetImport = function(fleetValue) {
   document.getElementById('fleet-import-modal').classList.remove('open');
   const input = _pendingImportInput;
   if (!input || !input.files[0]) return;
+  let tabMode = null;
+  if(typeof fleetValue === 'string' && fleetValue.indexOf('tab:') === 0){ tabMode = fleetValue.slice(4); fleetValue = hacTabFleet(tabMode) || 'egypt'; }
+  const isTunChoice = (!tabMode && fleetValue === 'tunnelling');
 
-  const fleetLabel = {egypt:'Egypt',ksa:'Saudi Arabia',algeria:'Algeria',uae:'UAE',foundation:'Foundation',tunnelling:'Tunnelling',archive:'Archive',all:'All Countries'}[fleetValue] || fleetValue;
+  const fleetLabel = tabMode ? ('Egypt › ' + tabMode) : {egypt:'Egypt',ksa:'Saudi Arabia',algeria:'Algeria',uae:'UAE',foundation:'Foundation',tunnelling:'Tunnelling',archive:'Archive',all:'All Countries'}[fleetValue] || fleetValue;
 
   // Country values in All_Data that map to each fleet
   const fleetCountryMap = {
@@ -5281,6 +5315,7 @@ window.confirmFleetImport = function(fleetValue) {
           chassis:     chassis,
           owner:       owner || 'HAC',
           fleet:       fleet,
+          tab:         sheetName,
           importedAt:  new Date().toISOString()
         };
       }).filter(function(r){ return r.equipment; });
@@ -5297,18 +5332,21 @@ window.confirmFleetImport = function(fleetValue) {
         });
       }
       const parseEgypt = function(onlyTab) {
-        const tabs = onlyTab ? [onlyTab] : EGYPT_TABS, out = [];
+        const tabs = onlyTab ? [].concat(onlyTab) : EGYPT_TABS, out = [];
         tabs.forEach(function(t){ const pr = parseFleet('egypt', true, t); if(pr && pr.records.length) out.push({fleet:'egypt', sheetName: pr.sheetName, records: pr.records}); });
         return out;
       };
       const parsedFleets = [];
-      if(fleetValue === 'egypt') {
+      if(tabMode) {
+        const pr = parseFleet(fleetValue, true, tabMode);
+        if(pr) parsedFleets.push({fleet: fleetValue, sheetName: pr.sheetName, records: pr.records});
+      } else if(fleetValue === 'egypt') {
         parseEgypt().forEach(function(x){ parsedFleets.push(x); });
-      } else if(fleetValue === 'tunnelling') {
-        parseEgypt('Tunnelling').forEach(function(x){ parsedFleets.push(x); });
+      } else if(isTunChoice) {
+        parseEgypt(HAC_TUN_TABS).forEach(function(x){ parsedFleets.push(x); });
       } else if(fleetValue === 'all') {
         parseEgypt().forEach(function(x){ parsedFleets.push(x); });
-        ['ksa','algeria','uae','foundation','jv'].forEach(function(fv){ const pr = parseFleet(fv, true); if(pr && pr.records.length) parsedFleets.push({fleet: fv, sheetName: pr.sheetName, records: pr.records}); });
+        ['ksa','algeria','uae','foundation'].forEach(function(fv){ const pr = parseFleet(fv, true); if(pr && pr.records.length) parsedFleets.push({fleet: fv, sheetName: pr.sheetName, records: pr.records}); });
         if(!parsedFleets.length) { const pr = parseFleet('all', false); if(pr) parsedFleets.push({fleet:'all', sheetName: pr.sheetName, records: pr.records}); }
       } else {
         const pr = parseFleet(fleetValue, false);
@@ -5365,7 +5403,9 @@ window.confirmFleetImport = function(fleetValue) {
     if(!confirm('حذف كل معدات الـ ' + fleetLabel + ' والاستبدال؟')) { _pendingImportInput.value=''; return; }
     // "All Countries" wipes the whole collection; a single fleet wipes only that fleet.
     // Firestore allows max 500 writes per batch, so delete in chunks (Egypt alone can be 2,000+ docs).
-    const delQuery = (fleetValue === 'all') ? db.collection('equipment') : db.collection('equipment').where('fleet','==',fleetValue);
+    const delQuery = tabMode ? db.collection('equipment').where('tab','==',tabMode)
+      : isTunChoice ? db.collection('equipment').where('tab','in',HAC_TUN_TABS)
+      : (fleetValue === 'all') ? db.collection('equipment') : db.collection('equipment').where('fleet','==',fleetValue);
     delQuery.get().then(function(snap){
       if(snap.empty) return Promise.resolve();
       const docs = snap.docs, chunks = [];
