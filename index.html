@@ -1975,7 +1975,8 @@ function doLogin() {
 
   auth.signInWithEmailAndPassword(email, pass).catch(function(e){
     btn.disabled = false; btn.textContent = 'Sign In';
-    errBox.textContent = e.code === 'auth/network-request-failed' ? 'Connection error!' : 'Invalid credentials';
+    var bad = ['auth/wrong-password','auth/user-not-found','auth/invalid-credential','auth/invalid-email','auth/invalid-login-credentials'];
+    errBox.textContent = e.code === 'auth/network-request-failed' ? 'Connection error!' : (bad.indexOf(e.code) > -1 ? 'Invalid credentials' : 'Sign-in failed: ' + (e.code || e.message) + (location.protocol === 'file:' ? ' (open the page from a web server / hosting, not as a local file)' : ''));
   });
 }
 
@@ -4799,6 +4800,7 @@ function addNewEquipFromExcel(input) {
 /* Same list the table shows (search + filters + fleet) -> shared PDF (Master Rental settings) */
 /* Dashboard export: one row per project — O.D, units per category, total (follows the dashboard filters) */
 function exportDashPDF(kind) {
+  if(kind==='xlsx' && typeof window.cmpDashXlsx==='function'){ window.cmpDashXlsx({od:multiFilter.od, proj:multiFilter.proj, cat:multiFilter.cat}); return; }
   const data = getFiltered();
   const byProj = {}, catTot = {};
   data.forEach(function(e){
@@ -8633,6 +8635,81 @@ window.cmpExport=function(kind){
     {h:'\u0394 Equipment',g:function(r){return r.rU-r.oU;},t:'i',s:true},
     {h:'Potential Saving',g:function(r){return r.oSbD>0?r.oL:0;},t:'z',s:true}];
   window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 Rental vs Owned Fleet Comparison',sub:f,cols:cols,rows:rows},kind);
+};
+
+/* Dashboard Excel — Follow-Up layout (All sheet + one tab per O.D + Month x Project pivot), numbers from the SAME Master Owned / Master Rental data as Fleet Comparison & Equipment Report */
+window.cmpDashXlsx=function(sc){
+  sc=sc||{};
+  var EJ=window.ExcelJS; if(!EJ){ if(typeof toast==='function')toast('Excel library did not load','error'); return; }
+  var pk=sc.proj?projKey(sc.proj):'';
+  function inScope(r){ if(sc.od&&(r.od||'').trim()!==sc.od) return false; if(pk&&projKey(r.project)!==pk) return false; return true; }
+  var owned=getOwned().filter(inScope), rental=getRental().filter(inScope);
+  if(!owned.length&&!rental.length){ if(typeof toast==='function')toast('Nothing to export','error'); return; }
+  function odOf(rows){ var s={}; rows.forEach(function(r){ var o=(r.od||'').trim(); if(o) s[o]=1; }); return s; }
+  function tbl(o,r){ return buildProjTable(o,r).map(function(x){
+    var ods={}; [].concat(o,r).forEach(function(q){ if(projKey(q.project)===projKey(x.name)){ var d=(q.od||'').trim(); if(d) ods[d]=1; } });
+    x.od=Object.keys(ods).join(' / '); x.tU=x.oU+x.rU; x.tC=x.oC+x.rC; return x; }).sort(function(a,b){ return b.tU-a.tU; }); }
+  var cols=[
+    {h:'#',g:function(r,i){return i+1;},t:'t'},
+    {h:'Project',g:function(r){return r.name;},t:'t'},
+    {h:'O.D',g:function(r){return r.od;},t:'t'},
+    {h:'Owned Equipment',g:function(r){return r.oU;},t:'i',s:true},
+    {h:'Rental Equipment',g:function(r){return r.rU;},t:'i',s:true},
+    {h:'Total Equipment',g:function(r){return r.tU;},t:'i',s:true},
+    {h:'Owned Cost',g:function(r){return r.oC;},t:'m',s:true},
+    {h:'Rental Cost',g:function(r){return r.rC;},t:'m',s:true},
+    {h:'Total Cost',g:function(r){return r.tC;},t:'m',s:true},
+    {h:'Overtime Cost',g:function(r){return r.oOT+r.rOT;},t:'z',s:true},
+    {h:'Fuel (L)',g:function(r){return r.oF+r.rF;},t:'z',s:true}];
+  function kp(rows){ var oU=0,rU=0,top=null; rows.forEach(function(r){ oU+=r.oU; rU+=r.rU; if(!top||r.tU>top.tU) top=r; });
+    return [{label:'Total Equipment',value:(oU+rU).toLocaleString('en-US')},{label:'Owned',value:oU.toLocaleString('en-US')},{label:'Rental',value:rU.toLocaleString('en-US')},{label:'Projects',value:rows.length},{label:'Top Project',value:top?(top.name+' ('+top.tU+')'):'\u2014'}]; }
+  var f=[sc.od&&('O.D: '+sc.od),sc.proj&&('Project: '+sc.proj),sc.cat&&('Category filter not applied to Owned/Rental data: '+sc.cat)].filter(Boolean).join(' \u00b7 ');
+  var all=tbl(owned,rental);
+  var wb=window.hacBuildXlsx({title:'Dashboard \u2014 All Projects',sub:f,cols:cols,rows:all,kpis:kp(all)},EJ);
+  var NAVY='FF0D1B2E',AMBER='FFF0A500',thin={style:'thin',color:{argb:'FFE3E7ED'}};
+  function sheet(name,title,rows,color,kpis){
+    var ws=wb.addWorksheet(name.replace(/[\\\/\?\*\[\]:]/g,' ').slice(0,31),{views:[{state:'frozen',ySplit:4}],properties:{tabColor:{argb:color}}});
+    var n=cols.length,last=String.fromCharCode(64+n);
+    ws.mergeCells('A1:'+last+'1'); var a=ws.getCell('A1'); a.value=title; a.font={name:'Calibri',size:13,bold:true,color:{argb:NAVY}}; a.alignment={horizontal:'center'};
+    ws.mergeCells('A2:'+last+'2'); var b=ws.getCell('A2'); b.value=rows.length.toLocaleString('en-US'); b.font={name:'Calibri',size:12,bold:true,color:{argb:'FF444444'}}; b.alignment={horizontal:'center'}; b.border={bottom:{style:'medium',color:{argb:AMBER}}};
+    ws.mergeCells('A3:'+last+'3'); var k=ws.getCell('A3'); k.value=kpis.map(function(x){return x.label+': '+x.value;}).join('   \u00b7   '); k.font={name:'Calibri',size:10.5,bold:true,color:{argb:NAVY}}; k.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFF6DA'}}; k.alignment={horizontal:'center'};
+    var h=ws.getRow(4); h.height=26;
+    cols.forEach(function(c,j){ var x=h.getCell(j+1); x.value=c.h==='#'?'S/N':c.h; x.font={name:'Calibri',size:10,bold:true,color:{argb:'FFFFFFFF'}}; x.fill={type:'pattern',pattern:'solid',fgColor:{argb:NAVY}}; x.alignment={vertical:'middle',horizontal:c.t==='t'?'left':'right',wrapText:true}; x.border={bottom:{style:'medium',color:{argb:AMBER}}}; });
+    var sums=cols.map(function(){return 0;});
+    rows.forEach(function(r,i){ var row=ws.getRow(5+i); cols.forEach(function(c,j){ var v=c.g(r,i),x=row.getCell(j+1);
+      if(c.t==='t'){ x.value=v==null?'':String(v); x.alignment={horizontal:'left'}; } else { v=Math.round(Number(v)||0); x.value=v; x.numFmt='#,##0'; x.alignment={horizontal:'right'}; if(c.s) sums[j]+=v; }
+      x.font={name:'Calibri',size:10}; x.border={bottom:thin}; if(i%2) x.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF8FAFC'}}; }); });
+    var t=ws.getRow(5+rows.length); cols.forEach(function(c,j){ var x=t.getCell(j+1); if(j===0) x.value='Total'; else if(c.s){ x.value=sums[j]; x.numFmt='#,##0'; x.alignment={horizontal:'right'}; } x.font={name:'Calibri',size:10,bold:true}; x.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF4F4F4'}}; x.border={top:{style:'medium',color:{argb:AMBER}}}; });
+    ws.columns=cols.map(function(c,j){ return {width:j===1?34:(j===2?14:13)}; });
+    ws.autoFilter={from:{row:4,column:1},to:{row:4+rows.length,column:n}};
+  }
+  var odList=Object.keys(odOf([].concat(owned,rental))).sort();
+  var PAL=['FF3FB950','FF58A6FF','FFF0A500','FFBC8CFF','FFF85149','FF8B949E'];
+  if(!sc.od&&odList.length>1) odList.forEach(function(od,i){
+    var o2=owned.filter(function(r){return (r.od||'').trim()===od;}), r2=rental.filter(function(r){return (r.od||'').trim()===od;});
+    var rows=tbl(o2,r2); if(rows.length) sheet(od,od+' \u2014 Projects',rows,PAL[i%PAL.length],kp(rows)); });
+  /* Month x Project pivot (total equipment = owned + rental, same counting as Fleet Comparison) */
+  var mo=function(r){ return r.month?String(r.month).slice(0,7):''; };
+  var months=allMonths(owned,rental).filter(function(m){return m!=='No Date';}), projs={};
+  [].concat(owned,rental).forEach(function(r){ var k=projKey(r.project); if(!k||!mo(r)) return; var p=projs[k]||(projs[k]={name:r.project.trim(),m:{},t:0}); var q=toN(r.qty); if(q>0){ p.m[mo(r)]=(p.m[mo(r)]||0)+q; p.t+=q; } });
+  var plist=Object.keys(projs).map(function(k){return projs[k];}).sort(function(a,b){return b.t-a.t;});
+  if(months.length&&plist.length){
+    var ws=wb.addWorksheet('By Month & Project',{views:[{state:'frozen',xSplit:1,ySplit:3}],properties:{tabColor:{argb:'FF58A6FF'}}});
+    var nc=2+months.length, lc=nc>26?'Z':String.fromCharCode(64+nc);
+    ws.mergeCells('A1:'+lc+'1'); ws.getCell('A1').value='Equipment by Month \u00d7 Project (Owned + Rental)'; ws.getCell('A1').font={name:'Calibri',size:13,bold:true,color:{argb:NAVY}};
+    var hr=ws.getRow(3); hr.height=24; hr.getCell(1).value='Project'; months.forEach(function(m,j){ hr.getCell(2+j).value=shortMonth(m); }); hr.getCell(nc).value='Total';
+    for(var c=1;c<=nc;c++){ var x=hr.getCell(c); x.font={name:'Calibri',size:10,bold:true,color:{argb:'FFFFFFFF'}}; x.fill={type:'pattern',pattern:'solid',fgColor:{argb:NAVY}}; x.alignment={horizontal:c===1?'left':'center'}; x.border={bottom:{style:'medium',color:{argb:AMBER}}}; }
+    var mt=months.map(function(){return 0;});
+    plist.forEach(function(p,i){ var row=ws.getRow(4+i); row.getCell(1).value=p.name; months.forEach(function(m,j){ var v=Math.round(p.m[m]||0); mt[j]+=v; var x=row.getCell(2+j); x.value=v; x.alignment={horizontal:'center'}; x.font={name:'Calibri',size:10,color:{argb:v?'FF000000':'FFCCCCCC'}}; });
+      var t=row.getCell(nc); t.value=Math.round(p.t); t.font={name:'Calibri',size:10,bold:true}; t.alignment={horizontal:'center'}; for(var c2=1;c2<=nc;c2++) row.getCell(c2).border={bottom:thin}; });
+    var tr=ws.getRow(4+plist.length); tr.getCell(1).value='Total'; months.forEach(function(m,j){ tr.getCell(2+j).value=mt[j]; tr.getCell(2+j).alignment={horizontal:'center'}; }); tr.getCell(nc).value=mt.reduce(function(a,b){return a+b;},0); tr.getCell(nc).alignment={horizontal:'center'};
+    for(var c3=1;c3<=nc;c3++){ var y=tr.getCell(c3); y.font={name:'Calibri',size:10,bold:true}; y.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF4F4F4'}}; y.border={top:{style:'medium',color:{argb:AMBER}}}; }
+    ws.columns=[{width:34}].concat(months.map(function(){return {width:11};})).concat([{width:10}]);
+    ws.autoFilter={from:{row:3,column:1},to:{row:3+plist.length,column:nc}};
+  }
+  var d=new Date(),p2=function(n){return n<10?'0'+n:''+n;};
+  wb.xlsx.writeBuffer().then(function(buf){ var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})); a.download='Dashboard_'+d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())+'.xlsx'; document.body.appendChild(a); a.click(); setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},1500); })
+   .catch(function(e){ if(typeof toast==='function')toast('Excel export failed: '+(e&&e.message||e),'error'); });
 };
 
 window.cmpRefresh=function(){
