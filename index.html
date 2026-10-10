@@ -489,6 +489,18 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
           <span class="fleet-flag">⛏</span> Tunnelling
           <span class="fleet-count" id="fleet-count-tunnelling">—</span>
         </button>
+        <button class="fleet-btn" id="fleet-btn-tbmsupport" onclick="switchFleet('tbmsupport',this)">
+          <span class="fleet-flag">🧰</span> TBM Support
+          <span class="fleet-count" id="fleet-count-tbmsupport">—</span>
+        </button>
+        <button class="fleet-btn" id="fleet-btn-others" onclick="switchFleet('others',this)">
+          <span class="fleet-flag">📦</span> Others
+          <span class="fleet-count" id="fleet-count-others">—</span>
+        </button>
+        <button class="fleet-btn" id="fleet-btn-welding" onclick="switchFleet('welding',this)">
+          <span class="fleet-flag">🔥</span> Welding Machines
+          <span class="fleet-count" id="fleet-count-welding">—</span>
+        </button>
                 <button class="fleet-btn" id="fleet-btn-all" onclick="switchFleet('all',this)">
           <span class="fleet-flag">🌍</span> All Countries
           <span class="fleet-count" id="fleet-count-all">—</span>
@@ -1587,7 +1599,7 @@ function switchFleet(fleet, btn) {
   renderTransfers();
   renderCatBreakdown();
   // Update page labels
-  const labels = {egypt:'🇪🇬 Egypt',ksa:'🇸🇦 Saudi Arabia',algeria:'🇩🇿 Algeria',uae:'🇦🇪 UAE',foundation:'🏗 Foundation',tunnelling:'⛏ Tunnelling',archive:'📦 Archive',all:'🌍 All Countries'};
+  const labels = {egypt:'🇪🇬 Egypt',ksa:'🇸🇦 Saudi Arabia',algeria:'🇩🇿 Algeria',uae:'🇦🇪 UAE',foundation:'🏗 Foundation',tunnelling:'⛏ Tunnelling',tbmsupport:'🧰 TBM Support',others:'📦 Others',welding:'🔥 Welding Machines',archive:'📦 Archive',all:'🌍 All Countries'};
   const label = labels[fleet] || fleet;
   const suffix = fleet === 'all' ? '' : ' Fleet';
   const execTitle = document.getElementById('exec-fleet-title');
@@ -1647,10 +1659,12 @@ function _isFoundation(e) {
   return cat.indexOf('foundation') !== -1 && cat.indexOf('tunnel') === -1;
 }
 
+var HAC_SUBFLEETS = {tbmsupport:{tab:'tbm support',label:'🧰 TBM Support'}, others:{tab:'others',label:'📦 Others'}, welding:{tab:'welding machines',label:'🔥 Welding Machines'}};
+function _isSub(e,k){ return String(e.tab||'').trim().toLowerCase() === HAC_SUBFLEETS[k].tab; }
 function _isTunnelling(e) {
   if((e.fleet||'') === 'tunnelling') return true;
   var tb = String(e.tab||'').trim().toLowerCase();
-  if(tb === 'tunnelling' || tb === 'tunneling' || tb === 'tbm support') return true;
+  if(tb === 'tunnelling' || tb === 'tunneling') return true;
   var cat = (e.category||'').toLowerCase();
   return cat.indexOf('tunnel') !== -1;
 }
@@ -1662,6 +1676,7 @@ function getFleetEquipment() {
   });
   if(currentFleet === 'foundation') return allEquipment.filter(function(e){ return _isFoundation(e); });
   if(currentFleet === 'tunnelling') return allEquipment.filter(function(e){ return _isTunnelling(e); });
+  if(HAC_SUBFLEETS[currentFleet]) return allEquipment.filter(function(e){ return _isSub(e,currentFleet); });
   return allEquipment.filter(function(e){ return (e.fleet || 'egypt') === currentFleet; });
 }
 
@@ -1670,6 +1685,7 @@ function inFleet(e){
   if(currentFleet === 'egypt') return (e.fleet||'egypt') === 'egypt' && !_isFoundation(e);
   if(currentFleet === 'foundation') return _isFoundation(e);
   if(currentFleet === 'tunnelling') return _isTunnelling(e);
+  if(HAC_SUBFLEETS[currentFleet]) return _isSub(e,currentFleet);
   return (e.fleet || 'egypt') === currentFleet;
 }
 
@@ -1766,14 +1782,15 @@ function jumpFleet(f) {
 
 
 function updateFleetCounts() {
-  const counts = {egypt:0,ksa:0,algeria:0,uae:0,foundation:0,tunnelling:0,archive:0};
+  const counts = {egypt:0,ksa:0,algeria:0,uae:0,foundation:0,tunnelling:0,tbmsupport:0,others:0,welding:0,archive:0};
   allEquipment.forEach(function(e){
+    Object.keys(HAC_SUBFLEETS).forEach(function(k){ if(_isSub(e,k)) counts[k]++; });
     if(_isTunnelling(e))  { counts.tunnelling++; if((e.fleet||'egypt')==='egypt') counts.egypt++; return; }
     if(_isFoundation(e))  { counts.foundation++; return; }
     const f = e.fleet || 'egypt';
     if(counts[f] !== undefined) counts[f]++;
   });
-  ['egypt','ksa','algeria','uae','foundation','tunnelling'].forEach(function(f){
+  ['egypt','ksa','algeria','uae','foundation','tunnelling','tbmsupport','others','welding'].forEach(function(f){
     const el = document.getElementById('fleet-count-' + f);
     if(el) el.textContent = counts[f] || '—';
   });
@@ -2340,7 +2357,7 @@ function catKey(e){ var c = e && e.category; return (c && String(c).trim()) ? c 
 
 function getFiltered(){
   return allEquipment.filter(function(e){
-    if(currentFleet !== 'all' && (e.fleet || 'egypt') !== currentFleet) return false;
+    if(!inFleet(e)) return false;
 
     if(multiFilter.od && e.od!==multiFilter.od) return false;
     if(multiFilter.cat && catKey(e)!==multiFilter.cat) return false;
@@ -4437,9 +4454,7 @@ function _mgmtTitle(t){
   return '<div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">'+t+'</div>';
 }
 function _ageData(){
-  if(currentFleet === 'all') return allEquipment;
-  if(currentFleet === 'egypt') return allEquipment.filter(function(e){ return (e.fleet||'egypt') === 'egypt' && !_isFoundation(e); });
-  return allEquipment.filter(function(e){ return (e.fleet || 'egypt') === currentFleet; });
+  return allEquipment.filter(inFleet);
 }
 
 function renderMgmtRow(){
@@ -4594,7 +4609,7 @@ function openAddModal() {
     const el = document.getElementById('f-'+f); if(el) el.value = '';
   });
   const fleetEl = document.getElementById('f-fleet');
-  if(fleetEl) fleetEl.value = (currentFleet && currentFleet !== 'all') ? currentFleet : 'egypt';
+  if(fleetEl) fleetEl.value = (currentFleet && currentFleet !== 'all' && !HAC_SUBFLEETS[currentFleet]) ? currentFleet : 'egypt';
   document.getElementById('eq-modal').classList.add('open');
 }
 
@@ -4679,7 +4694,7 @@ function deleteEquipment(id) {
   });
 }
 function clearCurrentFleet() {
-  const labels = {egypt:'🇪🇬 Egypt',ksa:'🇸🇦 Saudi Arabia',algeria:'🇩🇿 Algeria',uae:'🇦🇪 UAE',foundation:'🏗 Foundation',tunnelling:'⛏ Tunnelling',archive:'📦 Archive'};
+  const labels = {egypt:'🇪🇬 Egypt',ksa:'🇸🇦 Saudi Arabia',algeria:'🇩🇿 Algeria',uae:'🇦🇪 UAE',foundation:'🏗 Foundation',tunnelling:'⛏ Tunnelling',tbmsupport:'🧰 TBM Support',others:'📦 Others',welding:'🔥 Welding Machines',archive:'📦 Archive'};
   const label = labels[currentFleet] || currentFleet;
   const toDelete = getFleetEquipment();
   const count = toDelete.length;
@@ -5074,7 +5089,7 @@ function hacTabFleet(name){
   if(/^(hac egypt|egypt|others|tbm support|welding machines|tunnell?ing)/.test(n)) return 'egypt';
   return null;
 }
-var HAC_TUN_TABS = ['Tunnelling','TBM Support'];
+var HAC_TUN_TABS = ['Tunnelling'];
 function openFleetImportModal() {
   var modal = document.getElementById('fleet-import-modal'), grid = document.getElementById('fleet-import-grid');
   modal.classList.add('open');
@@ -5095,7 +5110,7 @@ function openFleetImportModal() {
     btn('🌍 All Countries','all',true,tabs.reduce(function(a,t){ return a+t.n; },0));
     if(sum('egypt')) btn('🇪🇬 Egypt (كل تابات مصر)','egypt',false,sum('egypt'));
     [['ksa','🇸🇦 Saudi Arabia'],['algeria','🇩🇿 Algeria'],['uae','🇦🇪 UAE'],['foundation','🏗️ Foundation']].forEach(function(x){ if(sum(x[0])) btn(x[1],x[0],false,sum(x[0])); });
-    if(tun) btn('🛠️ Tunnelling (Tunnelling + TBM Support)','tunnelling',false,tun);
+    if(tun) btn('🛠️ Tunnelling','tunnelling',false,tun);
     tabs.filter(function(t){ return t.fleet==='egypt'; }).forEach(function(t){ btn('📄 تاب: ' + t.name,'tab:'+t.name,false,t.n); });
   };
   var fallback = function(){ render([]); /* nothing readable: still offer the basic choices */
