@@ -4869,12 +4869,10 @@ function hacAllCountriesWorkbook(EJ, rows){
   var SECS=['Egypt','Workshop','KSA','UAE','Algeria','Foundation','Tunnelling'];
   var SECTXT={Egypt:'EGYPT',Workshop:'WORKSHOP',KSA:'KSA',UAE:'UAE',Algeria:'ALGERIA',Foundation:'FOUNDATION',Tunnelling:'TUNNELLING'};
   var SECSUB={Egypt:'Egypt \u00b7 project sites',Workshop:'Egypt \u00b7 Central Workshop',KSA:'Saudi Arabia',UAE:'United Arab Emirates',Algeria:'Algeria',Foundation:'Foundation division',Tunnelling:'Tunnelling division'};
-  var COL={Egypt:'B9473F',Workshop:'8A3B36',KSA:'006C35',UAE:'1F1F1F',Algeria:'00A651',Foundation:'1C7ED6',Tunnelling:'F08C00'};
-  var FLAG={Egypt:['B9473F','FFFFFF','2B2B2B'],Workshop:['B9473F','FFFFFF','2B2B2B'],KSA:['006C35','FFFFFF','006C35'],UAE:['00732F','FFFFFF','000000','FF0000'],Algeria:['006233','FFFFFF','D21034'],Foundation:['1C7ED6','74C0FC','1C7ED6'],Tunnelling:['F08C00','FFD43B','F08C00']};
+  var COL={Egypt:'CE1126',Workshop:'8F0B1C',KSA:'006C35',UAE:'1F1F1F',Algeria:'00A651',Foundation:'1C7ED6',Tunnelling:'F08C00'};
+  var FLAG={Egypt:['CE1126','FFFFFF','000000'],Workshop:['CE1126','FFFFFF','000000'],KSA:['006C35','FFFFFF','006C35'],UAE:['00732F','FFFFFF','000000','FF0000'],Algeria:['006233','FFFFFF','D21034'],Foundation:['1C7ED6','74C0FC','1C7ED6'],Tunnelling:['F08C00','FFD43B','F08C00']};
   var NAVY='0B2545', NAVY2='13315C', INK='1B2A41', MUTED='5C6B7A', LINE='DDE3EA', SOFT='F1F5F9', AMBER='F0A500', WHITE='FFFFFF';
-  var SUBT=''; 
   var SPARE=600, N=rows.length, CAPR=N+SPARE, F=5, L=F+CAPR-1;
-  SUBT=rows.length.toLocaleString('en-US')+' units  \u00b7  '+new Date().toISOString().slice(0,10);
   rows=rows.map(function(r){ var o={}; for(var k in r) o[k]=r[k]; o.sec=(r.div==='Egypt'&&String(r.proj).trim().toLowerCase()==='central workshop')?'Workshop':r.div; return o; });
 
   function A(h){ return 'FF'+h; }
@@ -4909,12 +4907,12 @@ function hacAllCountriesWorkbook(EJ, rows){
   function band(ws,r,c,c2,txt,color){ S(ws,r,c,txt,{c2:c2,fill:color||NAVY2,color:WHITE,b:1,sz:11,ind:1}); ws.getRow(r).height=22; }
   function colhdr(ws,r,c,c2,txt,h){ S(ws,r,c,txt,{c2:c2,fill:'E7EDF3',color:MUTED,b:1,sz:8,h:h||'left',ind:h?0:1,bd:{bottom:{style:'thin',color:{argb:A('B8C4D0')}}}}); }
   function banner(ws,c2,title,sub,color,se){
-    S(ws,1,2,title,{c2:c2,fill:color||'1F3864',color:WHITE,b:1,sz:18,h:'center'}); ws.getRow(1).height=36;
-    S(ws,2,2,sub,{c2:se||c2,fill:NAVY2,color:'C9D6E4',sz:9,h:'center',bd:{bottom:{style:'medium',color:{argb:A(AMBER)}}}}); ws.getRow(2).height=18;
+    S(ws,1,2,title,{c2:c2,fill:color||NAVY,color:WHITE,b:1,sz:20,ind:1}); ws.getRow(1).height=42;
+    S(ws,2,2,sub,{c2:se||c2,fill:NAVY2,color:'C9D6E4',sz:9,ind:1,bd:{bottom:{style:'medium',color:{argb:A(AMBER)}}}}); ws.getRow(2).height=20;
     ws.getRow(3).height=8;
   }
-  function cfLine(ws,ref,cond){ ws.addConditionalFormatting({ref:ref,rules:[{type:'expression',formulae:[cond],style:{border:{bottom:{style:'thin',color:{argb:A(LINE)}}}}}]}); }
   function stripe(ws,r,c1,c2,key){ var cs=FLAG[key], n=c2-c1+1; for(var c=c1;c<=c2;c++){ var h=cs[Math.min(cs.length-1,Math.floor((c-c1)/n*cs.length))]; if(h==='FFFFFF') h='E5E7EB'; ws.getCell(r,c).fill={type:'pattern',pattern:'solid',fgColor:{argb:A(h)}}; } ws.getRow(r).height=7; }
+  function cfLine(ws,ref,cond){ ws.addConditionalFormatting({ref:ref,rules:[{type:'expression',formulae:[cond],style:{border:{bottom:{style:'thin',color:{argb:A(LINE)}}}}}]}); }
   function link(ws,r,c,c2,txt,sheet,fill,color){
     S(ws,r,c,{text:txt,hyperlink:"#'"+sheet+"'!A1"},{c2:c2,fill:fill||SOFT,color:color||NAVY,b:1,sz:9,h:'center'});
   }
@@ -4957,108 +4955,10 @@ function hacAllCountriesWorkbook(EJ, rows){
     return RL;
   }
 
-
-  /* ═════ fine grid used by the Index sheet and every division sheet: 3 blocks of 8 columns ═════ */
-  var PAL=['1F4E9E','8A5A2B','1F6A8A','0B5D3E','44546A','8A6D00','6A2E7F','2A5EA8','355E3B','7A3E3E','5B6B2A','4A5B6F'];
-  var GW=[4.5,6,6,6,6,6.5,6.5,8], BC=[2,11,20], HC=[29,30,31];
-  function gridCols(ws){ var w=[2]; for(var b=0;b<3;b++){ GW.forEach(function(x){w.push(x);}); if(b<2) w.push(1.5); } w.push(2,6,6,6,6); w.forEach(function(x,k){ ws.getColumn(k+1).width=x; }); [29,30,31,32].forEach(function(c){ ws.getColumn(c).hidden=true; }); }
-  var WHT={type:'pattern',pattern:'solid',bgColor:{argb:'FFFFFFFF'}};
-  function blankCF(ws,ref,cond){ ws.addConditionalFormatting({ref:ref,rules:[{type:'expression',formulae:[cond],style:{fill:WHT,font:{color:{argb:'FFFFFFFF'}}}}]}); }
-  function bars(n,max,len){ return new Array(Math.max(0,Math.min(len,Math.round(n/max*len)))+1).join('\u2588'); }
-  /* tiles (TOTAL + one per category) and category blocks (equipment types per category, % of category) */
-  function classify(ws,top,si,ctI,totalExpr,total,info,nSlots){
-    var nameC=LR('cat','B'), keyC=LR('cat',kCol(si)), cntC=LR('cat',cCol(si)), k, j;
-    var gw=[]; for(var gb=0;gb<3;gb++){ GW.forEach(function(x){gw.push(x);}); if(gb<2) gw.push(1.5); }
-    var gtot=gw.reduce(function(a,b){return a+b;},0), G=7, tgt=gtot/G, spans=[], gi;
-    var nG=gw.length, INF=1e12, dp=[], bk=[], g, kq, jq;
-    for(g=0;g<=G;g++){ dp.push([]); bk.push([]); for(jq=0;jq<=nG;jq++){ dp[g].push(INF); bk[g].push(-1); } }
-    dp[0][0]=0;
-    for(g=1;g<=G;g++) for(jq=g;jq<=nG;jq++) for(kq=g-1;kq<jq;kq++){ var wsum=0, q2; for(q2=kq;q2<jq;q2++) wsum+=gw[q2]; var cost=dp[g-1][kq]+(wsum-tgt)*(wsum-tgt); if(cost<dp[g][jq]){ dp[g][jq]=cost; bk[g][jq]=kq; } }
-    var cuts=[], pj=nG; for(g=G;g>=1;g--){ var pk=bk[g][pj]; cuts.unshift([2+pk,2+pj-1]); pj=pk; }
-    spans=cuts;
-    var rowsT=(info.length+1>7)?2:1;
-    for(k=0;k<Math.min(13,7*rowsT);k++){ var c=spans[k%7][0], c2t=spans[k%7][1], lab=top+3*Math.floor(k/7), val=lab+1, ci=k-1, it=info[ci];
-      if(k===0){ S(ws,lab,c,'TOTAL FLEET',{c2:c2t,fill:'1F3864',color:WHITE,b:1,sz:8,h:'center',wrap:true}); S(ws,val,c,FM(totalExpr,total),{c2:c2t,fill:SOFT,color:'1F3864',b:1,sz:16,h:'center',fmt:'#,##0'}); continue; }
-      var m='MATCH(LARGE('+keyC+','+k+'),'+keyC+',0)';
-      S(ws,lab,c,FM('IFERROR("TOTAL "&UPPER(INDEX('+nameC+','+m+')),"")',it?'TOTAL '+String(it.k).toUpperCase():''),{c2:c2t,fill:PAL[ci%12],color:WHITE,b:1,sz:8,h:'center',wrap:true});
-      S(ws,val,c,FM('IFERROR(INDEX('+cntC+','+m+'),"")',it?it.n:''),{c2:c2t,fill:SOFT,color:PAL[ci%12],b:1,sz:16,h:'center',fmt:'#,##0'});
-      blankCF(ws,cl(c)+lab+':'+cl(c2t)+val,'$'+cl(c)+'$'+lab+'=""');
-    }
-    for(var tq=0;tq<rowsT;tq++){ ws.getRow(top+3*tq).height=30; ws.getRow(top+3*tq+1).height=28; ws.getRow(top+3*tq+2).height=8; }
-    var r0=top+3*rowsT;
-    for(j=1;j<=nSlots;j++){
-      var br=Math.floor((j-1)/3), bi=(j-1)%3, c0=BC[bi], hc=HC[bi], t=r0+br*13, color=PAL[(j-1)%12], blk=info[j-1], X=cl(c0), T='$'+X+'$'+t, totC='$'+cl(c0+5)+'$'+(t+11);
-      var pk=LR('ct',ctK(ctI)), pcn=LR('ct',ctC(ctI)), pty=LR('ct','C'), m2='MATCH(LARGE('+keyC+','+j+'),'+keyC+',0)';
-      S(ws,t,c0,FM('IFERROR(UPPER(INDEX('+nameC+','+m2+')),"")',blk?String(blk.k).toUpperCase():''),{c2:c0+7,fill:color,color:WHITE,b:1,sz:10,ind:1});
-      S(ws,t+1,c0,'No.',{fill:'E9EEF5',color:color,b:1,sz:8,h:'center'}); S(ws,t+1,c0+1,'Equipment Type',{c2:c0+4,fill:'E9EEF5',color:color,b:1,sz:8,ind:1}); S(ws,t+1,c0+5,'Units',{fill:'E9EEF5',color:color,b:1,sz:8,h:'center'}); S(ws,t+1,c0+6,'% of Category',{c2:c0+7,fill:'E9EEF5',color:color,b:1,sz:8,h:'center'});
-      for(var q=1;q<=8;q++){ var r=t+1+q, H='$'+cl(hc)+r, ty=blk&&blk.types[q-1];
-        ws.getCell(r,hc).value=FM('IFERROR(MATCH('+T+'&"|"&'+q+','+pk+',0),"")');
-        S(ws,r,c0,FM('IF('+H+'="","",'+q+')',ty?q:''),{h:'center',sz:9,color:MUTED});
-        S(ws,r,c0+1,FM('IF('+H+'="","",INDEX('+pty+','+H+'))',ty?ty.k:''),{c2:c0+4,ind:1,sz:9});
-        S(ws,r,c0+5,FM('IF('+H+'="","",INDEX('+pcn+','+H+'))',ty?ty.n:''),{h:'center',b:1,sz:9,fmt:'#,##0'});
-        S(ws,r,c0+6,FM('IF('+H+'="","",'+cl(c0+5)+r+'/'+totC+')',ty?ty.n/blk.n:''),{h:'center',sz:9,color:MUTED,fmt:'0%'});
-        S(ws,r,c0+7,FM('IF('+H+'="","",REPT("\u2588",ROUND('+cl(c0+5)+r+'/'+totC+'*8,0)))',ty?bars(ty.n,blk.n,8):''),{sz:8,color:color});
-      }
-      var ro=t+10, sumU='SUM('+cl(c0+5)+(t+2)+':'+cl(c0+5)+(t+9)+')', shown=blk?blk.types.slice(0,8).reduce(function(a,x){return a+x.n;},0):0, oth=blk?blk.n-shown:0;
-      S(ws,ro,c0+1,FM('IF('+T+'="","",IF('+totC+'-'+sumU+'>0,"Other types",""))',oth>0?'Other types':''),{c2:c0+4,ind:1,sz:9,i:true,color:MUTED});
-      S(ws,ro,c0+5,FM('IF($'+cl(c0+1)+ro+'="","",'+totC+'-'+sumU+')',oth>0?oth:''),{h:'center',sz:9,color:MUTED,fmt:'#,##0'});
-      S(ws,ro,c0+6,FM('IF($'+cl(c0+1)+ro+'="","",'+cl(c0+5)+ro+'/'+totC+')',oth>0?oth/blk.n:''),{h:'center',sz:9,color:MUTED,fmt:'0%'});
-      S(ws,t+11,c0,FM('IF('+T+'="","","Total \u2014 "&INDEX('+nameC+',MATCH('+T+','+nameC+',0)))',blk?'Total \u2014 '+blk.k:''),{c2:c0+4,fill:color,color:WHITE,b:1,sz:9,ind:1});
-      S(ws,t+11,c0+5,FM('IF('+T+'="","",INDEX('+cntC+',MATCH('+T+','+nameC+',0)))',blk?blk.n:''),{fill:color,color:WHITE,b:1,sz:9,h:'center',fmt:'#,##0'});
-      S(ws,t+11,c0+6,FM('IF('+T+'="","",'+totC+'/'+totalExpr+')',blk?blk.n/total:''),{c2:c0+7,fill:color,color:WHITE,b:1,sz:9,h:'center',fmt:'0%'});
-      cfLine(ws,X+(t+2)+':'+cl(c0+7)+(t+9),'$'+cl(hc)+(t+2)+'<>""');
-      blankCF(ws,X+t+':'+cl(c0+7)+(t+11),T+'=""');
-    }
-    return r0+Math.ceil(nSlots/3)*13;
-  }
-  /* ranked list block (top projects / O.D) in the same 8-column block layout */
-  function rankBlock(ws,top,c0,hc,title,id,si,color,totalExpr,total,list,otherLabel,mainOdFn){
-    var key=LR(id,kCol(si)), nm=LR(id,'B'), cn=LR(id,cCol(si)), X=cl(c0), totC='$'+cl(c0+5)+'$'+(top+11), q;
-    S(ws,top,c0,title,{c2:c0+7,fill:color,color:WHITE,b:1,sz:10,ind:1});
-    S(ws,top+1,c0,'No.',{fill:'E9EEF5',color:color,b:1,sz:8,h:'center'}); S(ws,top+1,c0+1,id==='proj'?'Project':'O.D Engineer',{c2:c0+4,fill:'E9EEF5',color:color,b:1,sz:8,ind:1}); S(ws,top+1,c0+5,'Units',{fill:'E9EEF5',color:color,b:1,sz:8,h:'center'}); S(ws,top+1,c0+6,'% of Total',{c2:c0+7,fill:'E9EEF5',color:color,b:1,sz:8,h:'center'});
-    for(q=1;q<=8;q++){ var r=top+1+q, H='$'+cl(hc)+r, it=list[q-1];
-      ws.getCell(r,hc).value=FM('IFERROR(MATCH(LARGE('+key+','+q+'),'+key+',0),"")');
-      S(ws,r,c0,FM('IF('+H+'="","",'+q+')',it?q:''),{h:'center',sz:9,color:MUTED});
-      S(ws,r,c0+1,FM('IF('+H+'="","",INDEX('+nm+','+H+'))',it?it.k:''),{c2:c0+4,ind:1,sz:9});
-      S(ws,r,c0+5,FM('IF('+H+'="","",INDEX('+cn+','+H+'))',it?it.n:''),{h:'center',b:1,sz:9,fmt:'#,##0'});
-      S(ws,r,c0+6,FM('IF('+H+'="","",'+cl(c0+5)+r+'/'+totC+')',it?it.n/total:''),{h:'center',sz:9,color:MUTED,fmt:'0%'});
-      S(ws,r,c0+7,FM('IF('+H+'="","",REPT("\u2588",ROUND('+cl(c0+5)+r+'/'+totC+'*8,0)))',it?bars(it.n,total,8):''),{sz:8,color:color});
-    }
-    var ro=top+10, sumU='SUM('+cl(c0+5)+(top+2)+':'+cl(c0+5)+(top+9)+')', shown=list.slice(0,8).reduce(function(a,x){return a+x.n;},0), oth=total-shown;
-    S(ws,ro,c0+1,FM('IF('+totC+'-'+sumU+'>0,"'+otherLabel+'","")',oth>0?otherLabel:''),{c2:c0+4,ind:1,sz:9,i:true,color:MUTED});
-    S(ws,ro,c0+5,FM('IF($'+cl(c0+1)+ro+'="","",'+totC+'-'+sumU+')',oth>0?oth:''),{h:'center',sz:9,color:MUTED,fmt:'#,##0'});
-    S(ws,ro,c0+6,FM('IF($'+cl(c0+1)+ro+'="","",'+cl(c0+5)+ro+'/'+totC+')',oth>0?oth/total:''),{h:'center',sz:9,color:MUTED,fmt:'0%'});
-    S(ws,top+11,c0,'Total',{c2:c0+4,fill:color,color:WHITE,b:1,sz:9,ind:1});
-    S(ws,top+11,c0+5,FM(totalExpr,total),{fill:color,color:WHITE,b:1,sz:9,h:'center',fmt:'#,##0'});
-    S(ws,top+11,c0+6,'',{c2:c0+7,fill:color});
-    cfLine(ws,X+(top+2)+':'+cl(c0+7)+(top+9),'$'+cl(hc)+(top+2)+'<>""');
-  }
-  /* equipment register on the fine grid */
-  function register2(ws,top,col,matchF,cap,title,lastHdr,lastSrc,lastKey,data){
-    S(ws,top,2,title,{c2:27,fill:col,color:WHITE,b:1,sz:11,ind:1}); ws.getRow(top).height=22;
-    var spans=[[2,2,'#','center'],[3,6,'Category'],[7,10,'Equipment'],[11,15,'Brand / Model'],[16,17,'Capacity'],[18,19,'Code / Board No.'],[20,23,'Project'],[24,26,lastHdr],[27,27,'Year','center']];
-    spans.forEach(function(sp){ S(ws,top+1,sp[0],sp[2],{c2:sp[1],fill:NAVY,color:WHITE,b:1,sz:10,h:sp[3]||'left',ind:sp[3]?0:1,bd:{bottom:{style:'medium',color:{argb:A(col)}}}}); });
-    ws.getRow(top+1).height=22;
-    var RF=top+2, RL=RF+cap-1, srcs=[null,'C','D','E','F','G','H',lastSrc,'J'], keys=[null,'cat','eq','brand','cap','code','proj',lastKey,'year'], i;
-    for(i=1;i<=cap;i++){ var r=RF+i-1, dd=data&&data[i-1];
-      ws.getCell(r,32).value=FM(matchF(i));
-      S(ws,r,2,FM('IF($AF'+r+'="","",'+i+')',dd?i:undefined),{h:'center',sz:9,color:MUTED});
-      for(var k=1;k<spans.length;k++){ var sp=spans[k]; S(ws,r,sp[0],FM('IF($AF'+r+'="","",INDEX('+adr(srcs[k])+',$AF'+r+')&"")',dd?String(dd[keys[k]]==null?'':dd[keys[k]]):undefined),{c2:sp[1],ind:sp[3]?0:1,sz:10,h:sp[3]||'left'}); }
-    }
-    cfLine(ws,'B'+RF+':AA'+RL,'$AF'+RF+'<>""');
-    ws.addConditionalFormatting({ref:'B'+RF+':AA'+RL,rules:[{type:'expression',formulae:['AND($AF'+RF+'<>"",MOD(ROW(),2)=0)'],style:{fill:{type:'pattern',pattern:'solid',bgColor:{argb:A('F5F8FB')}}}}]});
-    ws.addConditionalFormatting({ref:'T'+RF+':Z'+RL,rules:[{type:'expression',formulae:['AND($AF'+RF+'<>"",OR(T'+RF+'="",T'+RF+'="(none)"))'],style:{font:{color:{argb:A('C92A2A')},bold:true}}}]});
-    ws.autoFilter={from:{row:top+1,column:2},to:{row:RL,column:27}};
-    return RL;
-  }
-
   /* ── JS-side tallies (only used for cached numbers so the Dashboard is filled before Excel recalculates) ── */
-  function tallyOf(arr,fn){ var o={},disp={},ord=[]; arr.forEach(function(r){ var v=fn(r); if(v===''||v==null) return; var k=String(v).toLowerCase(); if(!(k in o)){o[k]=0;disp[k]=v;ord.push(k);} o[k]++; });
+  function tally(fn){ var o={},disp={},ord=[]; rows.forEach(function(r){ var v=fn(r); if(v===''||v==null) return; var k=String(v).toLowerCase(); if(!(k in o)){o[k]=0;disp[k]=v;ord.push(k);} o[k]++; });
     return ord.map(function(k,i){return {k:disp[k],n:o[k],i:i};}).sort(function(a,b){return b.n-a.n||a.i-b.i;}); }
-  function tally(fn){ return tallyOf(rows,fn); }
-  function notProj(p){ p=String(p==null?'':p).trim().toLowerCase(); return p===''||p==='(none)'||p==='central workshop'; }
-  function ctInfo(arr){ return tallyOf(arr,function(r){return r.cat;}).map(function(c){ var sub=arr.filter(function(r){return String(r.cat).toLowerCase()===String(c.k).toLowerCase();}); return {k:c.k,n:c.n,types:tallyOf(sub,function(r){return r.eq;})}; }); }
-  var tCat=tally(function(r){return r.cat;}), tOd=tally(function(r){return r.od;}), tProj=tally(function(r){return notProj(r.proj)?'':r.proj;}), tEq=tally(function(r){return r.eq;});
+  var tCat=tally(function(r){return r.cat;}), tOd=tally(function(r){return r.od;}), tProj=tally(function(r){return r.proj;}), tEq=tally(function(r){return r.eq;});
   tOd=tOd.filter(function(x){return x.k!=='(none)';}).concat(tOd.filter(function(x){return x.k==='(none)';}));
   var secN={}; SECS.forEach(function(s){ secN[s]=rows.filter(function(r){return r.sec===s;}).length; });
   var supN=rows.filter(function(r){return r.cat==='Supported Equipment';}).length;
@@ -5067,7 +4967,6 @@ function hacAllCountriesWorkbook(EJ, rows){
   var wb=new EJ.Workbook(); wb.creator='HAC PMV'; wb.created=new Date(); wb.calcProperties={fullCalcOnLoad:true};
   var tabs={Dashboard:AMBER,'O.D Projects':'12B886','Project x Category':'845EF7','Division x Category':'339AF0'};
   var wsD=wb.addWorksheet('Dashboard',{views:[{showGridLines:false,zoomScale:90}],properties:{tabColor:{argb:A(AMBER)}}});
-  var wsI=wb.addWorksheet('Index',{views:[{showGridLines:false,zoomScale:90}],properties:{tabColor:{argb:A('1F3864')}}});
   var wsO=wb.addWorksheet('O.D Overview',{views:[{showGridLines:false,state:'frozen',ySplit:8,zoomScale:90}],properties:{tabColor:{argb:A('12B886')}}});
   var wsOD=wb.addWorksheet('O.D Detail',{views:[{showGridLines:false,zoomScale:90}],properties:{tabColor:{argb:A('0F6B55')}}});
   var wsP=wb.addWorksheet('Project x Category',{views:[{showGridLines:false,state:'frozen',ySplit:5,xSplit:3,zoomScale:90}],properties:{tabColor:{argb:A('845EF7')}}});
@@ -5083,8 +4982,6 @@ function hacAllCountriesWorkbook(EJ, rows){
   [['cat',40,'C','Q','Categories'],['od',40,'I','O','O.D engineers'],['proj',200,'H','N','Projects'],['eq',120,'D','R','Equipment types']].forEach(function(b){
     BL[b[0]]={id:b[0],slots:b[1],name:b[2],num:b[3],title:b[4],t:cur,h:cur+1,f:cur+2,l:cur+1+b[1]}; cur+=b[1]+4; });
   BL.pair={id:'pair',slots:300,title:'O.D \u2194 Project links',t:cur,h:cur+1,f:cur+2,l:cur+1+300};
-  BL.ct={id:'ct',slots:250,title:'Category \u2194 Equipment type',t:BL.pair.l+4,h:BL.pair.l+5,f:BL.pair.l+6,l:BL.pair.l+5+250};
-  function ctC(si){return cl(4+2*si);} function ctK(si){return cl(5+2*si);}
   function BL_cat_f(){return BL.cat.f;} function BL_cat_l(){return BL.cat.l;} function BL_proj_f(){return BL.proj.f;} function BL_proj_l(){return BL.proj.l;} function BL_od_f(){return BL.od.f;} function BL_od_l(){return BL.od.l;}
   function LR(id,c){ var b=BL[id]; return 'Lists!$'+c+'$'+b.f+':$'+c+'$'+b.l; }
 
@@ -5095,13 +4992,13 @@ function hacAllCountriesWorkbook(EJ, rows){
     S(ws,1,1,'ALL DATA  \u2014  MASTER REGISTER',{c2:10,fill:NAVY,color:WHITE,b:1,sz:15,ind:1}); ws.getRow(1).height=32;
     ws.getRow(2).height=6;
     ws.getRow(3).height=6;
-    var H=['S/N','Division','Category','Equipment','Brand / Model','Capacity','Code / Board No.','Project','O.D','Year','Section','In view','Key','Proj#','O.D#','Link#','Cat#','Type#','View#','O.D#2','CT#'];
+    var H=['S/N','Division','Category','Equipment','Brand / Model','Capacity','Code / Board No.','Project','O.D','Year','Section','In view','Key','Proj#','O.D#','Link#','Cat#','Type#','View#','O.D#2'];
     H.forEach(function(t,i){ var x=ws.getCell(4,i+1); x.value=t; x.font={name:'Calibri',size:10,bold:true,color:{argb:A(i<10?WHITE:'DDE3EA')}};
       x.fill={type:'pattern',pattern:'solid',fgColor:{argb:A(i<10?NAVY:'6C757D')}}; x.alignment={horizontal:i===0||i===1||i===9||i>9?'center':'left',vertical:'middle'}; x.border={bottom:{style:'medium',color:{argb:A(AMBER)}}}; });
     ws.getRow(4).height=24;
-    var W=[7,12,22,24,34,14,16,26,22,8,11,8,14,7,7,7,7,7,7,7,7]; W.forEach(function(w,i){ ws.getColumn(i+1).width=w; });
+    var W=[7,12,22,24,34,14,16,26,22,8,11,8,14,7,7,7,7,7,7,7]; W.forEach(function(w,i){ ws.getColumn(i+1).width=w; });
     for(var c=1;c<=10;c++) ws.getColumn(c).font={name:'Calibri',size:10};
-    for(var c2=11;c2<=21;c2++){ var col=ws.getColumn(c2); col.font={name:'Calibri',size:8,color:{argb:A('868E96')}}; col.alignment={horizontal:'center'}; col.outlineLevel=1; col.hidden=true; }
+    for(var c2=11;c2<=20;c2++){ var col=ws.getColumn(c2); col.font={name:'Calibri',size:8,color:{argb:A('868E96')}}; col.alignment={horizontal:'center'}; col.outlineLevel=1; col.hidden=true; }
     ws.properties.outlineLevelCol=1;
     var vals=['','div','cat','eq','brand','cap','code','proj','od','year'];
     for(var i=0;i<CAPR;i++){
@@ -5116,7 +5013,6 @@ function hacAllCountriesWorkbook(EJ, rows){
       ws.getCell(r,16).value=FM('IF(OR($D'+r+'="",$H'+r+'="",$I'+r+'=""),"",IF(COUNTIFS($I$'+F+':$I'+r+',$I'+r+',$H$'+F+':$H'+r+',$H'+r+')=1,MAX($P$'+(F-1)+':$P'+(r-1)+')+1,""))');
       ws.getCell(r,17).value=FM('IF(OR($D'+r+'="",$C'+r+'=""),"",IF(COUNTIF($C$'+F+':$C'+r+',$C'+r+')=1,MAX($Q$'+(F-1)+':$Q'+(r-1)+')+1,""))');
       ws.getCell(r,18).value=FM('IF($D'+r+'="","",IF(COUNTIF($D$'+F+':$D'+r+',$D'+r+')=1,MAX($R$'+(F-1)+':$R'+(r-1)+')+1,""))');
-      ws.getCell(r,21).value=FM('IF(OR($D'+r+'="",$C'+r+'=""),"",IF(COUNTIFS($C$'+F+':$C'+r+',$C'+r+',$D$'+F+':$D'+r+',$D'+r+')=1,MAX($U$'+(F-1)+':$U'+(r-1)+')+1,""))');
       ws.getCell(r,19).value=FM('IF($L'+r+'=1,COUNTIF($L$'+F+':$L'+r+',1),"")');
       ws.getCell(r,20).value=FM('IF(OR($D'+r+'="",$I'+r+'<>\'O.D Detail\'!$D$4),"",COUNTIFS($I$'+F+':$I'+r+',\'O.D Detail\'!$D$4))');
       ws.getCell(r,1).alignment={horizontal:'center'}; ws.getCell(r,10).alignment={horizontal:'center'}; ws.getCell(r,2).alignment={horizontal:'center'};
@@ -5156,7 +5052,7 @@ function hacAllCountriesWorkbook(EJ, rows){
           else if(s==='OD') f='IF($B'+r+'="",0,COUNTIFS('+adr(b.name)+',$B'+r+','+adr('I')+',\'O.D Detail\'!$D$4))';
           else f='IF($B'+r+'="",0,COUNTIFS('+adr(b.name)+',$B'+r+','+adr('K')+','+cc+'$'+b.h+'))';
           row.getCell(3+2*i).value=FM(f);
-          var base=(id==='od')?'IF($B'+r+'="(none)",0.5,'+cc+r+')':cc+r; var cond=cc+r+'>0'; if(id==='proj') cond='AND('+cc+r+'>0,$B'+r+'<>"(none)",TRIM($B'+r+')<>"Central Workshop")'; row.getCell(4+2*i).value=FM('IF('+cond+','+base+'+(1000-$A'+r+')/10000,"")');
+          var base=(id==='od')?'IF($B'+r+'="(none)",0.5,'+cc+r+')':cc+r; row.getCell(4+2*i).value=FM('IF('+cc+r+'>0,'+base+'+(1000-$A'+r+')/10000,"")');
         });
         if(id==='proj'){
           var P=BL.pair, pp=LR('pair','C'), pc=LR('pair','D');
@@ -5180,33 +5076,13 @@ function hacAllCountriesWorkbook(EJ, rows){
     }
   })();
 
-  (function(){
-    var ws=wsL, p=BL.ct;
-    S(ws,p.t,1,p.title.toUpperCase()+'  (slots: '+p.slots+')',{c2:12,fill:NAVY2,color:WHITE,b:1,sz:10,ind:1});
-    var hh=ws.getRow(p.h); hh.getCell(1).value='k'; hh.getCell(2).value='Category'; hh.getCell(3).value='Type';
-    ['ALL'].concat(SECS).forEach(function(sn,si){ hh.getCell(4+2*si).value=sn; hh.getCell(5+2*si).value='key'; });
-    hh.font={name:'Calibri',size:9,bold:true,color:{argb:A(MUTED)}};
-    var pc=LR('ct','B');
-    for(var k=1;k<=p.slots;k++){ var r=p.f+k-1, row=ws.getRow(r);
-      row.getCell(1).value=k;
-      row.getCell(2).value=FM('IFERROR(INDEX('+adr('C')+',MATCH($A'+r+','+adr('U')+',0)),"")');
-      row.getCell(3).value=FM('IFERROR(INDEX('+adr('D')+',MATCH($A'+r+','+adr('U')+',0)),"")');
-      ['ALL'].concat(SECS).forEach(function(sn,si){
-        var cc=ctC(si), kk=ctK(si), cr=LR('ct',cc);
-        var f=(si===0)?'IF($B'+r+'="",0,COUNTIFS('+adr('C')+',$B'+r+','+adr('D')+',$C'+r+'))':'IF($B'+r+'="",0,COUNTIFS('+adr('C')+',$B'+r+','+adr('D')+',$C'+r+','+adr('K')+','+cc+'$'+p.h+'))';
-        row.getCell(4+2*si).value=FM(f);
-        row.getCell(5+2*si).value=FM('IF('+cc+r+'>0,$B'+r+'&"|"&(1+COUNTIFS('+pc+',$B'+r+','+cr+',">"&'+cc+r+')+COUNTIFS('+pc+',$B'+r+','+cr+','+cc+r+','+LR('ct','A')+',"<"&$A'+r+')),"")');
-      });
-    }
-  })();
-
   /* ═════════ DASHBOARD ═════════ */
   (function(){
     var ws=wsD, i, j;
     ws.getColumn(1).width=2; for(i=2;i<=15;i++) ws.getColumn(i).width=10.8; ws.getColumn(16).width=2;
     for(i=17;i<=20;i++){ ws.getColumn(i).width=7; ws.getColumn(i).hidden=true; }
     var d=new Date();
-    banner(ws,15,'HAC \u2014 Fleet Dashboard','All Countries  \u00b7  '+SUBT);
+    banner(ws,15,'FLEET COMMAND CENTER  \u00b7  HASSAN ALLAM CONSTRUCTION','Support Division \u2014 PMV Department   \u00b7   All Countries   \u00b7   '+N.toLocaleString('en-US')+' units   \u00b7   '+d.toISOString().slice(0,10));
     /* division tiles */
     S(ws,4,2,'FLEET BY DIVISION   \u2014   click a card to open its equipment',{c2:15,color:MUTED,b:1,sz:9,bd:{bottom:{style:'thin',color:{argb:A('B8C4D0')}}}});
     var tileCells=SECS.map(function(s,j){ return cl(2+2*j)+'6'; }).join(',');
@@ -5225,7 +5101,7 @@ function hacAllCountriesWorkbook(EJ, rows){
     S(ws,10,2,'VIEW  \u25b6',{c2:3,fill:NAVY,color:WHITE,b:1,sz:11,h:'center'});
     var sel=S(ws,10,4,'All',{c2:5,fill:'FFF3CD',color:'7A5C00',b:1,sz:13,h:'center',bd:{top:{style:'medium',color:{argb:A(AMBER)}},bottom:{style:'medium',color:{argb:A(AMBER)}},left:{style:'medium',color:{argb:A(AMBER)}},right:{style:'medium',color:{argb:A(AMBER)}}}});
     sel.dataValidation={type:'list',allowBlank:false,formulae:['"All,'+SECS.join(',')+'"'],showErrorMessage:true,errorTitle:'Pick from the list',error:'Choose All or one division'};
-    [['Index','Index'],['O.D Overview','O.D Overview'],['O.D Detail','O.D Detail'],['Project x Category','Project x Category'],['All Data','All Data']].forEach(function(l,k){ link(ws,10,6+2*k,7+2*k,l[0]+' \u25b8',l[1],'E7EDF3',NAVY); });
+    [['O.D Overview','O.D Overview'],['O.D Detail','O.D Detail'],['Project x Category','Project x Category'],['Division x Category','Division x Category'],['All Data','All Data']].forEach(function(l,k){ link(ws,10,6+2*k,7+2*k,l[0]+' \u25b8',l[1],'E7EDF3',NAVY); });
     ws.getRow(10).height=26; ws.getRow(11).height=8;
     /* KPI cards */
     var nProj=tProj.length, nOd=tOd.filter(function(x){return x.k!=='(none)';}).length, nCat=tCat.length;
@@ -5234,7 +5110,7 @@ function hacAllCountriesWorkbook(EJ, rows){
     card(ws,12,4,5,'IN VIEW',FM('SUM('+adr('L')+')',N),'units in selected view','1C7ED6');
     card(ws,12,6,7,'EQUIPMENT',FM('D13-H13',N-supN),'excl. supported','2F9E44');
     card(ws,12,8,9,'SUPPORTED',FM('COUNTIFS('+adr('L')+',1,'+adr('C')+',"Supported Equipment")',supN),'supported equipment','7048E8');
-    card(ws,12,10,11,'PROJECTS',FM('COUNT('+LR('proj',kCol(1))+')',nProj),'active in view','F59F00');
+    card(ws,12,10,11,'PROJECTS',FM('COUNTIF('+prC+',">0")',nProj),'active in view','F59F00');
     card(ws,12,12,13,'O.D ENGINEERS',FM('COUNTIF('+odC+',">0")-COUNTIFS('+LR('od','B')+',"(none)",'+odC+',">0")',nOd),'excl. "(none)"','12B886');
     card(ws,12,14,15,'CATEGORIES',FM('COUNTIF('+catC+',">0")',nCat),'active in view','E8590C');
     ws.getRow(15).height=10;
@@ -5261,8 +5137,7 @@ function hacAllCountriesWorkbook(EJ, rows){
       /* other / total */
       var ro=rl+1, rt=rl+2, cnt=cfg.cntCol, shown='SUM($'+cl(cnt)+'$'+r0+':$'+cl(cnt)+'$'+rl+')';
       var shownN=tl.slice(0,rowsN).reduce(function(a,x){return a+x.n;},0), oth=N-shownN;
-      var olab=(id==='proj')?'Other \u00b7 workshop \u00b7 no project':'Other / unassigned';
-      S(ws,ro,c,FM('IF('+VT+'-'+shown+'>0,"'+olab+'","")',oth>0?olab:''),{c2:c+2,fill:SOFT,i:true,color:MUTED,ind:1,bd:{bottom:thin}});
+      S(ws,ro,c,FM('IF('+VT+'-'+shown+'>0,"Other / unassigned","")',oth>0?'Other / unassigned':''),{c2:c+2,fill:SOFT,i:true,color:MUTED,ind:1,bd:{bottom:thin}});
       S(ws,ro,cnt,FM('IF($'+cl(c)+ro+'="","",'+VT+'-'+shown+')',oth>0?oth:''),{fill:SOFT,h:'center',color:MUTED,fmt:'#,##0',bd:{bottom:thin}});
       S(ws,rt,c,'TOTAL IN VIEW',{c2:c+2,fill:NAVY,color:WHITE,b:1,ind:1});
       S(ws,rt,cnt,FM(VT,N),{fill:NAVY,color:WHITE,b:1,h:'center',fmt:'#,##0'});
@@ -5304,7 +5179,7 @@ function hacAllCountriesWorkbook(EJ, rows){
     var hc=[[2,4,'UNITS WITHOUT O.D',FM('COUNTIFS('+adr('K')+',"?*",'+adr('I')+',"")+COUNTIFS('+adr('K')+',"?*",'+adr('I')+',"(none)")',noOd),'missing O.D','C92A2A'],
             [5,7,'UNITS WITHOUT PROJECT',FM('COUNTIFS('+adr('K')+',"?*",'+adr('H')+',"")+COUNTIFS('+adr('K')+',"?*",'+adr('H')+',"(none)")',noPr),'missing project','C92A2A'],
             [8,10,'ROWS OUTSIDE THE 7 SHEETS',FM('B13-('+secSum+')',0),'check Division','C92A2A'],
-            [11,13,'LIST CAPACITY',FM('IF(OR(MAX('+adr('Q')+')>40,MAX('+adr('O')+')>40,MAX('+adr('N')+')>200,MAX('+adr('R')+')>120,MAX('+adr('U')+')>250,MAX('+adr('P')+')>300),"\u26a0 EXTEND","\u2714 OK")','\u2714 OK'),'list slots','2F9E44']];
+            [11,13,'LIST CAPACITY',FM('IF(OR(MAX('+adr('Q')+')>40,MAX('+adr('O')+')>40,MAX('+adr('N')+')>200,MAX('+adr('R')+')>120,MAX('+adr('P')+')>300),"\u26a0 EXTEND","\u2714 OK")','\u2714 OK'),'list slots','2F9E44']];
     hc.forEach(function(h){ card(ws,54,h[0],h[1],h[2],h[3],h[4],h[5]); });
     S(ws,54,14,{text:'OPEN  All Data  \u25b6',hyperlink:"#'All Data'!A1"},{r2:56,c2:15,fill:AMBER,color:NAVY,b:1,sz:11,h:'center'});
     ws.addConditionalFormatting({ref:'B55:M55',rules:[{type:'expression',formulae:['AND(ISNUMBER(B55),B55=0)'],style:{font:{color:{argb:A('2F9E44')}}}}]});
@@ -5323,28 +5198,19 @@ function hacAllCountriesWorkbook(EJ, rows){
     ws.pageSetup={orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,paperSize:9};
   })();
 
-  /* ═════════ INDEX (classification of equipment — whole fleet) ═════════ */
-  (function(){
-    var ws=wsI; gridCols(ws);
-    banner(ws,27,'HAC \u2014 Classification of Equipment','All Countries  \u00b7  '+SUBT,'1F3864',23);
-    link(ws,2,24,27,'\u25c0 Dashboard','Dashboard',NAVY2,WHITE); ws.getCell(2,24).font={name:'Calibri',size:9,bold:true,color:{argb:A(WHITE)}};
-    classify(ws,5,0,0,'COUNT('+adr('A')+')',N,ctInfo(rows),12);
-    ws.pageSetup={orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,paperSize:9};
-  })();
-
   /* ═════════ O.D OVERVIEW ═════════ */
   (function(){
     var ws=wsO, i, j, NC=8;
     var W=[2,5,28,9,10]; for(j=0;j<NC;j++) W.push(11); W.push(9,22,6);
     W.forEach(function(w,k){ ws.getColumn(k+1).width=w; }); ws.getColumn(16).hidden=true;
-    banner(ws,15,'HAC \u2014 O.D Overview','All Countries  \u00b7  '+SUBT,'1F3864',13);
+    banner(ws,15,'O.D  OVERVIEW','Support Division \u2014 PMV Department','12B886',13);
     link(ws,2,14,15,'\u25c0 Dashboard','Dashboard','1B6E5A','FFFFFF');
     var odC=LR('od',cCol(0)), pl=LR('pair','D'), nOd=tOd.filter(function(x){return x.k!=='(none)';}).length;
     var noOd=rows.filter(function(r){return !r.od||r.od==='(none)';}).length;
     card(ws,4,2,3,'O.D ENGINEERS',FM('COUNTIF('+odC+',">0")-COUNTIFS('+LR('od','B')+',"(none)",'+odC+',">0")',nOd),'','12B886');
-    card(ws,4,4,5,'PROJECTS',FM('COUNT('+LR('proj',kCol(0))+')',tProj.length),'','F59F00');
+    card(ws,4,4,5,'PROJECTS',FM('COUNTIF('+LR('proj',cCol(0))+',">0")',tProj.length),'','F59F00');
     card(ws,4,6,8,'UNITS WITHOUT O.D',FM('COUNTIFS('+adr('K')+',"?*",'+adr('I')+',"")+COUNTIFS('+adr('K')+',"?*",'+adr('I')+',"(none)")',noOd),'','C92A2A');
-    card(ws,4,9,11,'PROJECTS ON MORE THAN ONE O.D',FM('COUNTIFS('+LR('proj','AA')+',">1",'+LR('proj',kCol(0))+',">0")'),'','E8590C');
+    card(ws,4,9,11,'PROJECTS ON MORE THAN ONE O.D',FM('COUNTIF('+LR('proj','AA')+',">1")'),'','E8590C');
     ws.getRow(7).height=8;
     var hs={fill:'0F6B55',color:WHITE,b:1,bd:{bottom:{style:'medium',color:{argb:A(AMBER)}}}};
     S(ws,8,2,'#',{fill:'0F6B55',color:WHITE,b:1,h:'center',bd:hs.bd}); S(ws,8,3,'O.D ENGINEER',{fill:'0F6B55',color:WHITE,b:1,ind:1,bd:hs.bd}); S(ws,8,4,'UNITS',{fill:'0F6B55',color:WHITE,b:1,h:'center',bd:hs.bd}); S(ws,8,5,'PROJECTS',{fill:'0F6B55',color:WHITE,b:1,h:'center',bd:hs.bd});
@@ -5364,7 +5230,7 @@ function hacAllCountriesWorkbook(EJ, rows){
       o(2,'IF($P'+r+'="","",'+i+')','center','0',false,MUTED);
       o(3,'IF($P'+r+'="","",INDEX('+LR('od','B')+',$P'+r+'))','left',null,true,NAVY);
       o(4,'IF($P'+r+'="","",INDEX('+odC+',$P'+r+'))','center','#,##0',true);
-      o(5,'IF($P'+r+'="","",COUNTIFS('+LR('pair','B')+',$C'+r+','+pl+',">0",'+LR('pair','C')+',"<>(none)",'+LR('pair','C')+',"<>Central Workshop"))','center','0',false,MUTED);
+      o(5,'IF($P'+r+'="","",COUNTIFS('+LR('pair','B')+',$C'+r+','+pl+',">0"))','center','0',false,MUTED);
       for(j=0;j<NC;j++){ var hc=cl(6+j); o(6+j,'IF(OR($P'+r+'="",'+hc+'$8=""),"",COUNTIFS('+adr('I')+',$C'+r+','+adr('C')+','+hc+'$8))','center','#,##0;-#,##0;"\u2013"'); }
       o(14,'IF($P'+r+'="","",$D'+r+'-SUM(F'+r+':M'+r+'))','center','#,##0;-#,##0;"\u2013"',false,MUTED);
       o(15,'IF($P'+r+'="","",REPT("\u2588",MIN(18,ROUND($D'+r+'/$D$'+first+'*18,0))))','left',null,false,'12B886');
@@ -5379,7 +5245,7 @@ function hacAllCountriesWorkbook(EJ, rows){
   (function(){
     var ws=wsOD, col='0F6B55';
     [2,6,22,24,32,14,16,26,22,8,2,6,6,6].forEach(function(w,k){ ws.getColumn(k+1).width=w; }); [12,13,14].forEach(function(c){ ws.getColumn(c).hidden=true; });
-    banner(ws,10,'HAC \u2014 O.D Detail','All Countries  \u00b7  '+SUBT,'1F3864',8);
+    banner(ws,10,'O.D  DETAIL','Support Division \u2014 PMV Department',col,8);
     link(ws,2,9,10,'\u25c0 Dashboard','Dashboard',col,WHITE); ws.getCell(2,9).font={name:'Calibri',size:9,bold:true,color:{argb:A(WHITE)}};
     var firstOd=(tOd.filter(function(x){return x.k!=='(none)';})[0]||tOd[0]||{k:''}).k;
     S(ws,4,2,'O.D  \u25b6',{c2:3,fill:NAVY,color:WHITE,b:1,sz:11,h:'center'});
@@ -5388,12 +5254,12 @@ function hacAllCountriesWorkbook(EJ, rows){
     sel.dataValidation={type:'list',allowBlank:false,formulae:[LR('od','B')],showErrorMessage:true,errorTitle:'Pick from the list',error:'Choose an O.D from the list'};
     ws.getRow(4).height=26; ws.getRow(5).height=8;
     var mine=rows.filter(function(r){return String(r.od).toLowerCase()===String(firstOd).toLowerCase();});
-    var sup=mine.filter(function(r){return r.cat==='Supported Equipment';}).length, np={},nc={},ne={}; mine.forEach(function(r){if(!notProj(r.proj)) np[String(r.proj).toLowerCase()]=1; nc[String(r.cat).toLowerCase()]=1;ne[String(r.eq).toLowerCase()]=1;});
+    var sup=mine.filter(function(r){return r.cat==='Supported Equipment';}).length, np={},nc={},ne={}; mine.forEach(function(r){np[String(r.proj).toLowerCase()]=1;nc[String(r.cat).toLowerCase()]=1;ne[String(r.eq).toLowerCase()]=1;});
     var K=adr('K'), I=adr('I');
     card(ws,6,2,3,'UNITS',FM('COUNTIFS('+K+',"?*",'+I+',$D$4)',mine.length),'','1C7ED6');
     card(ws,6,4,4,'EQUIPMENT',FM('B7-E7',mine.length-sup),'','2F9E44');
     card(ws,6,5,5,'SUPPORTED',FM('COUNTIFS('+K+',"?*",'+I+',$D$4,'+adr('C')+',"Supported Equipment")',sup),'','7048E8');
-    card(ws,6,6,7,'PROJECTS',FM('COUNT('+LR('proj',kCol(2))+')',Object.keys(np).length),'','F59F00');
+    card(ws,6,6,7,'PROJECTS',FM('COUNTIF('+LR('proj',cCol(2))+',">0")',Object.keys(np).length),'','F59F00');
     card(ws,6,8,8,'CATEGORIES',FM('COUNTIF('+LR('cat',cCol(2))+',">0")',Object.keys(nc).length),'','E8590C');
     card(ws,6,9,10,'EQUIPMENT TYPES',FM('COUNTIF('+LR('eq',cCol(2))+',">0")',Object.keys(ne).length),'','12B886');
     ws.getRow(9).height=8;
@@ -5409,7 +5275,7 @@ function hacAllCountriesWorkbook(EJ, rows){
     var ws=wsP, i, j, NC=10;
     var W=[2,6,34,24]; for(j=0;j<NC;j++) W.push(11); W.push(9,10,18,6);
     W.forEach(function(w,k){ ws.getColumn(k+1).width=w; }); ws.getColumn(18).hidden=true;
-    banner(ws,17,'HAC \u2014 Projects \u00d7 Categories','All Countries  \u00b7  '+SUBT,'1F3864',15);
+    banner(ws,17,'PROJECT  \u00d7  CATEGORY','Support Division \u2014 PMV Department','845EF7',15);
     link(ws,2,16,17,'\u25c0 Dashboard','Dashboard','5F3DC4','FFFFFF');
     var keyC=LR('cat',kCol(0)), nameC=LR('cat','B'), keyP=LR('proj',kCol(0));
     var r4=4, r5=5;
@@ -5445,7 +5311,7 @@ function hacAllCountriesWorkbook(EJ, rows){
   (function(){
     var ws=wsM, i, j;
     [2,32,11,11,11,11,11,11,11,11,24,6].forEach(function(w,k){ ws.getColumn(k+1).width=w; }); ws.getColumn(12).hidden=true;
-    banner(ws,11,'HAC \u2014 Divisions \u00d7 Categories','All Countries  \u00b7  '+SUBT,'1F3864',9);
+    banner(ws,11,'DIVISION  \u00d7  CATEGORY','Support Division \u2014 PMV Department','339AF0',9);
     link(ws,2,10,11,'\u25c0 Dashboard','Dashboard','1864AB','FFFFFF');
     S(ws,4,2,'Category',{fill:NAVY,color:WHITE,b:1,ind:1,bd:{bottom:{style:'medium',color:{argb:A(AMBER)}}}}); 
     SECS.forEach(function(s,k){ S(ws,4,3+k,{text:SECTXT[s],hyperlink:"#'"+s+"'!A1"},{fill:COL[s],color:WHITE,b:1,h:'center',sz:9,bd:{bottom:{style:'medium',color:{argb:A(AMBER)}}}}); ws.getCell(4,3+k).font={name:'Calibri',size:9,bold:true,color:{argb:A(WHITE)}}; });
@@ -5468,34 +5334,29 @@ function hacAllCountriesWorkbook(EJ, rows){
     ws.pageSetup={orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,paperSize:9};
   })();
 
-  /* ═════════ DIVISION SHEETS: classification index on top, equipment register underneath ═════════ */
-  var SECTITLE={Egypt:'Egypt \u00b7 Project Sites',Workshop:'Egypt \u00b7 Central Workshop',KSA:'Saudi Arabia (KSA)',UAE:'United Arab Emirates (UAE)',Algeria:'Algeria',Foundation:'Foundation Division',Tunnelling:'Tunnelling Division'};
+  /* ═════════ DIVISION SHEETS (live registers) ═════════ */
   SECS.forEach(function(sec,si){
-    var ws=wsS[sec], col=COL[sec], scopeI=3+si, ctI=1+si;
-    var sp=rows.filter(function(r){return r.sec===sec;}), cnt=sp.length, cap=Math.max(150,cnt+120);
-    gridCols(ws);
-    banner(ws,27,'HAC \u2014 '+SECTITLE[sec],secN[sec].toLocaleString('en-US')+' units  \u00b7  '+new Date().toISOString().slice(0,10),col,23);
-    link(ws,2,24,27,'\u25c0 Dashboard','Dashboard',NAVY2,WHITE); ws.getCell(2,24).font={name:'Calibri',size:9,bold:true,color:{argb:A(WHITE)}};
-    stripe(ws,3,2,27,sec);
-    ws.getRow(4).height=6;
-    var pC=LR('proj',kCol(scopeI)), oC=LR('od',cCol(scopeI)), cC=LR('cat',cCol(scopeI));
-    var sup=sp.filter(function(r){return r.cat==='Supported Equipment';}).length, nP={},nO={},nC={}; sp.forEach(function(r){ if(!notProj(r.proj)) nP[String(r.proj).toLowerCase()]=1; if(r.od&&r.od!=='(none)')nO[String(r.od).toLowerCase()]=1; nC[String(r.cat).toLowerCase()]=1;});
-    var K=adr('K');
-    card(ws,5,2,5,'UNITS',FM('COUNTIF('+K+','+Q(sec)+')',cnt),'',col);
-    card(ws,5,6,9,'EQUIPMENT',FM('B6-J6',cnt-sup),'excl. supported','2F9E44');
-    card(ws,5,10,13,'SUPPORTED',FM('COUNTIFS('+K+','+Q(sec)+','+adr('C')+',"Supported Equipment")',sup),'','7048E8');
-    card(ws,5,14,17,'PROJECTS',FM('COUNT('+pC+')',Object.keys(nP).length),'excl. workshop / none','F59F00');
-    card(ws,5,18,21,'O.D ENGINEERS',FM('COUNTIF('+oC+',">0")-COUNTIFS('+LR('od','B')+',"(none)",'+oC+',">0")',Object.keys(nO).length),'excl. "(none)"','12B886');
-    card(ws,5,22,27,'CATEGORIES',FM('COUNTIF('+cC+',">0")',Object.keys(nC).length),'','E8590C');
-    ws.getRow(8).height=8;
-    var info=ctInfo(sp), nSlots=Math.min(12,Math.max(3,Math.ceil((info.length+1)/3)*3));
-    var nxt=classify(ws,9,scopeI,ctI,'COUNTIF('+K+','+Q(sec)+')',cnt,info,nSlots);
-    var tp=tallyOf(sp,function(r){return notProj(r.proj)?'':r.proj;}), to=tallyOf(sp,function(r){return r.od;}); to=to.filter(function(x){return x.k!=='(none)';}).concat(to.filter(function(x){return x.k==='(none)';}));
-    rankBlock(ws,nxt,2,29,'TOP PROJECTS','proj',scopeI,'F59F00','COUNTIF('+K+','+Q(sec)+')',cnt,tp,'Other \u00b7 workshop \u00b7 no project');
-    rankBlock(ws,nxt,11,30,'O.D ENGINEERS','od',scopeI,'12B886','COUNTIF('+K+','+Q(sec)+')',cnt,to,'Other / unassigned');
-    var rtop=nxt+13;
-    register2(ws,rtop,col,function(i){return 'IFERROR(MATCH('+Q(sec+'|')+'&'+i+','+adr('M')+',0),"")';},cap,'EQUIPMENT REGISTER','O.D','I','od',sp);
-    ws.pageSetup={orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,paperSize:9};
+    var ws=wsS[sec], col=COL[sec], scopeI=3+si;
+    var cnt=secN[sec], cap=Math.max(150,cnt+120);
+    [2,6,22,24,32,14,16,26,22,8,2,6,6,6].forEach(function(w,k){ ws.getColumn(k+1).width=w; });
+    [12,13,14].forEach(function(c){ ws.getColumn(c).hidden=true; });
+    banner(ws,10,SECTXT[sec]+'  \u00b7  '+SECSUB[sec],'Support Division \u2014 PMV Department',col,8);
+    stripe(ws,3,2,10,sec);
+    link(ws,2,9,10,'\u25c0 Dashboard','Dashboard',col,WHITE); ws.getCell(2,9).font={name:'Calibri',size:9,bold:true,color:{argb:A(WHITE)}};
+    var pC=LR('proj',cCol(scopeI)), oC=LR('od',cCol(scopeI)), cC=LR('cat',cCol(scopeI));
+    var sp=rows.filter(function(r){return r.sec===sec;});
+    var sup=sp.filter(function(r){return r.cat==='Supported Equipment';}).length, nP={},nO={},nC={}; sp.forEach(function(r){nP[String(r.proj).toLowerCase()]=1; if(r.od&&r.od!=='(none)')nO[String(r.od).toLowerCase()]=1; nC[String(r.cat).toLowerCase()]=1;});
+    card(ws,4,2,3,'UNITS',FM('COUNTIF('+adr('K')+','+Q(sec)+')',cnt),SECSUB[sec],col);
+    card(ws,4,4,4,'EQUIPMENT',FM('B5-E5',cnt-sup),'excl. supported','2F9E44');
+    card(ws,4,5,5,'SUPPORTED',FM('COUNTIFS('+adr('K')+','+Q(sec)+','+adr('C')+',"Supported Equipment")',sup),'','7048E8');
+    card(ws,4,6,7,'PROJECTS',FM('COUNTIF('+pC+',">0")',Object.keys(nP).length),'','F59F00');
+    card(ws,4,8,8,'O.D ENGINEERS',FM('COUNTIF('+oC+',">0")-COUNTIFS('+LR('od','B')+',"(none)",'+oC+',">0")',Object.keys(nO).length),'excl. "(none)"','12B886');
+    card(ws,4,9,10,'CATEGORIES',FM('COUNTIF('+cC+',">0")',Object.keys(nC).length),'','E8590C');
+    ws.getRow(7).height=8;
+    mini(ws,8,scopeI,col,'$B$5');
+    ws.getRow(21).height=8;
+    register(ws,22,col,function(i){return 'IFERROR(MATCH('+Q(sec+'|')+'&'+i+','+adr('M')+',0),"")';},cap,'EQUIPMENT REGISTER','O.D','I',sp,'od');
+    ws.pageSetup={orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,paperSize:9,printTitlesRow:'23:23'};
   });
 
   return wb;
