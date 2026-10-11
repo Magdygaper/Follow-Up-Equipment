@@ -790,6 +790,16 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
             📅 Update Manuf. Year
             <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="updateYearsFromExcel(this)">
           </label>
+          <select id="hm-month" title="Show the hour-meter reading of this month (the last reading up to it)" onchange="hmSetMonth(this.value)"><option value="">H/M: Latest</option></select>
+          <span id="hm-meta" style="font-size:11px;color:var(--text-muted);white-space:nowrap;"></span>
+          <label id="btn-hm-import" title="Replaces ALL stored hour-meter readings with the uploaded sheet" style="display:none; background: rgba(88,166,255,.12); border: 1px solid rgba(88,166,255,.4); color: #58a6ff; padding: 8px 14px; border-radius: var(--radius); cursor: pointer; font-size: 13px; font-weight: 600; white-space: nowrap;">
+            ⏱ Import H/M
+            <input type="file" accept=".xlsx,.xls,.xlsb,.csv" style="display:none;" onchange="hmImport(this,'all')">
+          </label>
+          <label id="btn-hm-new" title="Adds only the readings whose S/N is not stored yet (e.g. the new month) - nothing existing is changed" style="display:none; background: rgba(63,185,80,.12); border: 1px solid rgba(63,185,80,.4); color: #3fb950; padding: 8px 14px; border-radius: var(--radius); cursor: pointer; font-size: 13px; font-weight: 600; white-space: nowrap;">
+            ➕ Add New H/M Only
+            <input type="file" accept=".xlsx,.xls,.xlsb,.csv" style="display:none;" onchange="hmImport(this,'new')">
+          </label>
           <button id="btn-clear-fleet" style="display:none; background:rgba(248,81,73,.12); border:1px solid rgba(248,81,73,.45); color:#f85149; padding:8px 14px; border-radius:var(--radius); cursor:pointer; font-size:13px; font-weight:600; white-space:nowrap;" onclick="clearCurrentFleet()">🗑️ مسح كل معدات الدولة دي</button>
         </div>
 
@@ -799,7 +809,7 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
             <thead>
               <tr>
                 <th>#</th><th>Equipment</th><th>Category</th><th>Brand / Model</th><th>Capacity</th>
-                <th>Code</th><th>Project</th><th>O.D</th><th>Year</th>
+                <th>Code</th><th>Project</th><th>O.D</th><th>Year</th><th>Hour / Meter</th><th>Last Read</th>
                 <th id="actions-col" style="display:none;">Actions</th>
               </tr>
             </thead>
@@ -2025,6 +2035,7 @@ auth.onAuthStateChanged(function(user) {
         document.getElementById('btn-clear-import').style.display = isAdmin ? 'inline-flex' : 'none';
         document.getElementById('btn-clear-fleet').style.display = isAdmin ? 'inline-flex' : 'none';
         document.getElementById('btn-update-years').style.display = isAdmin ? 'inline-flex' : 'none';
+        if(typeof hmAdminUI==='function') hmAdminUI();
 
     document.getElementById('actions-col').style.display = isAdmin ? '' : 'none';
     document.getElementById('fu-actions-col').style.display = isAdmin ? '' : 'none';
@@ -2811,6 +2822,7 @@ function renderTable() {
       +'<td>'+_hacEsc(e.project||'—')+'</td>'
       +'<td style="color:var(--text-muted);font-size:12px">'+(isCentralWorkshop(e.project) ? '—' : _hacEsc(e.od||'—'))+'</td>'
       +'<td style="font-family:monospace;font-size:12px">'+_hacEsc(e.year||'—')+'</td>'
+      +(typeof hmCells==='function'?hmCells(e):'<td></td><td></td>')
       +(isAdmin ? '<td><div class="action-btns">'
         +'<button class="btn-transfer" onclick="event.stopPropagation();openTransferModal(\''+e.id+'\')">Transfer</button>'
         +'<button class="btn-edit" onclick="event.stopPropagation();openEditModal(\''+e.id+'\')">Edit</button>'
@@ -4874,7 +4886,7 @@ function showEquipHistory(id){
     +'</div>';
   }).join('') : '<div class="empty">No past transfers.</div>';
 
-  document.getElementById('hist-content').innerHTML = details + timeline;
+  document.getElementById('hist-content').innerHTML = details + (typeof hmHistoryHtml==='function'?hmHistoryHtml(eq.code):'') + timeline;
   document.getElementById('history-modal').classList.add('open');
 }
 
@@ -7059,7 +7071,8 @@ function moRenderCharts(){
 }
 
 /* ═════ 10) Table ═════ */
-var MO_COLS=['#','Month','Status','Eq.Code','Equipment','Qty','Model / Capacity','Project','O.D','Cat.','Worked','Standby','Repair','Standby Cost','Money Made','OT Cost','Fuel L','Utl%','B.M St.'];
+var MO_COLS=['#','Month','Status','Eq.Code','Equipment','Qty','Model / Capacity','Hour/Meter','Last Read','Project','O.D','Cat.','Worked','Standby','Repair','Standby Cost','Money Made','OT Cost','Fuel L','Utl%','B.M St.'];
+document.addEventListener('hm-loaded',function(){ try{ moTableApply(); }catch(e){} });
 function moTableApply(){
   var rows=searchRows(moBase(null));
   document.getElementById('mo-thead').innerHTML=MO_COLS.map(function(h){ return '<th>'+h+'</th>'; }).join('');
@@ -7079,6 +7092,7 @@ function moTableApply(){
       +'<td style="font-weight:600">'+esc(r.equipment||'—')+'</td>'
       +'<td class="n">'+units(r)+'</td>'
       +'<td style="color:var(--text-muted);max-width:220px;white-space:normal;font-size:11.5px">'+esc(r.model||'—')+'</td>'
+      +(typeof hmMoCells==='function'?hmMoCells(r.code,r.month):'<td></td><td></td>')
       +'<td style="max-width:190px;white-space:normal;font-size:11.5px">'+esc(r.project||'—')+'</td>'
       +'<td style="color:var(--text-muted)">'+esc(r.od||'—')+'</td>'
       +'<td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+cc+';margin-right:6px"></span><span style="color:var(--text-muted);font-size:11.5px">'+esc(r.cat||'—')+'</span></td>'
@@ -13219,5 +13233,194 @@ try{firebase.auth().onAuthStateChanged(function(u){
 try{console.log('%cHAC \u00b7 PMV','color:#f0a500;font-size:18px;font-weight:700');console.log('Confidential. Access is logged.');}catch(e){}
 })();
 </script>
+<script>
+/* ═════ Hour Meter (H/M) — readings per equipment code, by month ═════
+   Source sheet columns used: S.n (row id), Month, Code / Board No., Start, End.   "End" = the reading of that month.
+   Stored in Firestore: hour_meter/_dataset (meta) + hour_meter/_dataset/chunks/c0..cN (parallel arrays). */
+(function(){
+  var COLL='hour_meter', DSID='_dataset', CHUNK=1500;
+  var HM={rows:[], bySn:{}, byCode:{}, months:[], latest:'', maxSn:0, meta:null, loaded:false, loading:false, sel:''};
+  window.HM_STATE=HM;
+  function esc(v){ return (typeof _hacEsc==='function')?_hacEsc(v):String(v==null?'':v); }
+  function pad(n){ return (n<10?'0':'')+n; }
+  function normCode(c){ return String(c==null?'':c).toUpperCase().replace(/\s+/g,''); }
+  var MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function ymLabel(m){ if(!m) return '—'; var p=String(m).split('-'); var i=parseInt(p[1],10)-1; return (MN[i]||p[1])+' '+p[0]; }
+  function fmtN(n){ return Number(n).toLocaleString('en-US'); }
+  function toast2(m,t){ try{ if(typeof toast==='function') toast(m,t); else alert(m); }catch(e){ alert(m); } }
+  function ymOf(v){
+    if(v==null||v==='') return '';
+    if(v instanceof Date){ return isNaN(v)?'':(v.getFullYear()+'-'+pad(v.getMonth()+1)); }
+    if(typeof v==='number'){ if(v>20000&&v<80000&&window.XLSX&&XLSX.SSF){ var d=XLSX.SSF.parse_date_code(v); if(d) return d.y+'-'+pad(d.m); } return ''; }
+    var s=String(v).trim(), m=s.match(/^(\d{4})[-\/.](\d{1,2})/);
+    if(m) return m[1]+'-'+pad(+m[2]);
+    m=s.match(/^(\d{1,2})[-\/.](\d{4})$/); if(m) return m[2]+'-'+pad(+m[1]);
+    m=s.toLowerCase().match(/([a-z]{3})[a-z]*[\s\-\/,\.']*(\d{2,4})/);
+    if(m){ var mi=MN.map(function(x){return x.toLowerCase();}).indexOf(m[1]); if(mi>=0){ var y=+m[2]; if(y<100) y+=2000; return y+'-'+pad(mi+1); } }
+    var d2=new Date(s); if(!isNaN(d2)) return d2.getFullYear()+'-'+pad(d2.getMonth()+1);
+    return '';
+  }
+  function numOf(v){ if(v==null||v==='') return null; var n=Number(String(v).replace(/,/g,'').trim()); return isFinite(n)?n:null; }
+
+  function reindex(){
+    HM.byCode={}; HM.bySn={}; HM.maxSn=0; var ms={};
+    HM.rows.forEach(function(r){ (HM.byCode[r.c]=HM.byCode[r.c]||[]).push(r); HM.bySn[r.n]=1; ms[r.m]=1; if(r.n>HM.maxSn) HM.maxSn=r.n; });
+    HM.months=Object.keys(ms).sort(); HM.latest=HM.months.length?HM.months[HM.months.length-1]:'';
+  }
+  /* last reading (End>0) for a code, up to a month (default: the selected month / latest) */
+  function pick(code,ym){
+    var L=HM.byCode[normCode(code)]; if(!L) return null;
+    var lim=ym||HM.sel||'9999-99', best=null;
+    L.forEach(function(r){ if(r.m>lim||!(r.e>0)) return;
+      if(!best||r.m>best.m||(r.m===best.m&&(r.e>best.e||(r.e===best.e&&r.n>best.n)))) best=r; });
+    return best;
+  }
+  function cell(r,ref){
+    if(!r) return '<td style="font-family:monospace;font-size:12px;color:var(--text-muted)">—</td><td style="font-family:monospace;font-size:12px;color:var(--text-muted)">—</td>';
+    var old=ref&&r.m<ref;
+    return '<td style="font-family:monospace;font-size:12px;font-weight:700;white-space:nowrap" title="Start '+fmtN(r.s||0)+' → End '+fmtN(r.e)+'">'+fmtN(r.e)+'</td>'
+      +'<td style="font-family:monospace;font-size:12px;white-space:nowrap;'+(old?'color:#e3a008;':'color:var(--text-muted);')+'" title="'+(old?'Older than '+ymLabel(ref)+' — no newer reading':'')+'">'+ymLabel(r.m)+(old?' ⚠':'')+'</td>';
+  }
+  /* Equipment List table cells */
+  window.hmCells=function(e){
+    if(!HM.loaded&&!HM.loading) hmLoad(function(){ if(typeof renderTable==='function') renderTable(); });
+    return cell(pick(e&&e.code),HM.sel||HM.latest);
+  };
+  /* Master Owned table cells: reading as of that row's month */
+  window.hmMoCells=function(code,month){
+    if(!HM.loaded&&!HM.loading) hmLoad();
+    var ym=ymOf(month)||'';
+    return cell(pick(code,ym||undefined),ym||HM.latest);
+  };
+  window.hmHistoryHtml=function(code){
+    var L=(HM.byCode[normCode(code)]||[]).slice().sort(function(a,b){ return a.m<b.m?1:a.m>b.m?-1:b.n-a.n; });
+    if(!L.length) return '';
+    var h='<div style="margin:6px 0 12px;"><div style="font-size:11px;letter-spacing:1px;color:var(--text-muted);margin-bottom:6px;">HOUR METER READINGS</div><table style="width:100%;font-size:12px;border-collapse:collapse;"><thead><tr style="color:var(--text-muted);text-align:left;"><th style="padding:3px 6px;">Month</th><th>Start</th><th>End</th><th>Diff</th></tr></thead><tbody>';
+    L.forEach(function(r){ var d=(r.s!=null&&r.e>0)?(r.e-r.s):null; h+='<tr style="border-top:1px solid var(--border);"><td style="padding:4px 6px;">'+ymLabel(r.m)+'</td><td style="font-family:monospace;">'+(r.s!=null?fmtN(r.s):'—')+'</td><td style="font-family:monospace;font-weight:700;">'+fmtN(r.e)+'</td><td style="font-family:monospace;color:var(--text-muted);">'+(d!=null?fmtN(d):'—')+'</td></tr>'; });
+    return h+'</tbody></table></div>';
+  };
+  window.hmSetMonth=function(v){ HM.sel=v||''; if(typeof renderTable==='function') renderTable(); };
+  window.hmLookup=function(code,ym){ return pick(code,ym); };
+
+  function refreshUI(){
+    var sel=document.getElementById('hm-month');
+    if(sel){ var cur=HM.sel, h='<option value="">H/M: Latest'+(HM.latest?' ('+ymLabel(HM.latest)+')':'')+'</option>';
+      HM.months.slice().reverse().forEach(function(m){ h+='<option value="'+m+'"'+(cur===m?' selected':'')+'>H/M: '+ymLabel(m)+'</option>'; });
+      sel.innerHTML=h; }
+    var meta=document.getElementById('hm-meta');
+    if(meta){ meta.textContent=HM.rows.length?('H/M · '+ymLabel(HM.months[0])+' → '+ymLabel(HM.latest)+' · '+fmtN(HM.rows.length)+' readings · last S/N '+HM.maxSn):'H/M · no data yet'; }
+  }
+  function hmLoad(cb){
+    if(HM.loading) return; HM.loading=true;
+    var ref=db.collection(COLL).doc(DSID);
+    ref.get().then(function(snap){
+      if(!snap.exists){ HM.meta=null; HM.rows=[]; return null; }
+      HM.meta=snap.data(); var n=HM.meta.chunks||0, ps=[], i;
+      for(i=0;i<n;i++) ps.push(ref.collection('chunks').doc('c'+i).get());
+      return Promise.all(ps).then(function(docs){
+        var rows=[]; docs.forEach(function(d){ if(!d.exists) return; var x=d.data(), L=(x.n||[]).length, k;
+          for(k=0;k<L;k++) rows.push({n:x.n[k],m:x.m[k],c:x.c[k],s:(x.s[k]===-1?null:x.s[k]),e:x.e[k]}); });
+        HM.rows=rows; });
+    }).then(function(){ reindex(); HM.loaded=true; HM.loading=false; refreshUI(); try{ document.dispatchEvent(new Event('hm-loaded')); }catch(x){} if(cb) cb(); })
+    .catch(function(err){ HM.loading=false; HM.loaded=true; console.error('H/M load failed',err); refreshUI();
+      var m=document.getElementById('hm-meta'); if(m) m.textContent='H/M · load failed ('+(err&&err.code||err&&err.message||'error')+')'; });
+  }
+  window.hmReload=function(){ HM.loaded=false; HM.loading=false; hmLoad(function(){ if(typeof renderTable==='function') renderTable(); }); };
+
+  /* ── parse the uploaded sheet (xlsx / xls / xlsb / csv) ── */
+  function mapHeader(row){
+    var N=row.map(function(v){ return String(v==null?'':v).toLowerCase().replace(/[^a-z0-9]/g,''); });
+    function find(c){ var i,k; for(k=0;k<c.length;k++){ i=N.indexOf(c[k]); if(i>=0) return i; } return -1; }
+    return {sn:find(['sn','sno','slno','serial','serialno']), month:find(['month','period','date']),
+      code:find(['codeboardno','codeboard','boardno','eqcode','assetcode','code']), start:find(['start','startreading','startmeter']), end:find(['end','endreading','endmeter','lastreading'])};
+  }
+  function parseWB(wb){
+    var out=null;
+    wb.SheetNames.forEach(function(name){
+      if(out) return;
+      var raw=XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,defval:'',raw:true}), hi=-1, cm=null, i;
+      for(i=0;i<Math.min(raw.length,20);i++){ var m=mapHeader(raw[i]); if(m.code>=0&&m.end>=0&&m.month>=0&&m.sn>=0){ hi=i; cm=m; break; } }
+      if(hi<0) return;
+      var rows=[], skip={noSn:0,noCode:0,noMonth:0,noEnd:0}, seen={};
+      for(i=hi+1;i<raw.length;i++){ var r=raw[i];
+        var sn=numOf(r[cm.sn]); if(!(sn>0)){ if(r.join('').trim()) skip.noSn++; continue; }
+        var code=normCode(r[cm.code]); if(!code){ skip.noCode++; continue; }
+        var ym=ymOf(r[cm.month]); if(!ym){ skip.noMonth++; continue; }
+        var e=numOf(r[cm.end]); if(!(e>0)){ skip.noEnd++; continue; }
+        if(seen[sn]) continue; seen[sn]=1;
+        rows.push({n:sn,m:ym,c:code,s:cm.start>=0?numOf(r[cm.start]):null,e:e});
+      }
+      out={sheet:name,rows:rows,skip:skip};
+    });
+    return out;
+  }
+  function readFile(file,cb){
+    var fr=new FileReader();
+    fr.onload=function(ev){ try{ var wb=XLSX.read(ev.target.result,{type:'array',cellDates:true}); cb(null,parseWB(wb)); }catch(err){ cb(err); } };
+    fr.onerror=function(){ cb(new Error('file read error')); };
+    fr.readAsArrayBuffer(file);
+  }
+
+  /* ── save ── */
+  function metaOf(rows,chunks){ var ms={}, mx=0; rows.forEach(function(r){ ms[r.m]=1; if(r.n>mx) mx=r.n; });
+    return {chunks:chunks,count:rows.length,maxSn:mx,months:Object.keys(ms).sort(),updated:new Date().toISOString(),schema:1}; }
+  function chunkDoc(rows){ var o={n:[],m:[],c:[],s:[],e:[]}; rows.forEach(function(r){ o.n.push(r.n); o.m.push(r.m); o.c.push(r.c); o.s.push(r.s==null?-1:r.s); o.e.push(r.e); }); return o; }
+  function writeChunks(rows,startIdx){
+    var ref=db.collection(COLL).doc(DSID), chain=Promise.resolve(), k=0, i;
+    for(i=0;i<rows.length;i+=CHUNK){ (function(part,idx){ chain=chain.then(function(){ return ref.collection('chunks').doc('c'+idx).set(chunkDoc(part)); }); })(rows.slice(i,i+CHUNK),startIdx+k); k++; }
+    return chain.then(function(){ return k; });
+  }
+  function saveAll(rows){
+    var ref=db.collection(COLL).doc(DSID), oldN=(HM.meta&&HM.meta.chunks)||0;
+    return writeChunks(rows,0).then(function(k){
+      var chain=Promise.resolve(), j; for(j=k;j<oldN;j++) (function(j){ chain=chain.then(function(){ return ref.collection('chunks').doc('c'+j).delete(); }); })(j);
+      return chain.then(function(){ var m=metaOf(rows,k); return ref.set(m).then(function(){ HM.meta=m; }); }); });
+  }
+  function appendRows(newRows){
+    var ref=db.collection(COLL).doc(DSID), oldN=(HM.meta&&HM.meta.chunks)||0;
+    return writeChunks(newRows,oldN).then(function(k){ var all=HM.rows.concat(newRows), m=metaOf(all,oldN+k); return ref.set(m).then(function(){ HM.meta=m; }); });
+  }
+  function permHint(err){ var c=err&&err.code||''; return c==='permission-denied'?'Permission denied — allow read/write on the "hour_meter" collection in the Firestore rules.':(err&&err.message||String(err)); }
+  function codeSet(){ var s={}; try{ (allEquipment||[]).forEach(function(e){ if(e&&e.code) s[normCode(e.code)]=1; }); }catch(x){} return s; }
+
+  window.hmImport=function(input,mode){
+    var file=input.files&&input.files[0]; if(!file) return;
+    if(typeof isAdmin!=='undefined'&&!isAdmin){ toast2('Admins only','error'); input.value=''; return; }
+    toast2('⏳ Reading '+file.name+'…');
+    var go=function(){
+      readFile(file,function(err,res){
+        input.value='';
+        if(err||!res){ alert('Could not read the sheet.\n'+(err&&err.message||'No sheet with S.n / Month / Code / Board No. / End columns was found.')); return; }
+        if(!res.rows.length){ alert('No hour-meter readings found (rows need S.n, Month, Code and an End reading).'); return; }
+        var cs=codeSet(), nUnk={}, cnt=0;
+        var rows=(mode==='new')?res.rows.filter(function(r){ return !HM.bySn[r.n]; }):res.rows;
+        if(!rows.length){ alert('No new readings — every S/N in this sheet is already stored (last S/N: '+HM.maxSn+').'); return; }
+        rows.forEach(function(r){ if(!cs[r.c]) nUnk[r.c]=1; });
+        var ms={}, mn=1e12, mx=0; rows.forEach(function(r){ ms[r.m]=(ms[r.m]||0)+1; if(r.n<mn) mn=r.n; if(r.n>mx) mx=r.n; });
+        var unk=Object.keys(nUnk), mtxt=Object.keys(ms).sort().map(function(m){ return ymLabel(m)+' ('+fmtN(ms[m])+')'; }).join(', ');
+        var msg=(mode==='new'?'ADD NEW readings only':'REPLACE all stored readings')+'\n\n'
+          +fmtN(rows.length)+' readings · S/N '+mn+' → '+mx+'\nMonths: '+mtxt+'\n'
+          +(unk.length?('\n'+fmtN(unk.length)+' code(s) are not in the equipment list yet (they will still be stored): '+unk.slice(0,8).join(', ')+(unk.length>8?' …':'')+'\n'):'')
+          +(mode==='new'?'':'\nThis deletes the previous H/M data first.')+'\n\nContinue?';
+        if(!confirm(msg)) return;
+        toast2('⏳ Saving '+fmtN(rows.length)+' readings…');
+        var p=(mode==='new')?appendRows(rows).then(function(){ HM.rows=HM.rows.concat(rows); }):saveAll(rows).then(function(){ HM.rows=rows; });
+        p.then(function(){ reindex(); HM.loaded=true; refreshUI(); if(typeof renderTable==='function') renderTable();
+          try{ document.dispatchEvent(new Event('hm-loaded')); }catch(x){}
+          toast2('✓ '+(mode==='new'?'Added ':'Imported ')+fmtN(rows.length)+' readings','success'); })
+        .catch(function(e){ console.error(e); alert('Save failed: '+permHint(e)); });
+      });
+    };
+    if(mode==='new'&&!HM.loaded){ if(!HM.loading) hmLoad(); var t=setInterval(function(){ if(HM.loaded){ clearInterval(t); go(); } },150); } else go();
+  };
+  window.hmAdminUI=function(){
+    var on=(typeof isAdmin!=='undefined')&&isAdmin;
+    ['btn-hm-import','btn-hm-new'].forEach(function(id){ var b=document.getElementById(id); if(b) b.style.display=on?'inline-flex':'none'; });
+  };
+  document.addEventListener('DOMContentLoaded',function(){ refreshUI(); });
+  setTimeout(function(){ refreshUI(); hmAdminUI(); },1500);
+})();
+</script>
+
 </body>
 </html>
