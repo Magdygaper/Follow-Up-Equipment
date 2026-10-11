@@ -3777,6 +3777,31 @@ function renderFuPriceResult(res){
   return h;
 }
 
+/* Follow Up — same workbook on the follow-up requests. Follow-up rows have no O.D / category of their own, so both are looked up
+   from the fleet (project -> its main O.D, equipment name -> its category). Provision (Rental / Transfer / Hold / ...) is shown as the "Provision" column. */
+function fuDashXlsx(scoped){
+  var EJ=window.ExcelJS;
+  if(!EJ){ if(typeof toast==='function') toast('Excel library did not load \u2014 check the internet connection','error'); return; }
+  if(!scoped||!scoped.length){ if(typeof toast==='function') toast('Nothing to export','error'); return; }
+  function projKey(s){return (s||'').toString().trim().toLowerCase().replace(/[\s\-_.]+/g,' ').trim();}
+  var pm={}, em={};
+  function addMap(m,k,v){ if(!k||!v) return; k=projKey(k); if(!k) return; var o=m[k]||(m[k]={}); o[v]=(o[v]||0)+1; }
+  function best(m,k){ var o=m[projKey(k)]; if(!o) return ''; var b='',n=-1; Object.keys(o).forEach(function(x){ if(o[x]>n){ n=o[x]; b=x; } }); return b; }
+  try{ (typeof allEquipment!=='undefined'?allEquipment:[]).forEach(function(e){ var od=e.od&&e.od!=='(none)'?e.od:''; addMap(pm,e.project,od); var c=''; try{ c=catKey(e); }catch(x){} addMap(em,e.equipment,c); }); }catch(e0){}
+  try{ ((window.MO&&typeof window.MO.data==='function')?(window.MO.data()||[]):[]).forEach(function(r){ addMap(pm,r.project,r.od); addMap(em,r.equipment,r.cat); }); }catch(e1){}
+  var rows=scoped.map(function(r){
+    var sav=0; try{ sav=Number(fuSavingOf(r))||0; }catch(x){}
+    return {month:fuMonthKey(r.submission_date)||'', hiring:(typeof fuFmtMDY==='function'?fuFmtMDY(r.date_from):'')||'', od:best(pm,r.project)||'(No O.D)',
+      project:String(r.project||'').trim()||'(No project)', cat:best(em,r.equipment)||'(No category)', eq:String(r.equipment||''), cap:String(r.capacity||''),
+      sub:String(r.provision||''), qty:Number(r.qty)||0, days:Number(r.days)||0, unit:0, total:sav, ot:0, ded:fuIsDeduction(r)?1:0, fuel:0, util:null, type:'Equipment'};
+  });
+  var wb;
+  try{ wb=window.hacRentalWorkbook(EJ,rows,{name:'Follow Up',fleet:'Equipment requests',sub:'Provision',total:'Savings',totalNote:'cancel / hold savings (EGP)',ded:'Deduction',ded2:'Deduction Requests',dedNote:'requests marked \u062e\u0635\u0645 \u0639 \u0627\u0644\u0645\u0642\u0627\u0648\u0644',days:'Days'}); }
+  catch(err){ console.error(err); if(typeof toast==='function') toast('Excel export failed: '+(err&&err.message||err),'error'); return; }
+  window.hacDownloadWb(wb,'Follow_Up_Report');
+}
+
+
 function exportFuPDF(kind) {
   const data = getFilteredFuData();
   const scoped = getScopedFuData();
@@ -7147,6 +7172,26 @@ function moOpenTable(){
   document.getElementById('mo-table-wrap').scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
+/* Master Owned — same formula workbook as Master Rental (Dashboard, Index, O.D Detail, O.D Overview, Project x Month, Project x Category, All Data) */
+function moDashXlsx(){
+  var EJ=window.ExcelJS;
+  if(!EJ){ if(typeof toast==='function') toast('Excel library did not load \u2014 check the internet connection','error'); return; }
+  var src=searchRows(moBase(null));
+  if(!src.length){ if(typeof toast==='function') toast('Nothing to export','error'); return; }
+  function pct(v){ if(v==null||v==='') return null; var s=String(v), n=parseFloat(s.replace('%','').replace(/,/g,'')); if(isNaN(n)) return null; return (s.indexOf('%')<0&&n>0&&n<=1)?n*100:n; }
+  var rows=src.map(function(r){
+    return {month:String(r.month||'').slice(0,7), hiring:r.hiring||'', od:String(r.od||'').trim()||'(No O.D)', project:String(r.project||'').trim()||'(No project)',
+      cat:String(r.cat||'').trim()||'(No category)', eq:String(r.equipment||''), cap:String(r.model||''), sub:String(r.status||''),
+      qty:units(r), days:toNum(r.worked), unit:toNum(r.unitPrice), total:toNum(r.totalCost), ot:toNum(r.costOt), ded:toNum(lostOf(r)),
+      fuel:toNum(r.totalFuel), util:pct(r.utl), type:'Equipment'};
+  });
+  var wb;
+  try{ wb=window.hacRentalWorkbook(EJ,rows,{name:'Master Owned',fleet:'Owned fleet',sub:'Status',total:'Money Made',totalNote:'money made (EGP)',ded:'Standby',ded2:'Standby Cost',dedNote:'standby cost (EGP)',days:'Worked Days'}); }
+  catch(err){ console.error(err); if(typeof toast==='function') toast('Excel export failed: '+(err&&err.message||err),'error'); return; }
+  window.hacDownloadWb(wb,'Master_Owned_Fleet_Report');
+}
+
+
 /* ═════ 12) Export ═════ */
 function moExport(){
   var rows=searchRows(moBase(null));
@@ -9382,47 +9427,8 @@ function hacDownloadWb(wb, base){
   }).catch(function(err){ if(typeof toast==='function') toast('Excel export failed: '+(err&&err.message||err),'error'); });
 }
 
-/* Master Owned — same formula workbook as Master Rental (Dashboard, Index, O.D Detail, O.D Overview, Project x Month, Project x Category, All Data) */
-function moDashXlsx(){
-  var EJ=window.ExcelJS;
-  if(!EJ){ if(typeof toast==='function') toast('Excel library did not load \u2014 check the internet connection','error'); return; }
-  var src=searchRows(moBase(null));
-  if(!src.length){ if(typeof toast==='function') toast('Nothing to export','error'); return; }
-  function pct(v){ if(v==null||v==='') return null; var s=String(v), n=parseFloat(s.replace('%','').replace(/,/g,'')); if(isNaN(n)) return null; return (s.indexOf('%')<0&&n>0&&n<=1)?n*100:n; }
-  var rows=src.map(function(r){
-    return {month:String(r.month||'').slice(0,7), hiring:r.hiring||'', od:String(r.od||'').trim()||'(No O.D)', project:String(r.project||'').trim()||'(No project)',
-      cat:String(r.cat||'').trim()||'(No category)', eq:String(r.equipment||''), cap:String(r.model||''), sub:String(r.status||''),
-      qty:units(r), days:toNum(r.worked), unit:toNum(r.unitPrice), total:toNum(r.totalCost), ot:toNum(r.costOt), ded:toNum(lostOf(r)),
-      fuel:toNum(r.totalFuel), util:pct(r.utl), type:'Equipment'};
-  });
-  var wb;
-  try{ wb=hacRentalWorkbook(EJ,rows,{name:'Master Owned',fleet:'Owned fleet',sub:'Status',total:'Money Made',totalNote:'money made (EGP)',ded:'Standby',ded2:'Standby Cost',dedNote:'standby cost (EGP)',days:'Worked Days'}); }
-  catch(err){ console.error(err); if(typeof toast==='function') toast('Excel export failed: '+(err&&err.message||err),'error'); return; }
-  hacDownloadWb(wb,'Master_Owned_Fleet_Report');
-}
-
-/* Follow Up — same workbook on the follow-up requests. Follow-up rows have no O.D / category of their own, so both are looked up
-   from the fleet (project -> its main O.D, equipment name -> its category). Provision (Rental / Transfer / Hold / ...) is shown as the "Provision" column. */
-function fuDashXlsx(scoped){
-  var EJ=window.ExcelJS;
-  if(!EJ){ if(typeof toast==='function') toast('Excel library did not load \u2014 check the internet connection','error'); return; }
-  if(!scoped||!scoped.length){ if(typeof toast==='function') toast('Nothing to export','error'); return; }
-  var pm={}, em={};
-  function addMap(m,k,v){ if(!k||!v) return; k=projKey(k); if(!k) return; var o=m[k]||(m[k]={}); o[v]=(o[v]||0)+1; }
-  function best(m,k){ var o=m[projKey(k)]; if(!o) return ''; var b='',n=-1; Object.keys(o).forEach(function(x){ if(o[x]>n){ n=o[x]; b=x; } }); return b; }
-  try{ (typeof allEquipment!=='undefined'?allEquipment:[]).forEach(function(e){ var od=e.od&&e.od!=='(none)'?e.od:''; addMap(pm,e.project,od); var c=''; try{ c=catKey(e); }catch(x){} addMap(em,e.equipment,c); }); }catch(e0){}
-  try{ (typeof moData!=='undefined'?moData:[]).forEach(function(r){ addMap(pm,r.project,r.od); addMap(em,r.equipment,r.cat); }); }catch(e1){}
-  var rows=scoped.map(function(r){
-    var sav=0; try{ sav=Number(fuSavingOf(r))||0; }catch(x){}
-    return {month:fuMonthKey(r.submission_date)||'', hiring:(typeof fuFmtMDY==='function'?fuFmtMDY(r.date_from):'')||'', od:best(pm,r.project)||'(No O.D)',
-      project:String(r.project||'').trim()||'(No project)', cat:best(em,r.equipment)||'(No category)', eq:String(r.equipment||''), cap:String(r.capacity||''),
-      sub:String(r.provision||''), qty:Number(r.qty)||0, days:Number(r.days)||0, unit:0, total:sav, ot:0, ded:fuIsDeduction(r)?1:0, fuel:0, util:null, type:'Equipment'};
-  });
-  var wb;
-  try{ wb=hacRentalWorkbook(EJ,rows,{name:'Follow Up',fleet:'Equipment requests',sub:'Provision',total:'Savings',totalNote:'cancel / hold savings (EGP)',ded:'Deduction',ded2:'Deduction Requests',dedNote:'requests marked \u062e\u0635\u0645 \u0639 \u0627\u0644\u0645\u0642\u0627\u0648\u0644',days:'Days'}); }
-  catch(err){ console.error(err); if(typeof toast==='function') toast('Excel export failed: '+(err&&err.message||err),'error'); return; }
-  hacDownloadWb(wb,'Follow_Up_Report');
-}
+/* exposed so Master Owned / Follow Up (other scopes) can reuse the same workbook engine */
+window.hacRentalWorkbook=hacRentalWorkbook; window.hacDownloadWb=hacDownloadWb;
 
 /* Export Excel (Master Rental) = same style as the All Countries dashboard report: master "All Data" sheet + live-formula dashboards.
    Follows every active filter (cards + search + column filters); Deduction / Transport rows are exported as Type = "Extra". */
