@@ -8407,9 +8407,9 @@ var TCOLS=[
   {k:'ot',h:'Over time',hideable:1},{k:'fuel',h:'Fuel (L)',hideable:1},
   {k:'util',h:'Util%',hideable:1},{k:'ded',h:'Total Deduct',hideable:1}
 ];
-function tRows(skip){
+function tRows(skip,keepExtras){
   var rows=view();
-  if(!TUI.x) rows=rows.filter(function(r){ return !isExtraRow(r); });
+  if(!TUI.x&&!keepExtras) rows=rows.filter(function(r){ return !isExtraRow(r); });
   return rows.filter(function(r){
     for(var i=0;i<TCOLS.length;i++){
       var c=TCOLS[i]; if(!c.f||c.f===skip) continue;
@@ -8675,7 +8675,7 @@ function onAct(act,v){
   if(act==='refresh'){ tt('Refreshing...'); load().then(function(){ render(); }); return; }
   if(act==='director'){ mrDirectorReport(); return; }
   if(act==='exportpdf'){ mrExportPDF(); return; }
-  if(act==='exportxlsx'){ mrExportPDF('xlsx'); return; }
+  if(act==='exportxlsx'){ mrDashXlsx(); return; }
   if(act==='combined-import'){
     if(!isAdminNow()){ tt('Admins only','error'); return; }
     if(!window.__hacCombinedFileInRental){ var _i=window.__hacCombinedFileInRental=document.createElement('input'); _i.type='file'; _i.accept='.xlsx,.xls'; _i.style.display='none'; document.body.appendChild(_i);
@@ -8846,6 +8846,144 @@ function mrDirectorReport(){
   var w=window.open('','_blank');try{ if(w) w.opener=null; }catch(_e){}
   if(!w){ tt('Popup blocked','error'); return; }
   w.document.write(h); w.document.close();
+}
+
+/* ═════ Export Excel — Master Rental, same layout as the Equipment Dashboard export:
+   All Projects sheet (KPI line + Top-10 style summary) · one tab per O.D · Month × Project pivot · All Rows.
+   Follows every active filter (cards + search + column filters). Equipment counts skip Deduction / Transport / Extras rows;
+   money columns (value, OT, deduct, fuel) include every row so totals still match the page. ═════ */
+function mrDashXlsx(){
+  var EJ=window.ExcelJS;
+  if(!EJ||typeof window.hacBuildXlsx!=='function'){ tt('Excel library did not load \u2014 check the internet connection','error'); return; }
+  var rows=tRows(null,true);
+  if(!rows.length){ tt('Nothing to export','error'); return; }
+  var NAVY='FF0D1B2E',AMBER='FFF0A500',thin={style:'thin',color:{argb:'FFE3E7ED'}};
+  function fx(n){ return Math.round(n).toLocaleString('en-US'); }
+  function two(n){ return n<10?'0'+n:''+n; }
+
+  function projTable(rs){
+    var map={};
+    rs.forEach(function(r){
+      var p=S(r.project)||'(No project)';
+      var o=map[p]||(map[p]={name:p,ods:{},u:0,v:0,ot:0,fuel:0,ded:0});
+      var od=S(r.od); if(od) o.ods[od]=1;
+      o.v+=N(r.totalPrice); o.ot+=N(r.otCost); o.fuel+=N(r.fuel); o.ded+=N(r.totalDeduct);
+      if(!isExtraRow(r)){ var q=N(r.qty); if(q>0) o.u+=q; }
+    });
+    return Object.keys(map).map(function(k){ var o=map[k]; o.od=Object.keys(o.ods).join(' / '); return o; })
+      .sort(function(a,b){ return b.u-a.u || b.v-a.v; });
+  }
+  var cols=[
+    {h:'#',g:function(r,i){return i+1;},t:'t'},
+    {h:'Project',g:function(r){return r.name;},t:'t'},
+    {h:'O.D',g:function(r){return r.od;},t:'t'},
+    {h:'Rental Equipment',g:function(r){return r.u;},t:'i',s:true},
+    {h:'Total Value',g:function(r){return r.v;},t:'m',s:true},
+    {h:'Overtime Cost',g:function(r){return r.ot;},t:'z',s:true},
+    {h:'Total Deduct',g:function(r){return r.ded;},t:'z',s:true},
+    {h:'Fuel (L)',g:function(r){return r.fuel;},t:'z',s:true}];
+  function kp(pt){
+    var u=0,v=0,d=0,top=null;
+    pt.forEach(function(x){ u+=x.u; v+=x.v; d+=x.ded; if(!top||x.u>top.u) top=x; });
+    return [{label:'Total Equipment',value:fx(u)},{label:'Projects',value:pt.length},{label:'Total Value',value:fx(v)},
+            {label:'Deductions',value:fx(d)},{label:'Top Project',value:top?(top.name+' ('+fx(top.u)+')'):'\u2014'}];
+  }
+  var fl=[];
+  if(F.month) fl.push('Month: '+F.month); if(F.cat) fl.push('Category: '+F.cat); if(F.od) fl.push('O.D: '+F.od);
+  if(F.proj) fl.push('Project: '+F.proj); if(F.q) fl.push('Search: '+F.q);
+  [['eq','Equipment'],['cap','Capacity'],['cat','Category'],['od','O.D'],['proj','Project'],['sub','Subcon'],['mon','Month']].forEach(function(p){
+    var v=TUI.tf[p[0]]; if(v) fl.push(p[1]+': '+(v==='__blank__'?'(blank)':v));
+  });
+  var all=projTable(rows);
+  var wb=window.hacBuildXlsx({title:'Master Rental \u2014 All Projects',sub:fl.join(' \u00b7 '),cols:cols,rows:all,kpis:kp(all)},EJ);
+
+  /* one data sheet in the same style (title / count / KPI line / navy header / zebra rows / Total row) */
+  function sheet(name,title,rs,cs,color,kpis,widths){
+    var ws=wb.addWorksheet(String(name).replace(/[\\\/\?\*\[\]:]/g,' ').slice(0,31),{views:[{state:'frozen',ySplit:4}],properties:{tabColor:{argb:color}}});
+    var n=cs.length,last=String.fromCharCode(64+n);
+    ws.mergeCells('A1:'+last+'1'); var a=ws.getCell('A1'); a.value=title; a.font={name:'Calibri',size:13,bold:true,color:{argb:NAVY}}; a.alignment={horizontal:'center'};
+    ws.mergeCells('A2:'+last+'2'); var b=ws.getCell('A2'); b.value=rs.length.toLocaleString('en-US'); b.font={name:'Calibri',size:12,bold:true,color:{argb:'FF444444'}}; b.alignment={horizontal:'center'}; b.border={bottom:{style:'medium',color:{argb:AMBER}}};
+    ws.mergeCells('A3:'+last+'3'); var k=ws.getCell('A3'); k.value=kpis.map(function(x){return x.label+': '+x.value;}).join('   \u00b7   '); k.font={name:'Calibri',size:10.5,bold:true,color:{argb:NAVY}}; k.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFFFF6DA'}}; k.alignment={horizontal:'center'};
+    var h=ws.getRow(4); h.height=26;
+    cs.forEach(function(c,j){ var x=h.getCell(j+1); x.value=c.h==='#'?'S/N':c.h; x.font={name:'Calibri',size:10,bold:true,color:{argb:'FFFFFFFF'}}; x.fill={type:'pattern',pattern:'solid',fgColor:{argb:NAVY}}; x.alignment={vertical:'middle',horizontal:c.t==='t'?'left':'right',wrapText:true}; x.border={bottom:{style:'medium',color:{argb:AMBER}}}; });
+    var sums=cs.map(function(){return 0;});
+    rs.forEach(function(r,i){ var row=ws.getRow(5+i); cs.forEach(function(c,j){ var v=c.g(r,i),x=row.getCell(j+1);
+      if(c.t==='t'){ x.value=v==null?'':String(v); x.alignment={horizontal:'left'}; }
+      else if(c.t==='d'){ v=Math.round((Number(v)||0)*10)/10; x.value=v; x.numFmt='#,##0.0'; x.alignment={horizontal:'right'}; if(c.s) sums[j]+=v; }
+      else { v=Math.round(Number(v)||0); x.value=v; x.numFmt='#,##0'; x.alignment={horizontal:'right'}; if(c.s) sums[j]+=v; }
+      x.font={name:'Calibri',size:10}; x.border={bottom:thin}; if(i%2) x.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF8FAFC'}}; }); });
+    var t=ws.getRow(5+rs.length); cs.forEach(function(c,j){ var x=t.getCell(j+1); if(j===0) x.value='Total'; else if(c.s){ x.value=sums[j]; x.numFmt='#,##0'; x.alignment={horizontal:'right'}; } x.font={name:'Calibri',size:10,bold:true}; x.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF4F4F4'}}; x.border={top:{style:'medium',color:{argb:AMBER}}}; });
+    ws.columns=cs.map(function(c,j){ return {width:widths?widths[j]:(j===1?34:(j===2?14:13))}; });
+    ws.autoFilter={from:{row:4,column:1},to:{row:4+rs.length,column:n}};
+  }
+
+  /* one tab per O.D */
+  var ods={}; rows.forEach(function(r){ var o=S(r.od); if(o) ods[o]=1; });
+  var odList=Object.keys(ods).sort();
+  var PAL=['FF3FB950','FF58A6FF','FFF0A500','FFBC8CFF','FFF85149','FF8B949E'];
+  if(odList.length>1) odList.forEach(function(od,i){
+    var pt=projTable(rows.filter(function(r){ return S(r.od)===od; }));
+    if(pt.length) sheet(od,od+' \u2014 Projects',pt,cols,PAL[i%PAL.length],kp(pt));
+  });
+
+  /* Month × Project pivot (equipment units) */
+  var months={}, projs={};
+  rows.forEach(function(r){
+    var m=S(r.month); if(!m||isExtraRow(r)) return;
+    var q=N(r.qty); if(!(q>0)) return;
+    var pn=S(r.project)||'(No project)';
+    months[m]=1;
+    var p=projs[pn]||(projs[pn]={name:pn,m:{},t:0}); p.m[m]=(p.m[m]||0)+q; p.t+=q;
+  });
+  var mList=Object.keys(months).sort(), plist=Object.keys(projs).map(function(k){return projs[k];}).sort(function(a,b){return b.t-a.t;});
+  function mLabel(m){ var x=/^(\d{4})-(\d{2})$/.exec(m); return x?(['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+x[2]-1]+'-'+x[1].slice(2)):m; }
+  if(mList.length&&plist.length){
+    var ws=wb.addWorksheet('By Month & Project',{views:[{state:'frozen',xSplit:1,ySplit:3}],properties:{tabColor:{argb:'FF58A6FF'}}});
+    var nc=2+mList.length, lc=nc>26?'Z':String.fromCharCode(64+nc);
+    ws.mergeCells('A1:'+lc+'1'); ws.getCell('A1').value='Rental Equipment by Month \u00d7 Project'; ws.getCell('A1').font={name:'Calibri',size:13,bold:true,color:{argb:NAVY}};
+    var hr=ws.getRow(3); hr.height=24; hr.getCell(1).value='Project'; mList.forEach(function(m,j){ hr.getCell(2+j).value=mLabel(m); }); hr.getCell(nc).value='Total';
+    for(var c=1;c<=nc;c++){ var x=hr.getCell(c); x.font={name:'Calibri',size:10,bold:true,color:{argb:'FFFFFFFF'}}; x.fill={type:'pattern',pattern:'solid',fgColor:{argb:NAVY}}; x.alignment={horizontal:c===1?'left':'center'}; x.border={bottom:{style:'medium',color:{argb:AMBER}}}; }
+    var mt=mList.map(function(){return 0;});
+    plist.forEach(function(p,i){
+      var row=ws.getRow(4+i); row.getCell(1).value=p.name;
+      mList.forEach(function(m,j){ var v=Math.round(p.m[m]||0); mt[j]+=v; var x=row.getCell(2+j); x.value=v; x.alignment={horizontal:'center'}; x.font={name:'Calibri',size:10,color:{argb:v?'FF000000':'FFCCCCCC'}}; });
+      var t=row.getCell(nc); t.value=Math.round(p.t); t.font={name:'Calibri',size:10,bold:true}; t.alignment={horizontal:'center'};
+      for(var c2=1;c2<=nc;c2++) row.getCell(c2).border={bottom:thin};
+    });
+    var tr=ws.getRow(4+plist.length); tr.getCell(1).value='Total';
+    mList.forEach(function(m,j){ tr.getCell(2+j).value=mt[j]; tr.getCell(2+j).alignment={horizontal:'center'}; });
+    tr.getCell(nc).value=mt.reduce(function(a,b){return a+b;},0); tr.getCell(nc).alignment={horizontal:'center'};
+    for(var c3=1;c3<=nc;c3++){ var y=tr.getCell(c3); y.font={name:'Calibri',size:10,bold:true}; y.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF4F4F4'}}; y.border={top:{style:'medium',color:{argb:AMBER}}}; }
+    ws.columns=[{width:34}].concat(mList.map(function(){return {width:11};})).concat([{width:10}]);
+    ws.autoFilter={from:{row:3,column:1},to:{row:3+plist.length,column:nc}};
+  }
+
+  /* every row of the current view */
+  var rc=[
+    {h:'#',g:function(r,i){return i+1;},t:'t'},
+    {h:'Month',g:function(r){return S(r.month);},t:'t'},
+    {h:'Hiring Date',g:function(r){return r.hiringDate||'';},t:'t'},
+    {h:'O.D',g:function(r){return S(r.od);},t:'t'},
+    {h:'Project',g:function(r){return S(r.project);},t:'t'},
+    {h:'Category',g:function(r){return S(r.category);},t:'t'},
+    {h:'Equipment',g:function(r){return S(r.equipment);},t:'t'},
+    {h:'Capacity',g:capOf,t:'t'},
+    {h:'Subcon',g:function(r){return S(r.subcon);},t:'t'},
+    {h:'Qty',g:function(r){return N(r.qty);},t:'i'},
+    {h:'Days',g:function(r){return N(r.days);},t:'d'},
+    {h:'Unit Price',g:function(r){return N(r.unitPrice);},t:'m'},
+    {h:'Total Value',g:function(r){return N(r.totalPrice);},t:'m',s:true},
+    {h:'OT Cost',g:function(r){return N(r.otCost);},t:'z',s:true},
+    {h:'Total Deduct',g:function(r){return N(r.totalDeduct);},t:'z',s:true},
+    {h:'Fuel (L)',g:function(r){return N(r.fuel);},t:'z',s:true}];
+  sheet('All Rows','Master Rental \u2014 All Rows',rows,rc,'FF8B949E',kp(all),[6,10,12,14,34,16,28,14,20,7,8,11,13,12,12,10]);
+
+  var d=new Date();
+  wb.xlsx.writeBuffer().then(function(buf){
+    var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+    a.download='Master_Rental_Dashboard_'+d.getFullYear()+'-'+two(d.getMonth()+1)+'-'+two(d.getDate())+'.xlsx';
+    document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1500);
+  }).catch(function(err){ tt('Excel export failed: '+(err&&err.message||err),'error'); });
 }
 
 /* ═════ Export PDF (table) — Master Rental ═════ */
