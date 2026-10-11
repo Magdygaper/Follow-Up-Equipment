@@ -3799,7 +3799,7 @@ function exportFuPDF(kind) {
     {h:'Provision',g:f('provision'),t:'t'},{h:'From',g:function(r){return fuFmtMDY(r.date_from);},t:'t'},{h:'To',g:function(r){return fuFmtMDY(r.date_to);},t:'t'},
     {h:'Days',g:function(r){return r.days;},t:'i',s:true},{h:'Notes',g:f('notes'),t:'t'}];
   const opts = {title:'HAC \u00b7 PMV \u2014 Equipment Follow-Up Export',cols:cols,rows:data,kpis:kpis};
-  if(kind === 'xlsx') { exportFuXlsxWithDeduction(opts, scoped); return; }
+  if(kind === 'xlsx') { fuDashXlsx(scoped); return; }
   window.hacPdfTable(opts, kind);
 }
 
@@ -7120,7 +7120,7 @@ document.getElementById('mo-btn-table').addEventListener('click',function(){ moT
 document.getElementById('mo-btn-audit').addEventListener('click',function(){ moAuditOpen=!moAuditOpen; document.getElementById('mo-audit').style.display=moAuditOpen?'block':'none'; this.classList.toggle('accent',moAuditOpen); if(moAuditOpen) moRenderAudit(); });
 document.getElementById('mo-btn-refresh').addEventListener('click',function(){ moLoadDataset(true); });
 document.getElementById('mo-btn-export-pdf').addEventListener('click',function(){ moExportPDF(); });
-document.getElementById('mo-btn-export-xlsx').addEventListener('click',moExportXlsxDashboard);
+document.getElementById('mo-btn-export-xlsx').addEventListener('click',moDashXlsx);
 document.getElementById('mo-btn-director').addEventListener('click',moDirectorReport);
 document.getElementById('mo-btn-import').addEventListener('click',function(){ document.getElementById('mo-file-input').click(); });
 document.getElementById('mo-btn-file').addEventListener('click',function(){ document.getElementById('mo-file-input').click(); });
@@ -8851,7 +8851,8 @@ function mrDirectorReport(){
 /* ═══ Master Rental Excel report — same design as the All Countries report: one master sheet ("All Data"), everything else is live formulas ═══
    Edit ONLY the "All Data" sheet (rows can be added up to the last spare row): new projects / O.D / categories / months appear everywhere on their own.
    rows: [{month,hiring,od,project,cat,eq,cap,sub,qty,days,unit,total,ot,ded,fuel,util,type}]  type: 'Equipment' | 'Extra' (Deduction / Transport …) */
-function hacRentalWorkbook(EJ, rows){
+function hacRentalWorkbook(EJ, rows, cfg){
+  var CFG=Object.assign({name:"Master Rental",fleet:"Rental fleet",sub:"Subcon",total:"Total Value",totalNote:"contracted rental value (EGP)",ded:"Deduct",ded2:"Total Deduct",dedNote:"savings & penalties (EGP)",days:"Days"},cfg||{});
   var NAVY='0B2545', NAVY2='13315C', INK='1B2A41', MUTED='5C6B7A', LINE='DDE3EA', SOFT='F1F5F9', AMBER='F0A500', WHITE='FFFFFF';
   var SPARE=500, N=rows.length, F=5, L=F+N+SPARE-1;
   var MS=24, CS=30, OS=30, PS=200;            /* list capacities: months / categories / O.D / projects */
@@ -8919,10 +8920,10 @@ function hacRentalWorkbook(EJ, rows){
      helpers: T Units | U Month key | V Month # | W O.D # | X Project # | Y Category #                                                                       */
   (function(){
     var ws=wsA;
-    S(ws,1,1,'ALL DATA  \u2014  MASTER REGISTER (Master Rental)',{c2:18,fill:NAVY,color:WHITE,b:1,sz:15,ind:1}); ws.getRow(1).height=32;
+    S(ws,1,1,'ALL DATA  \u2014  MASTER REGISTER ('+CFG.name+')',{c2:18,fill:NAVY,color:WHITE,b:1,sz:15,ind:1}); ws.getRow(1).height=32;
     S(ws,2,1,'Edit ONLY this sheet \u2014 type or paste rows (up to row '+L+'). Type = "Extra" for Deduction / Transport / Addition rows (not counted as equipment). Month format 2026-03. Grey columns T:AB are helpers \u2014 leave them.',{c2:18,fill:SOFT,color:MUTED,sz:9,ind:1});
     ws.getRow(2).height=18;
-    var H=['S/N','Month','Hiring Date','O.D','Project','Category','Equipment','Capacity','Subcon','Qty','Days','Unit Price','Total Value','OT Cost','Total Deduct','Fuel (L)','Util %','Type'];
+    var H=['S/N','Month','Hiring Date','O.D','Project','Category','Equipment','Capacity',CFG.sub,'Qty',CFG.days,'Unit Price',CFG.total,'OT Cost',CFG.ded2,'Fuel (L)','Util %','Type'];
     H.forEach(function(t,k){ hdrCell(ws,4,k+1,t,NAVY,k>=9&&k<=16?'right':'left'); });
     ['Units','Month key','Month #','O.D #','Project #','Category #','O.D scope','O.D row #','Type pair #'].forEach(function(t,k){ hdrCell(ws,4,20+k,t,'6C757D','center'); });
     ws.getRow(4).height=24;
@@ -8987,7 +8988,7 @@ function hacRentalWorkbook(EJ, rows){
     var ws=wsD;
     [2,12,12,12,12,12,12,12,12,12,12,12,12,2].forEach(function(w,k){ ws.getColumn(k+1).width=w; });
     ws.getColumn(18).hidden=true; ws.getColumn(19).hidden=true;
-    banner(ws,13,'HAC \u2014 Master Rental Dashboard','Rental fleet  \u00b7  '+SUBT+'  \u00b7  every number is a live formula off the "All Data" sheet');
+    banner(ws,13,'HAC \u2014 '+CFG.name+' Dashboard',CFG.fleet+'  \u00b7  '+SUBT+'  \u00b7  every number is a live formula off the "All Data" sheet');
     /* month picker */
     S(ws,4,2,'MONTH  \u25B8',{c2:3,fill:NAVY,color:WHITE,b:1,sz:11,h:'center'});
     var pk=S(ws,4,4,'All',{c2:5,fill:'FFF6DA',color:NAVY,b:1,sz:12,h:'center',bd:{top:{style:'medium',color:{argb:A(AMBER)}},bottom:{style:'medium',color:{argb:A(AMBER)}},left:{style:'medium',color:{argb:A(AMBER)}},right:{style:'medium',color:{argb:A(AMBER)}}}});
@@ -9006,9 +9007,9 @@ function hacRentalWorkbook(EJ, rows){
     card(ws,7,2,4,'EQUIPMENT',FM('SUMIFS('+AD('T')+','+SEL()+')/'+DIV),FM(SELD),'1F6AA5');
     card(ws,7,5,7,'PROJECTS',FM('COUNTIF('+LR('U',PS)+',">0")'),'with equipment in selection','F08C00');
     card(ws,7,8,10,'O.D',FM('COUNTIF('+LR('P',OS)+',">0")'),'operation districts','0B5D3E');
-    card(ws,7,11,13,'TOTAL VALUE',FM('SUMIFS('+AD('M')+','+SEL()+')'),'contracted rental value (EGP)','C47F00');
+    card(ws,7,11,13,CFG.total.toUpperCase(),FM('SUMIFS('+AD('M')+','+SEL()+')'),CFG.totalNote,'C47F00');
     ws.getRow(10).height=8;
-    card(ws,11,2,4,'TOTAL DEDUCT',FM('SUMIFS('+AD('O')+','+SEL()+')'),'savings & penalties (EGP)','2B8A3E');
+    card(ws,11,2,4,CFG.ded2.toUpperCase(),FM('SUMIFS('+AD('O')+','+SEL()+')'),CFG.dedNote,'2B8A3E');
     card(ws,11,5,7,'OVERTIME COST',FM('SUMIFS('+AD('N')+','+SEL()+')'),'overtime accrued (EGP)','6A2E7F');
     card(ws,11,8,10,'FUEL',FM('SUMIFS('+AD('P')+','+SEL()+')'),'total diesel consumed','E8590C','#,##0" L"');
     card(ws,11,11,13,'AVG UTILIZATION',FM('IFERROR(AVERAGEIFS('+AD('Q')+','+SEL()+','+AD('Q')+',"<>")/100,0)'),'average of records with a value','1971C2','0.0%');
@@ -9018,7 +9019,7 @@ function hacRentalWorkbook(EJ, rows){
     var top=15;
     function rankTable(title,color,n,nameR,uR,keyR,adCol,slots,label){
       band(ws,top,2,13,title,color);
-      colhdr(ws,top+1,2,4,label); colhdr(ws,top+1,5,5,'Units','center'); colhdr(ws,top+1,6,6,'Share','center'); colhdr(ws,top+1,7,8,''); colhdr(ws,top+1,9,10,'Value (EGP)','center'); colhdr(ws,top+1,11,11,'Deduct','center'); colhdr(ws,top+1,12,12,'Overtime','center'); colhdr(ws,top+1,13,13,'Fuel (L)','center');
+      colhdr(ws,top+1,2,4,label); colhdr(ws,top+1,5,5,'Units','center'); colhdr(ws,top+1,6,6,'Share','center'); colhdr(ws,top+1,7,8,''); colhdr(ws,top+1,9,10,'Value (EGP)','center'); colhdr(ws,top+1,11,11,CFG.ded,'center'); colhdr(ws,top+1,12,12,'Overtime','center'); colhdr(ws,top+1,13,13,'Fuel (L)','center');
       var r0=top+2, rN=top+1+n, i, nm=LR(nameR,slots), uu=LR(uR,slots), kk=LR(keyR,slots);
       for(i=1;i<=n;i++){ var r=r0+i-1, bd={bottom:thin}, ix='$S'+r;
         ws.getCell('S'+r).value=FM('IFERROR(IF(INDEX('+uu+',MATCH(LARGE('+kk+','+i+'),'+kk+',0))>0,MATCH(LARGE('+kk+','+i+'),'+kk+',0),""),"")');
@@ -9056,7 +9057,7 @@ function hacRentalWorkbook(EJ, rows){
 
     /* by month (all months, ignores the picker) */
     band(ws,top,2,13,'BY MONTH  \u2014  all months','44546A');
-    colhdr(ws,top+1,2,4,'Month'); colhdr(ws,top+1,5,5,'Units','center'); colhdr(ws,top+1,6,8,'Value (EGP)','center'); colhdr(ws,top+1,9,10,'Deduct','center'); colhdr(ws,top+1,11,11,'Overtime','center'); colhdr(ws,top+1,12,13,'Fuel (L)','center');
+    colhdr(ws,top+1,2,4,'Month'); colhdr(ws,top+1,5,5,'Units','center'); colhdr(ws,top+1,6,8,'Value (EGP)','center'); colhdr(ws,top+1,9,10,CFG.ded,'center'); colhdr(ws,top+1,11,11,'Overtime','center'); colhdr(ws,top+1,12,13,'Fuel (L)','center');
     var m0=top+2, i;
     for(i=1;i<=MS;i++){ var r=m0+i-1, bd={bottom:thin}, key='Lists!$C$'+(4+i);
       S(ws,r,2,FM('Lists!$D$'+(4+i)),{c2:4,ind:1,b:1,bd:bd});
@@ -9073,10 +9074,10 @@ function hacRentalWorkbook(EJ, rows){
   /* ═════════ O.D OVERVIEW (all months) ═════════ */
   (function(){
     var ws=wsO, i;
-    banner(ws,10,'HAC \u2014 O.D Overview','Master Rental  \u00b7  '+SUBT+'  \u00b7  all months','1F3864');
+    banner(ws,10,'HAC \u2014 O.D Overview',CFG.name+'  \u00b7  '+SUBT+'  \u00b7  all months','1F3864');
     [2,6,26,14,16,14,14,14,12,2,6].forEach(function(w,k){ ws.getColumn(k+1).width=w; });
     ws.getColumn(11).hidden=true;
-    ['#','O.D','Avg Equipment / Month','Total Value (EGP)','Overtime (EGP)','Deduct (EGP)','Fuel (L)','Avg Util %'].forEach(function(t,k){ hdrCell(ws,5,k+2,t,NAVY,k<2?'left':'right'); });
+    ['#','O.D','Avg Equipment / Month',CFG.total+' (EGP)','Overtime (EGP)',CFG.ded+' (EGP)','Fuel (L)','Avg Util %'].forEach(function(t,k){ hdrCell(ws,5,k+2,t,NAVY,k<2?'left':'right'); });
     ws.getRow(5).height=26;
     var nm=LR('O',OS), kk=LR('R',OS);
     for(i=1;i<=OS;i++){ var r=5+i, ix='$K'+r;
@@ -9229,7 +9230,7 @@ function hacRentalWorkbook(EJ, rows){
     var ws=wsI, i, b, g, q, j;
     [2,5,30,9,9,12,2,5,30,9,9,12,2,5,30,9,9,12,6,6,6].forEach(function(w,k){ ws.getColumn(k+1).width=w; });
     [19,20,21].forEach(function(c){ ws.getColumn(c).hidden=true; });
-    bannerL(ws,18,'HAC \u2014 Classification of Equipment','Master Rental  \u00b7  '+SUBT+'  \u00b7  follows the Month and Project pickers','1F3864',15);
+    bannerL(ws,18,'HAC \u2014 Classification of Equipment',CFG.name+'  \u00b7  '+SUBT+'  \u00b7  follows the Month and Project pickers','1F3864',15);
     link(ws,2,16,18,'\u25c0 Dashboard','Dashboard',NAVY2,WHITE);
     var pbd=pickBorder();
     S(ws,4,2,'MONTH  \u25B8',{c2:3,fill:NAVY,color:WHITE,b:1,sz:11,h:'center'});
@@ -9286,7 +9287,7 @@ function hacRentalWorkbook(EJ, rows){
   (function(){
     var ws=wsOD, col='0F6B55', i;
     [2,6,22,24,32,14,16,26,22,8,2,6,6,6].forEach(function(w,k){ ws.getColumn(k+1).width=w; }); [12,13,14].forEach(function(c){ ws.getColumn(c).hidden=true; });
-    bannerL(ws,10,'HAC \u2014 O.D Detail','Master Rental  \u00b7  '+SUBT,'1F3864',8);
+    bannerL(ws,10,'HAC \u2014 O.D Detail',CFG.name+'  \u00b7  '+SUBT,'1F3864',8);
     link(ws,2,9,10,'\u25c0 Dashboard','Dashboard',col,WHITE);
     var pbd=pickBorder();
     S(ws,4,2,'O.D  \u25B6',{c2:3,fill:NAVY,color:WHITE,b:1,sz:11,h:'center'});
@@ -9305,7 +9306,7 @@ function hacRentalWorkbook(EJ, rows){
     card(ws,7,4,4,'PROJECTS',FM('COUNTIF('+CP('S')+',">0")'),'','F59F00');
     card(ws,7,5,5,'CATEGORIES',FM('COUNTIF('+CC('N')+',">0")'),'','E8590C');
     card(ws,7,6,7,'EQUIPMENT TYPES',FM('COUNTIF('+CR('H')+',">0")'),'','12B886');
-    card(ws,7,8,8,'TOTAL VALUE',FM('SUMIFS('+AD('M')+','+ODSEL+')'),'contracted rental value (EGP)','C47F00');
+    card(ws,7,8,8,CFG.total.toUpperCase(),FM('SUMIFS('+AD('M')+','+ODSEL+')'),CFG.totalNote,'C47F00');
     card(ws,7,9,10,'FUEL',FM('SUMIFS('+AD('P')+','+ODSEL+')'),'diesel consumed','E8590C','#,##0" L"');
     ws.getRow(10).height=8;
     band(ws,11,2,5,'TOP CATEGORIES',NAVY2); band(ws,11,6,10,'TOP PROJECTS',NAVY2);
@@ -9329,7 +9330,7 @@ function hacRentalWorkbook(EJ, rows){
     ws.getRow(24).height=8;
     /* equipment register for the selected O.D / month / project */
     band(ws,25,2,10,'EQUIPMENT  \u00b7  selected O.D / month / project',col);
-    ['#','Month','Category','Equipment','Capacity','Subcon','Project','Total Value (EGP)','Qty'].forEach(function(t,k){
+    ['#','Month','Category','Equipment','Capacity',CFG.sub,'Project',CFG.total+' (EGP)','Qty'].forEach(function(t,k){
       var x=ws.getCell(26,2+k); x.value=t; x.font={name:'Calibri',size:10,bold:true,color:{argb:A(WHITE)}}; x.fill={type:'pattern',pattern:'solid',fgColor:{argb:A(NAVY)}};
       x.alignment={horizontal:(k===0||k===8)?'center':(k===7?'right':'left'),vertical:'middle',indent:(k===0||k===8||k===7)?0:1}; x.border={bottom:{style:'medium',color:{argb:A(col)}}}; });
     ws.getRow(26).height=22;
@@ -9349,7 +9350,78 @@ function hacRentalWorkbook(EJ, rows){
     ws.pageSetup={orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,paperSize:9,printTitlesRow:'26:26'};
   })();
 
+  /* ═════════ NAV STRIP on every sheet (row 3) — all sheets are linked to each other ═════════ */
+  (function(){
+    var ALL=[['Dashboard','Dashboard'],['Index','Index'],['O.D Detail','O.D Detail'],['O.D Overview','O.D Overview'],['Proj \u00d7 Month','Project x Month'],['Proj \u00d7 Category','Project x Category'],['All Data','All Data']];
+    function strip(ws,current,spans,fill){
+      var others=ALL.filter(function(a){ return a[1]!==current; });
+      ws.getRow(3).height=16;
+      others.forEach(function(a,k){ var sp=spans[k]; if(!sp) return;
+        S(ws,3,sp[0],{text:a[0]+' \u25b8',hyperlink:"#'"+a[1]+"'!A1"},{c2:sp[1],fill:fill||'E7EDF3',color:NAVY,b:1,sz:8,h:'center'}); });
+    }
+    function even(c1,c2,n){ var out=[],w=c2-c1+1,i; for(i=0;i<n;i++) out.push([c1+Math.floor(i*w/n),c1+Math.floor((i+1)*w/n)-1]); return out; }
+    strip(wsI,'Index',even(2,18,6));
+    strip(wsOD,'O.D Detail',[[2,3],[4,4],[5,5],[6,7],[8,8],[9,10]]);
+    strip(wsO,'O.D Overview',[[2,3],[4,4],[5,5],[6,6],[7,7],[8,9]]);
+    strip(wsPM,'Project x Month',[[2,3],[4,5],[6,7],[8,9],[10,11],[12,13]]);
+    strip(wsPC,'Project x Category',[[2,3],[4,5],[6,7],[8,9],[10,11],[12,13]]);
+    strip(wsA,'All Data',[[1,3],[4,5],[6,6],[7,7],[8,9],[10,13]]);
+  })();
+
   return wb;
+}
+
+/* ═══ shared helpers for the formula-driven Excel reports (Master Owned / Follow Up) ═══ */
+function hacDownloadWb(wb, base){
+  var d=new Date(); function two(n){ return n<10?'0'+n:''+n; }
+  wb.xlsx.writeBuffer().then(function(buf){
+    var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+    a.download=base+'_'+d.getFullYear()+'-'+two(d.getMonth()+1)+'-'+two(d.getDate())+'.xlsx';
+    document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1500);
+    if(typeof toast==='function') toast('Excel exported','success');
+  }).catch(function(err){ if(typeof toast==='function') toast('Excel export failed: '+(err&&err.message||err),'error'); });
+}
+
+/* Master Owned — same formula workbook as Master Rental (Dashboard, Index, O.D Detail, O.D Overview, Project x Month, Project x Category, All Data) */
+function moDashXlsx(){
+  var EJ=window.ExcelJS;
+  if(!EJ){ if(typeof toast==='function') toast('Excel library did not load \u2014 check the internet connection','error'); return; }
+  var src=searchRows(moBase(null));
+  if(!src.length){ if(typeof toast==='function') toast('Nothing to export','error'); return; }
+  function pct(v){ if(v==null||v==='') return null; var s=String(v), n=parseFloat(s.replace('%','').replace(/,/g,'')); if(isNaN(n)) return null; return (s.indexOf('%')<0&&n>0&&n<=1)?n*100:n; }
+  var rows=src.map(function(r){
+    return {month:String(r.month||'').slice(0,7), hiring:r.hiring||'', od:String(r.od||'').trim()||'(No O.D)', project:String(r.project||'').trim()||'(No project)',
+      cat:String(r.cat||'').trim()||'(No category)', eq:String(r.equipment||''), cap:String(r.model||''), sub:String(r.status||''),
+      qty:units(r), days:toNum(r.worked), unit:toNum(r.unitPrice), total:toNum(r.totalCost), ot:toNum(r.costOt), ded:toNum(lostOf(r)),
+      fuel:toNum(r.totalFuel), util:pct(r.utl), type:'Equipment'};
+  });
+  var wb;
+  try{ wb=hacRentalWorkbook(EJ,rows,{name:'Master Owned',fleet:'Owned fleet',sub:'Status',total:'Money Made',totalNote:'money made (EGP)',ded:'Standby',ded2:'Standby Cost',dedNote:'standby cost (EGP)',days:'Worked Days'}); }
+  catch(err){ console.error(err); if(typeof toast==='function') toast('Excel export failed: '+(err&&err.message||err),'error'); return; }
+  hacDownloadWb(wb,'Master_Owned_Fleet_Report');
+}
+
+/* Follow Up — same workbook on the follow-up requests. Follow-up rows have no O.D / category of their own, so both are looked up
+   from the fleet (project -> its main O.D, equipment name -> its category). Provision (Rental / Transfer / Hold / ...) is shown as the "Provision" column. */
+function fuDashXlsx(scoped){
+  var EJ=window.ExcelJS;
+  if(!EJ){ if(typeof toast==='function') toast('Excel library did not load \u2014 check the internet connection','error'); return; }
+  if(!scoped||!scoped.length){ if(typeof toast==='function') toast('Nothing to export','error'); return; }
+  var pm={}, em={};
+  function addMap(m,k,v){ if(!k||!v) return; k=projKey(k); if(!k) return; var o=m[k]||(m[k]={}); o[v]=(o[v]||0)+1; }
+  function best(m,k){ var o=m[projKey(k)]; if(!o) return ''; var b='',n=-1; Object.keys(o).forEach(function(x){ if(o[x]>n){ n=o[x]; b=x; } }); return b; }
+  try{ (typeof allEquipment!=='undefined'?allEquipment:[]).forEach(function(e){ var od=e.od&&e.od!=='(none)'?e.od:''; addMap(pm,e.project,od); var c=''; try{ c=catKey(e); }catch(x){} addMap(em,e.equipment,c); }); }catch(e0){}
+  try{ (typeof moData!=='undefined'?moData:[]).forEach(function(r){ addMap(pm,r.project,r.od); addMap(em,r.equipment,r.cat); }); }catch(e1){}
+  var rows=scoped.map(function(r){
+    var sav=0; try{ sav=Number(fuSavingOf(r))||0; }catch(x){}
+    return {month:fuMonthKey(r.submission_date)||'', hiring:(typeof fuFmtMDY==='function'?fuFmtMDY(r.date_from):'')||'', od:best(pm,r.project)||'(No O.D)',
+      project:String(r.project||'').trim()||'(No project)', cat:best(em,r.equipment)||'(No category)', eq:String(r.equipment||''), cap:String(r.capacity||''),
+      sub:String(r.provision||''), qty:Number(r.qty)||0, days:Number(r.days)||0, unit:0, total:sav, ot:0, ded:fuIsDeduction(r)?1:0, fuel:0, util:null, type:'Equipment'};
+  });
+  var wb;
+  try{ wb=hacRentalWorkbook(EJ,rows,{name:'Follow Up',fleet:'Equipment requests',sub:'Provision',total:'Savings',totalNote:'cancel / hold savings (EGP)',ded:'Deduction',ded2:'Deduction Requests',dedNote:'requests marked \u062e\u0635\u0645 \u0639 \u0627\u0644\u0645\u0642\u0627\u0648\u0644',days:'Days'}); }
+  catch(err){ console.error(err); if(typeof toast==='function') toast('Excel export failed: '+(err&&err.message||err),'error'); return; }
+  hacDownloadWb(wb,'Follow_Up_Report');
 }
 
 /* Export Excel (Master Rental) = same style as the All Countries dashboard report: master "All Data" sheet + live-formula dashboards.
