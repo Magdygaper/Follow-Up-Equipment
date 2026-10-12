@@ -792,6 +792,7 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
           </label>
           <select id="hm-month" title="Show the hour-meter reading of this month (the last reading up to it)" onchange="hmSetMonth(this.value)"><option value="">H/M: Latest</option></select>
           <span id="hm-meta" style="font-size:11px;color:var(--text-muted);white-space:nowrap;"></span>
+          <button class="btn-sm" id="btn-hm-low" onclick="hmLowOpen()" title="Units whose monthly hour-meter difference is below the limit (equipment 80 h, generators 125 h by default)">📉 Low H/M usage</button>
           <label id="btn-hm-import" title="Replaces ALL stored hour-meter readings with the uploaded sheet" style="display:none; background: rgba(88,166,255,.12); border: 1px solid rgba(88,166,255,.4); color: #58a6ff; padding: 8px 14px; border-radius: var(--radius); cursor: pointer; font-size: 13px; font-weight: 600; white-space: nowrap;">
             ⏱ Import H/M
             <input type="file" accept=".xlsx,.xls,.xlsb,.csv" style="display:none;" onchange="hmImport(this,'all')">
@@ -13263,13 +13264,15 @@ try{console.log('%cHAC \u00b7 PMV','color:#f0a500;font-size:18px;font-weight:700
   function toast2(m,t){ try{ if(typeof toast==='function') toast(m,t); else alert(m); }catch(e){ alert(m); } }
   function ymOf(v){
     if(v==null||v==='') return '';
-    if(v instanceof Date){ return isNaN(v)?'':(v.getFullYear()+'-'+pad(v.getMonth()+1)); }
+    if(Object.prototype.toString.call(v)==='[object Date]'){ return isNaN(v)?'':(v.getFullYear()+'-'+pad(v.getMonth()+1)); }
     if(typeof v==='number'){ if(v>20000&&v<80000&&window.XLSX&&XLSX.SSF){ var d=XLSX.SSF.parse_date_code(v); if(d) return d.y+'-'+pad(d.m); } return ''; }
     var s=String(v).trim(), m=s.match(/^(\d{4})[-\/.](\d{1,2})/);
     if(m) return m[1]+'-'+pad(+m[2]);
     m=s.match(/^(\d{1,2})[-\/.](\d{4})$/); if(m) return m[2]+'-'+pad(+m[1]);
-    m=s.toLowerCase().match(/([a-z]{3})[a-z]*[\s\-\/,\.']*(\d{2,4})/);
-    if(m){ var mi=MN.map(function(x){return x.toLowerCase();}).indexOf(m[1]); if(mi>=0){ var y=+m[2]; if(y<100) y+=2000; return y+'-'+pad(mi+1); } }
+    var low=s.toLowerCase(), names=MN.map(function(x){return x.toLowerCase();}), mi=-1, k2;
+    for(k2=0;k2<12&&mi<0;k2++){ if(new RegExp('(^|[^a-z])'+names[k2]+'[a-z]*').test(low)) mi=k2; }
+    if(mi>=0){ var y4=low.match(/(19|20)\d\d/); if(y4) return y4[0]+'-'+pad(mi+1);
+      var y2=low.match(new RegExp(names[mi]+'[a-z]*[\\s\\-\\/,\\.\']*(\\d{2})(?!\\d)')); if(y2) return (2000+(+y2[1]))+'-'+pad(mi+1); }
     var d2=new Date(s); if(!isNaN(d2)) return d2.getFullYear()+'-'+pad(d2.getMonth()+1);
     return '';
   }
@@ -14189,6 +14192,106 @@ function init(){
 if(document.readyState!=='loading') init(); else document.addEventListener('DOMContentLoaded',init);
 
 window.HACBI={exportPage:exportPage,dashboard:openDashboard,build:function(id){ var s=BUILD[id](); finalize(s,id); return s; },pages:Object.keys(BUILD)};
+})();
+</script>
+
+<script>
+/* ═════ Low H/M usage — units whose monthly hour-meter difference (End − Start) is below a limit ═════ */
+(function(){
+  var LS='hm_low_thr_v1', thr={eq:80,gen:125,inc:false}, ST={ym:'',fleet:'all',q:''}, LAST=[];
+  try{ var o=JSON.parse(localStorage.getItem(LS)||'null'); if(o){ thr.eq=isFinite(+o.eq)?+o.eq:80; thr.gen=isFinite(+o.gen)?+o.gen:125; thr.inc=!!o.inc; } }catch(e){}
+  function HMS(){ return window.HM_STATE||{byCode:{},months:[],latest:'',loaded:false,rows:[]}; }
+  function esc(v){ return (typeof _hacEsc==='function')?_hacEsc(v):String(v==null?'':v); }
+  function norm(c){ return String(c==null?'':c).toUpperCase().replace(/\s+/g,''); }
+  var MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function lab(m){ if(!m) return '—'; var p=String(m).split('-'); return (MN[parseInt(p[1],10)-1]||p[1])+' '+p[0]; }
+  function fmt(n){ return Number(n).toLocaleString('en-US'); }
+  function isGen(e){ return /generator|gen[\s\-]?set|\u0645\u0648\u0644\u062f/i.test(String(e.equipment||''))||/^GN/i.test(String(e.code||'').trim()); }
+  function reading(code,ym){ var L=HMS().byCode[norm(code)]||[], b=null; L.forEach(function(r){ if(r.m!==ym||!(r.e>0)) return; if(!b||r.e>b.e||(r.e===b.e&&r.n>b.n)) b=r; }); return b; }
+  function catOf(e){ try{ return (typeof catKey==='function')?catKey(e):(e.category||''); }catch(x){ return e.category||''; } }
+  function capOf(e){ try{ var c=eqCapacity(e); var v=c&&c.v; return (v&&v!=='\u2014')?v:''; }catch(x){ return ''; } }
+  var FL={egypt:'Egypt',ksa:'Saudi Arabia',algeria:'Algeria',uae:'UAE',foundation:'Foundation',tunnelling:'Tunnelling'};
+  function compute(){
+    var out=[], withRead=0, total=0, q=ST.q.trim().toLowerCase();
+    (typeof allEquipment!=='undefined'?allEquipment:[]).forEach(function(e){
+      var fl=e.fleet||'egypt'; if(fl==='archive') return;
+      if(ST.fleet!=='all'&&fl!==ST.fleet) return;
+      total++;
+      var g=isGen(e), lim=g?thr.gen:thr.eq, r=reading(e.code,ST.ym);
+      var item=null;
+      if(!r){ if(thr.inc) item={e:e,g:g,lim:lim,r:null,d:null}; }
+      else if(r.s!=null){ withRead++; var d=r.e-r.s; if(d<lim) item={e:e,g:g,lim:lim,r:r,d:d}; }
+      if(!item) return;
+      if(q){ var hay=(String(e.code||'')+' '+(e.equipment||'')+' '+(e.project||'')+' '+(e.od||'')+' '+(e.brand||'')).toLowerCase(); if(hay.indexOf(q)<0) return; }
+      out.push(item);
+    });
+    out.sort(function(a,b){ if(a.d==null&&b.d==null) return String(a.e.code).localeCompare(String(b.e.code)); if(a.d==null) return 1; if(b.d==null) return -1; return a.d-b.d; });
+    LAST=out; return {rows:out,withRead:withRead,total:total};
+  }
+  function ensureModal(){
+    if(document.getElementById('hm-low-modal')) return;
+    var d=document.createElement('div'); d.className='modal-overlay'; d.id='hm-low-modal';
+    d.innerHTML='<div class="modal" style="max-width:1180px;width:96vw;max-height:92vh;display:flex;flex-direction:column;">'
+      +'<div class="modal-title" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;"><span>📉 Low H/M usage <span style="font-size:12px;font-weight:400;color:var(--text-muted);">— monthly hour-meter difference (End − Start) below the limit</span></span><button class="btn-sm" onclick="closeModal(\'hm-low-modal\')">✕ Close</button></div>'
+      +'<div id="hm-low-body" style="overflow:auto;"></div></div>';
+    document.body.appendChild(d);
+  }
+  function draw(){
+    var H=HMS(), body=document.getElementById('hm-low-body'); if(!body) return;
+    if(!H.months.length){ body.innerHTML='<div style="padding:30px;text-align:center;color:var(--text-muted);">No hour-meter data loaded yet. Import the H/M sheet first.</div>'; return; }
+    if(!ST.ym||H.months.indexOf(ST.ym)<0) ST.ym=H.latest;
+    var R=compute(), nG=R.rows.filter(function(x){return x.g&&x.d!=null;}).length, nE=R.rows.filter(function(x){return !x.g&&x.d!=null;}).length, nN=R.rows.filter(function(x){return x.d==null;}).length;
+    var inp='background:var(--bg);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:6px;font-size:12px;';
+    var h='<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:10px;font-size:12px;">'
+      +'<label>Month <select id="hml-ym" style="'+inp+'">'+H.months.slice().reverse().map(function(m){ return '<option value="'+m+'"'+(m===ST.ym?' selected':'')+'>'+lab(m)+'</option>'; }).join('')+'</select></label>'
+      +'<label>Equipment below <input id="hml-eq" type="number" min="0" value="'+thr.eq+'" style="'+inp+'width:70px;"> h</label>'
+      +'<label>Generators below <input id="hml-gen" type="number" min="0" value="'+thr.gen+'" style="'+inp+'width:70px;"> h</label>'
+      +'<label>Fleet <select id="hml-fl" style="'+inp+'"><option value="all">All fleets</option>'+Object.keys(FL).map(function(k){ return '<option value="'+k+'"'+(ST.fleet===k?' selected':'')+'>'+FL[k]+'</option>'; }).join('')+'</select></label>'
+      +'<label><input id="hml-inc" type="checkbox"'+(thr.inc?' checked':'')+'> include units with no reading this month</label>'
+      +'<input id="hml-q" placeholder="Search code / equipment / project / O.D" value="'+esc(ST.q)+'" style="'+inp+'min-width:230px;">'
+      +'<button class="btn-sm accent" onclick="hmLowExport()">📊 Excel</button></div>';
+    h+='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">'
+      +'<span class="mr-chip" style="cursor:default;">'+fmt(R.rows.length)+' units listed</span>'
+      +'<span class="mr-chip" style="cursor:default;">Equipment &lt; '+thr.eq+' h: <b>'+fmt(nE)+'</b></span>'
+      +'<span class="mr-chip" style="cursor:default;">Generators &lt; '+thr.gen+' h: <b>'+fmt(nG)+'</b></span>'
+      +(thr.inc?'<span class="mr-chip" style="cursor:default;">No reading: <b>'+fmt(nN)+'</b></span>':'')
+      +'<span style="font-size:11px;color:var(--text-muted);align-self:center;">'+fmt(R.withRead)+' of '+fmt(R.total)+' units have a '+lab(ST.ym)+' reading</span></div>';
+    var th='style="text-align:left;padding:8px 10px;font-size:10px;letter-spacing:.8px;color:var(--text-muted);position:sticky;top:0;background:var(--surface,#161b22);"';
+    h+='<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr><th '+th+'>#</th><th '+th+'>Code</th><th '+th+'>Equipment</th><th '+th+'>Category</th><th '+th+'>Brand / Model</th><th '+th+'>Capacity</th><th '+th+'>Project</th><th '+th+'>O.D</th><th '+th+'>Start</th><th '+th+'>End</th><th '+th+'>Diff (h)</th><th '+th+'>Limit</th></tr></thead><tbody>';
+    var lim=Math.min(R.rows.length,800);
+    for(var i=0;i<lim;i++){ var x=R.rows[i], e=x.e, td='style="padding:7px 10px;border-top:1px solid var(--border);"', mono='style="padding:7px 10px;border-top:1px solid var(--border);font-family:monospace;"';
+      h+='<tr><td '+td+'>'+(i+1)+'</td><td '+mono+'><span style="color:#e3a008;">'+esc(e.code||'—')+'</span></td><td '+td+'><b>'+esc(e.equipment||'—')+'</b>'+(x.g?' <span style="font-size:10px;color:var(--text-muted);">gen</span>':'')+'</td><td '+td+'>'+esc(catOf(e)||'—')+'</td><td '+td+'>'+esc(e.brand||'—')+'</td><td '+mono+'>'+esc(capOf(e)||'—')+'</td><td '+td+'>'+esc(e.project||'—')+'</td><td '+td+'>'+esc(e.od||'—')+'</td>'
+        +(x.r?('<td '+mono+'>'+fmt(x.r.s)+'</td><td '+mono+'>'+fmt(x.r.e)+'</td><td '+mono+'><b style="color:'+(x.d<0?'#e3a008':'var(--red,#f85149)')+';">'+fmt(x.d)+(x.d<0?' ⚠':'')+'</b></td>'):('<td '+mono+'>—</td><td '+mono+'>—</td><td '+mono+'><span style="color:var(--text-muted);">no reading</span></td>'))
+        +'<td '+mono+'>&lt; '+x.lim+'</td></tr>'; }
+    if(!R.rows.length) h+='<tr><td colspan="12" style="padding:30px;text-align:center;color:var(--text-muted);">No units below the limit in '+lab(ST.ym)+' 🎉</td></tr>';
+    h+='</tbody></table>'+(R.rows.length>lim?'<div style="font-size:11px;color:var(--text-muted);margin-top:6px;">Showing the first '+lim+' — use Excel for the full list.</div>':'');
+    var keepQ=(document.activeElement&&document.activeElement.id==='hml-q'), pos=keepQ?document.activeElement.selectionStart:0;
+    body.innerHTML=h; wire();
+    if(keepQ){ var q=document.getElementById('hml-q'); q.focus(); try{ q.setSelectionRange(pos,pos); }catch(x){} }
+  }
+  function save(){ try{ localStorage.setItem(LS,JSON.stringify(thr)); }catch(e){} }
+  function wire(){
+    function on(id,ev,fn){ var el=document.getElementById(id); if(el) el.addEventListener(ev,fn); }
+    on('hml-ym','change',function(){ ST.ym=this.value; draw(); });
+    on('hml-fl','change',function(){ ST.fleet=this.value; draw(); });
+    on('hml-eq','change',function(){ thr.eq=Math.max(0,+this.value||0); save(); draw(); });
+    on('hml-gen','change',function(){ thr.gen=Math.max(0,+this.value||0); save(); draw(); });
+    on('hml-inc','change',function(){ thr.inc=this.checked; save(); draw(); });
+    on('hml-q','input',function(){ ST.q=this.value; draw(); });
+  }
+  window.hmLowOpen=function(){
+    ensureModal(); var H=HMS();
+    if(!H.loaded&&typeof hmReload==='function'){ hmReload(); }
+    ST.ym=(H.sel||H.latest||ST.ym||'');
+    document.getElementById('hm-low-modal').classList.add('open'); draw();
+  };
+  document.addEventListener('hm-loaded',function(){ var m=document.getElementById('hm-low-modal'); if(m&&m.classList.contains('open')) draw(); });
+  window.hmLowExport=function(){
+    if(!LAST.length){ if(typeof toast==='function') toast('Nothing to export','error'); return; }
+    var data=LAST.map(function(x,i){ var e=x.e; return {'#':i+1,'Code':e.code||'','Equipment':e.equipment||'','Category':catOf(e),'Brand / Model':e.brand||'','Capacity':capOf(e),'Fleet':FL[e.fleet||'egypt']||e.fleet||'','Project':e.project||'','O.D':e.od||'','Month':lab(ST.ym),'Start':x.r?x.r.s:'','End':x.r?x.r.e:'','Diff (h)':x.d==null?'no reading':x.d,'Limit (h)':x.lim,'Type':x.g?'Generator':'Equipment'}; });
+    var wb=XLSX.utils.book_new(), ws=XLSX.utils.json_to_sheet(data); ws['!cols']=[{wch:5},{wch:12},{wch:20},{wch:22},{wch:24},{wch:12},{wch:14},{wch:26},{wch:22},{wch:10},{wch:9},{wch:9},{wch:10},{wch:9},{wch:11}];
+    XLSX.utils.book_append_sheet(wb,ws,'Low H-M usage'); XLSX.writeFile(wb,'Low_HM_Usage_'+ST.ym+'.xlsx');
+  };
 })();
 </script>
 
