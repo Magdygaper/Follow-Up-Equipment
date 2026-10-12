@@ -14060,6 +14060,20 @@ function download(buf,fname){
   var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fname; document.body.appendChild(a); a.click();
   setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1500);
 }
+function pickHandle(fname){
+  /* Chrome/Edge: let the user pick the file once; same name => overwrite (no "(1)"). Returns null => fallback to normal download, false => user cancelled */
+  if(!(window.showSaveFilePicker&&window.isSecureContext)) return Promise.resolve(null);
+  try{
+    return window.showSaveFilePicker({suggestedName:fname,id:'hac-pbi',startIn:'documents',types:[{description:'Excel workbook',accept:{'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':['.xlsx']}}]})
+      .catch(function(e){ return (e&&e.name==='AbortError')?false:null; });
+  }catch(e){ return Promise.resolve(null); }
+}
+function saveBuf(buf,fname,handle){
+  if(!handle){ download(buf,fname); return Promise.resolve(); }
+  return handle.createWritable().then(function(w){
+    return w.write(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})).then(function(){ return w.close(); });
+  });
+}
 function fleetSlug(){ var f=(typeof currentFleet!=='undefined')?currentFleet:''; return f?String(f).replace(/[^A-Za-z0-9]+/g,'_'):''; }
 
 function exportPage(pageId,btn){
@@ -14071,9 +14085,10 @@ function exportPage(pageId,btn){
     toast_(dyn[pageId]?('No data to export — wait until '+dyn[pageId]+' finishes loading, or clear the filters'):'Nothing to export with the current filters','error'); return;
   }
   var mismatches=finalize(spec,pageId);
-  var d=new Date(), stamp=d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());
   var fleetPart=(['executive','dashboard','equipment','transfers'].indexOf(pageId)>=0&&fleetSlug())?('_'+fleetSlug()):'';
-  var fname='HAC_PMV_PowerBI_'+LABELS[pageId]+fleetPart+'_'+stamp+'.xlsx';
+  var fname='HAC_PMV_PowerBI_'+LABELS[pageId]+fleetPart+'.xlsx';
+  pickHandle(fname).then(function(handle){
+  if(handle===false) return;
   var old=btn?btn.innerHTML:''; if(btn){ btn.disabled=true; btn.innerHTML='⏳ Building…'; }
   var done=function(){ if(btn){ btn.disabled=false; btn.innerHTML=old; } };
   var EJ=window.ExcelJS, X=window.XLSX, p;
@@ -14081,9 +14096,10 @@ function exportPage(pageId,btn){
     if(EJ) p=writeEJ(EJ,spec); else if(X&&X.write) p=writeSJS(X,spec); else { done(); toast_('Excel library did not load — check the internet connection','error'); return; }
   }catch(err){ console.error('[HAC Power BI]',err); done(); toast_('Power BI export failed: '+(err&&err.message||err),'error'); return; }
   p.then(function(buf){
-    download(buf,fname); done();
-    toast_(mismatches?('⚠ Exported, but '+mismatches+' reconciliation check(s) failed — see the Info sheet'):('✓ Power BI workbook exported ('+(spec.sheets.length)+' tables)'),mismatches?'error':'success');
+    return saveBuf(buf,fname,handle).then(function(){ done();
+    toast_(mismatches?('⚠ Exported, but '+mismatches+' reconciliation check(s) failed — see the Info sheet'):('✓ Power BI workbook exported ('+(spec.sheets.length)+' tables)'),mismatches?'error':'success'); });
   }).catch(function(err){ console.error('[HAC Power BI]',err); done(); toast_('Power BI export failed: '+(err&&err.message||err),'error'); });
+  });
 }
 
 /* ───────────────────────── UI: one button on every page ───────────────────────── */
