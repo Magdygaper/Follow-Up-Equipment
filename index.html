@@ -7662,7 +7662,10 @@ window.MO={ setFilter:function(f){moFilter.month=f.month?[f.month]:[];moFilter.o
   /* helpers exposed for Combined Import (they live inside this IIFE) */
   normKey:normKey, toNum:toNum, mapHeaders:moMapHeaders, normalizeRow:moNormalizeRow,
   deriveStatus:deriveStatus, assignKeys:assignKeys, writeDataset:moWriteDataset,
-  handleImport:moHandleImport, biBox:moBiBox };
+  handleImport:moHandleImport, biBox:moBiBox,
+  /* Power BI export hooks */
+  view:function(){ return searchRows(moBase(null)); }, filterState:function(){ return moFilter; },
+  units:units, lostOf:lostOf, lostDaysOf:lostDaysOf, dailyRate:dailyRate, monthsCount:moMonthsCount };
 
 })();
 </script>
@@ -9685,6 +9688,7 @@ function mrReplaceAll(recs){
   });
 }
 window.MR={ import:doImport, importMode:doImportMode, wipe:doWipe, load:load, render:render, data:function(){return DATA;}, bumpVersion:mrBumpVersion,
+  view:function(){ return view(); }, filterState:function(){ return F; },
   buildIndexFromHeader:mrBuildIndexFromHeader, buildRecsFromRows:mrBuildRecsFromRows, replaceAll:mrReplaceAll, setFilter:function(f){F.month=f.month||null;F.od=f.od||null;F.proj=f.proj||null;F.cat=null;F.q=f.q||'';render();} };
 
 if(document.readyState!=='loading') initStandaloneRental(); else document.addEventListener('DOMContentLoaded',initStandaloneRental);
@@ -10160,7 +10164,12 @@ window.cmpSetMonth=function(m){CMP.month=(CMP.month===m?'all':m);cmpRender();};
 window.cmpSetOd=function(o){CMP.od=(CMP.od===o?'all':o);cmpRender();};
 window.cmpSetProjectSearch=function(q){CMP.projectSearch=q;cmpRender();var el=document.getElementById('cmp-proj-search');if(el)el.focus();};
 window.cmpRender=cmpRender;
-window.__cmpx={state:CMP,filter:cmpApplyFilters,months:allMonths,ods:allODs};
+window.__cmpx={state:CMP,filter:cmpApplyFilters,months:allMonths,ods:allODs,
+  /* Power BI export hooks */
+  owned:function(){ return filterOwned(getOwned()); }, rental:function(){ return filterRental(getRental()); },
+  projTable:function(){ return buildProjTable(filterOwned(getOwned()),filterRental(getRental())); },
+  monthTable:function(){ return buildMonthData(filterOwned(getOwned()),filterRental(getRental())); },
+  stats:function(o,r){ return {oU:oUnits(o),oC:oCost(o),oL:oLost(o),oSbU:oSbUnits(o),oSbD:oSbDays(o),oOT:oOT(o),oF:oFuel(o),rU:rUnits(r),rC:rCost(r),rOT:rOT(r),rD:rDeduct(r),rF:rFuel(r)}; }};
 /* Project-level Rental vs Owned table (follows the month / O.D / project-search filters) -> PDF or Excel */
 window.cmpExport=function(kind){
   var owned=filterOwned(getOwned()),rental=filterRental(getRental());
@@ -12736,6 +12745,8 @@ window.rdOpen=function(){
 window.rdImport=importFile;
 /* exposed for tests only */
 window.__rd={parseWorkbook:parseWorkbook,setRows:function(r,m){ rows=r; meta=m||null; loaded=true; start(); }};
+/* Power BI export hook: filtered rows exactly as the page shows them */
+window.__rdData=function(){ return {rows:list(), all:rows, meta:meta, F:F, metric:metric, val:val}; };
 })();
 </script>
 
@@ -13422,6 +13433,691 @@ try{console.log('%cHAC \u00b7 PMV','color:#f0a500;font-size:18px;font-weight:700
   };
   document.addEventListener('DOMContentLoaded',function(){ refreshUI(); });
   setTimeout(function(){ refreshUI(); hmAdminUI(); },1500);
+})();
+</script>
+
+<script>
+/* ═════════════════════════════════════════════════════════════════════════════
+   HAC · PMV — Power BI Export (all pages)
+   One button per page → one .xlsx whose sheets are real Excel TABLES, ready for
+   Power BI  ▸ Get Data ▸ Excel workbook ▸ tick the tables you want.
+
+   Every workbook contains:
+     Info        – what/when/filters + automatic reconciliation checks (OK / MISMATCH)
+     KPI         – the same headline numbers the page shows (where the page has them)
+     By_…        – dashboard breakdowns (flat, one dimension per sheet, with Share_Pct)
+     Breakdown_… – long-format cross breakdowns (best source for Power BI matrices)
+     Fact_…      – the underlying rows (one row per record, real dates, real numbers)
+
+   "What you see is what you export": each builder reads the SAME filtered rows the
+   page is showing right now (fleet, search box, drop-downs, month / O.D / project chips).
+   ═════════════════════════════════════════════════════════════════════════════ */
+(function(){
+'use strict';
+if(window.__HAC_BLOCKED) return;
+
+var LABELS={executive:'Executive_Summary',dashboard:'Dashboard',equipment:'Equipment_List',transfers:'Transfer_Log',
+  workshop:'Central_Workshop',followup:'Follow_Up',rentaldb:'Rental_Database',masterowned:'Master_Owned',
+  masterrental:'Master_Rental',comparison:'Rental_vs_Owned'};
+
+/* ───────────────────────── helpers ───────────────────────── */
+function S(v){ return v==null?'':String(v).replace(/\s+/g,' ').trim(); }
+function num(v){
+  if(v==null||v==='') return null;
+  if(typeof v==='number') return isFinite(v)?v:null;
+  var n=parseFloat(String(v).replace(/,/g,'').replace(/%$/,'').trim());
+  return isFinite(n)?n:null;
+}
+function n0(v){ var n=num(v); return n==null?0:n; }
+function toast_(m,t){ try{ if(typeof toast==='function') toast(m,t||'success'); }catch(e){} }
+function pad2(n){ return (n<10?'0':'')+n; }
+
+function mkDate(y,m,d){
+  if(!(y>1900&&y<2200)||m<1||m>12||d<1||d>31) return null;
+  var dt=new Date(Date.UTC(y,m-1,d));
+  return dt.getUTCMonth()===m-1?dt:null;
+}
+/* Unambiguous dates only: ISO (yyyy-mm-dd…), Excel serials, and d/m/yyyy (the portal's own convention in fuMonthKey) */
+function toDate(v){
+  if(v==null||v==='') return null;
+  if(v instanceof Date) return isNaN(v)?null:mkDate(v.getFullYear(),v.getMonth()+1,v.getDate());
+  var s=String(v).trim(); if(!s||s==='—') return null;
+  var m=/^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s); if(m) return mkDate(+m[1],+m[2],+m[3]);
+  if(/^\d+(\.\d+)?$/.test(s)){ var n=Number(s); if(n>30000&&n<70000){ var d=new Date(Math.round((n-25569)*864e5)); return mkDate(d.getUTCFullYear(),d.getUTCMonth()+1,d.getUTCDate()); } return null; }
+  m=/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/.exec(s); if(m) return mkDate(+m[3],+m[2],+m[1]);
+  return null;
+}
+function monthOf(d){ return d?(d.getUTCFullYear()+'-'+pad2(d.getUTCMonth()+1)):''; }
+function monthText(v){ var m=/^(\d{4})-(\d{2})/.exec(S(v)); return m?(m[1]+'-'+m[2]):''; }
+function yn(b){ return b?'Yes':'No'; }
+
+function group(rows,keyFn){
+  var map=new Map();
+  rows.forEach(function(r){ var k=keyFn(r), a=map.get(k); if(!a){ a={key:k,rows:[]}; map.set(k,a); } a.rows.push(r); });
+  return Array.from(map.values());
+}
+function sum(rows,fn){ var t=0; for(var i=0;i<rows.length;i++){ var v=fn(rows[i]); if(v) t+=v; } return t; }
+function distinct(rows,fn){ var s=new Set(); rows.forEach(function(r){ var v=fn(r); if(v!==''&&v!=null) s.add(v); }); return s.size; }
+function distinctList(rows,fn){ var s=new Set(); rows.forEach(function(r){ var v=fn(r); if(v!==''&&v!=null) s.add(v); }); return Array.from(s).sort().join(' / '); }
+function avg(rows,fn){ var t=0,n=0; rows.forEach(function(r){ var v=fn(r); if(v!=null&&isFinite(v)){ t+=v; n++; } }); return n?t/n:null; }
+function r6(v){ return (v==null||!isFinite(v))?null:Math.round(v*1e6)/1e6; }
+function rnd(v,d){ if(v==null||!isFinite(v)) return null; var p=Math.pow(10,d==null?2:d); return Math.round(v*p)/p; }
+function round(v){ return r6(v); }
+
+/* group + aggregate → {cols, rows}. dims:[{h,fn,t?}] · measures:[{h,fn(rowsOfGroup),t?}] · o.sort = measure index (desc) · o.share = add Share_Pct of that measure */
+function breakdown(rows,dims,measures,o){
+  o=o||{}; var si=o.sort==null?0:o.sort;
+  var gs=group(rows,function(r){ return dims.map(function(d){ return d.fn(r); }).join('\u0001'); });
+  var out=gs.map(function(x){
+    var r0=x.rows[0];
+    return {d:dims.map(function(d){ return d.fn(r0); }), m:measures.map(function(m){ return m.fn(x.rows); })};
+  });
+  out.sort(function(a,b){
+    var d=(b.m[si]||0)-(a.m[si]||0); if(d) return d;
+    for(var i=0;i<a.d.length;i++){ var c=String(a.d[i]).localeCompare(String(b.d[i])); if(c) return c; }
+    return 0;
+  });
+  var total=sum(out,function(x){ return x.m[si]; });
+  var cols=dims.map(function(d){ return {h:d.h,t:d.t||'s'}; }).concat(measures.map(function(m){ return {h:m.h,t:m.t||'i'}; }));
+  if(o.share) cols.push({h:'Share_Pct',t:'p'});
+  return {cols:cols, rows:out.map(function(x){ var r=x.d.concat(x.m); if(o.share) r.push(total?(x.m[si]||0)/total:0); return r; })};
+}
+function D(h,fn,t){ return {h:h,fn:fn,t:t}; }
+function M(h,fn,t){ return {h:h,fn:fn,t:t}; }
+var CNT=M('Units',function(r){ return r.length; },'i');
+
+/* ───────────────────────── spec container ───────────────────────── */
+function Spec(page){
+  this.page=page; this.sheets=[]; this.filters=[]; this.notes=[]; this.checks=[]; this.scope=''; this.source=0;
+}
+Spec.prototype.add=function(name,cols,rows,extra){
+  if(!rows||!rows.length) return null;
+  var sh={name:name,cols:cols,rows:rows,kind:(extra&&extra.kind)||'table'};
+  this.sheets.push(sh); return sh;
+};
+Spec.prototype.addBreakdown=function(name,bd){ return this.add(name,bd.cols,bd.rows); };
+Spec.prototype.check=function(label,a,b){ this.checks.push({label:label,a:a,b:b}); };
+Spec.prototype.colTotal=function(sh,header){
+  if(!sh) return 0; var i=-1; sh.cols.forEach(function(c,j){ if(c.h===header) i=j; });
+  return i<0?0:sum(sh.rows,function(r){ return num(r[i]); });
+};
+function fleetLabel(){
+  var cf=(typeof currentFleet!=='undefined'&&currentFleet)?currentFleet:''; var b=null;
+  try{ b=document.querySelector('.fleet-btn.active'); }catch(e){}
+  var t=b?S(b.textContent).replace(/[\d,]+\s*$/,'').trim():'';
+  return t?(t+' ('+cf+')'):String(cf||'');
+}
+
+/* ═══════════════════════ EQUIPMENT-BASED PAGES (executive · dashboard · equipment) ═══════════════════════ */
+function eqCat(e){ try{ if(typeof catKey==='function') return catKey(e); }catch(x){} return S(e.category)||'Uncategorized'; }
+function eqCap(e){ try{ if(typeof eqCapacity==='function') return S(eqCapacity(e).v).replace(/^[\u2014\u2013-]+$/,''); }catch(x){} return ''; }
+function isCW(p){ return S(p).toLowerCase()==='central workshop'; }
+function eqYear(e){ var y=num(e.year); return (y&&y>1950&&y<2100)?Math.round(y):null; }
+
+function equipmentSheets(spec,data,opt){
+  opt=opt||{};
+  var cat=eqCat, typ=function(e){ return S(e.equipment)||'(No Type)'; },
+      prj=function(e){ return S(e.project)||'(No Project)'; }, od=function(e){ return S(e.od)||'(No O.D)'; };
+  var notCW=function(e){ return !isCW(e.project); };
+  var yearTxt=function(e){ var y=eqYear(e); return y==null?'Unknown':String(y); };
+
+  var bCat=breakdown(data,[D('Category',cat)],[CNT,
+    M('Equipment_Types',function(r){ return distinct(r,typ); }),
+    M('Projects',function(r){ return distinct(r.filter(notCW),prj); }),
+    M('OD_Engineers',function(r){ return distinct(r,function(e){ return S(e.od); }); })],{share:1});
+  var shCat=spec.addBreakdown('By_Category',bCat);
+
+  var shTyp=spec.addBreakdown('By_Equipment_Type',breakdown(data,[D('Category',cat),D('Equipment_Type',typ)],[CNT,
+    M('Projects',function(r){ return distinct(r.filter(notCW),prj); })],{share:1}));
+
+  var shPrj=spec.addBreakdown('By_Project',breakdown(data,[D('Project',prj),D('Is_Central_Workshop',function(e){ return yn(isCW(e.project)); })],[CNT,
+    M('OD_Engineer',function(r){ return distinctList(r,function(e){ return S(e.od); }); },'s'),
+    M('Categories',function(r){ return distinct(r,cat); }),
+    M('Equipment_Types',function(r){ return distinct(r,typ); })],{share:1}));
+
+  var shOd=spec.addBreakdown('By_OD_Engineer',breakdown(data,[D('OD_Engineer',od)],[CNT,
+    M('Projects',function(r){ return distinct(r.filter(notCW),prj); }),
+    M('Categories',function(r){ return distinct(r,cat); })],{share:1}));
+
+  var shYr=spec.addBreakdown('By_Year',breakdown(data,[D('Year',yearTxt)],[CNT],{share:1}));
+
+  var shLong=spec.addBreakdown('Breakdown_Cat_Type_Project_OD',breakdown(data,
+    [D('Category',cat),D('Equipment_Type',typ),D('Project',prj),D('OD_Engineer',od)],[CNT]));
+
+  var N=data.length;
+  spec.check('By_Category units = rows',spec.colTotal(shCat,'Units'),N);
+  spec.check('By_Equipment_Type units = rows',spec.colTotal(shTyp,'Units'),N);
+  spec.check('By_Project units = rows',spec.colTotal(shPrj,'Units'),N);
+  spec.check('By_OD_Engineer units = rows',spec.colTotal(shOd,'Units'),N);
+  spec.check('By_Year units = rows',spec.colTotal(shYr,'Units'),N);
+  spec.check('Breakdown_Cat_Type_Project_OD units = rows',spec.colTotal(shLong,'Units'),N);
+
+  var cols=[{h:'Fleet',t:'s'},{h:'Category',t:'s'},{h:'Equipment_Type',t:'s'},{h:'Brand_Model',t:'s'},{h:'Capacity',t:'s'},
+    {h:'Code',t:'s'},{h:'SAP',t:'s'},{h:'Chassis_No',t:'s'},{h:'Engine',t:'s'},{h:'Engine_SN',t:'s'},{h:'Year',t:'i0'},{h:'Power',t:'s'},
+    {h:'Project',t:'s'},{h:'OD_Engineer',t:'s'},{h:'Is_Central_Workshop',t:'s'},{h:'Cost_Center',t:'s'},{h:'Value',t:'m'}];
+  var rows=data.map(function(e){
+    return [S(e.fleet)||'egypt',cat(e),S(e.equipment),S(e.brand),eqCap(e),S(e.code),S(e.sap),S(e.chassis),S(e.engine),S(e.enginesn),
+      eqYear(e),S(e.power),S(e.project),S(e.od),yn(isCW(e.project)),S(e.costcenter),num(e.value)];
+  });
+  spec.add('Fact_Equipment',cols,rows);
+}
+
+function mgmtKpis(){
+  var out=[];
+  try{
+    var ws=(typeof wsEquipment!=='undefined'&&wsEquipment)||[], fu=(typeof FU_DATA!=='undefined'&&FU_DATA)||[];
+    var active=ws.filter(function(i){ return i.status!=='Dispatched'; });
+    var md=function(i){ try{ return _mgmtDays(i); }catch(e){ return 0; } };
+    out.push(['Workshop & Follow-Up','Workshop — Ready',ws.filter(function(i){ return i.status==='Ready'; }).length,'Central Workshop page cards']);
+    out.push(['Workshop & Follow-Up','Workshop — Waiting',ws.filter(function(i){ return i.status==='Waiting'; }).length,'']);
+    out.push(['Workshop & Follow-Up','Workshop — Delay',ws.filter(function(i){ return i.status==='Delay'; }).length,'']);
+    out.push(['Workshop & Follow-Up','Workshop — over 15 days',active.filter(function(i){ return md(i)>15; }).length,'Active items only, same rule as the Red Flags card']);
+    out.push(['Workshop & Follow-Up','Follow-Up — Pending',fu.filter(function(r){ return r.provision==='Pending'; }).length,'Requests (rows)']);
+    out.push(['Workshop & Follow-Up','Follow-Up — Hold',fu.filter(function(r){ return r.provision==='Hold'; }).length,'Requests (rows)']);
+  }catch(e){}
+  return out;
+}
+
+function buildExecutive(){
+  var spec=new Spec('executive'); var data=(typeof getFleetEquipment==='function'?getFleetEquipment():[]);
+  if(!data.length) return spec;
+  spec.scope='Fleet: '+fleetLabel(); spec.source=data.length;
+  var kp=[['Fleet','Total Fleet',data.length,'Every equipment record in the selected fleet'],
+    ['Fleet','Active Projects',distinct(data.filter(function(e){ return !isCW(e.project); }),function(e){ return S(e.project); }),'Distinct projects, Central Workshop excluded (same as the page)'],
+    ['Fleet','Categories',distinct(data,function(e){ return S(e.category); }),'Distinct non-empty categories (same as the page)'],
+    ['Fleet','O.D Engineers',distinct(data,function(e){ return S(e.od); }),'Distinct non-empty O.D names'],
+    ['Fleet','Units in Central Workshop (project)',data.filter(function(e){ return isCW(e.project); }).length,''],
+    ['Fleet','Units without category',data.filter(function(e){ return !S(e.category); }).length,'Shown as "Uncategorized" in the breakdowns so totals reconcile']];
+  mgmtKpis().forEach(function(k){ kp.push(k); });
+  spec.add('KPI',[{h:'Section',t:'s'},{h:'Metric',t:'s'},{h:'Value',t:'i'},{h:'Note',t:'s'}],kp);
+  equipmentSheets(spec,data);
+  spec.notes.push('The Executive page shows only the top categories/projects; this export lists ALL of them.');
+  return spec;
+}
+
+function buildDashboard(){
+  var spec=new Spec('dashboard'); var data=(typeof getFiltered==='function'?getFiltered():[]);
+  if(!data.length) return spec;
+  var mf=((typeof multiFilter!=='undefined'&&multiFilter)||{});
+  spec.scope='Fleet: '+fleetLabel(); spec.source=data.length;
+  if(mf.od) spec.filters.push('O.D = '+mf.od); if(mf.cat) spec.filters.push('Category = '+mf.cat); if(mf.proj) spec.filters.push('Project = '+mf.proj);
+  spec.add('KPI',[{h:'Section',t:'s'},{h:'Metric',t:'s'},{h:'Value',t:'i'},{h:'Note',t:'s'}],[
+    ['Dashboard','Total Equipment',data.length,'Rows matching the active dashboard filters'],
+    ['Dashboard','Active Projects',distinct(data.filter(function(e){ return !isCW(e.project); }),function(e){ return S(e.project); }),'Central Workshop excluded'],
+    ['Dashboard','O.D Engineers',distinct(data,function(e){ return S(e.od); }),''],
+    ['Dashboard','Categories',distinct(data,eqCat),'']]);
+  equipmentSheets(spec,data);
+  return spec;
+}
+
+function buildEquipment(){
+  var spec=new Spec('equipment');
+  var el=function(id){ var x=document.getElementById(id); return x?x.value:''; };
+  var q=el('search-input').toLowerCase(), cat=el('filter-cat'), type=el('filter-type'), proj=el('filter-proj');
+  var mf=((typeof multiFilter!=='undefined'&&multiFilter)||{});
+  var data=((typeof getFleetEquipment==='function'?getFleetEquipment():[])).filter(function(e){
+    var mQ=!q||[e.equipment,e.brand,e.code,e.project,e.od,e.sap].some(function(v){ return v&&String(v).toLowerCase().indexOf(q)!==-1; });
+    if(mf.od&&e.od!==mf.od) return false;
+    if(mf.cat&&eqCat(e)!==mf.cat) return false;
+    if(mf.proj&&e.project!==mf.proj) return false;
+    return mQ&&(!cat||e.category===cat)&&(!type||e.equipment===type)&&(!proj||e.project===proj);
+  });
+  if(!data.length) return spec;
+  spec.scope='Fleet: '+fleetLabel(); spec.source=data.length;
+  if(q) spec.filters.push('Search = '+q); if(cat) spec.filters.push('Category = '+cat); if(type) spec.filters.push('Type = '+type); if(proj) spec.filters.push('Project = '+proj);
+  if(mf.od) spec.filters.push('O.D = '+mf.od); if(mf.cat) spec.filters.push('Dashboard category = '+mf.cat); if(mf.proj) spec.filters.push('Dashboard project = '+mf.proj);
+  equipmentSheets(spec,data);
+  return spec;
+}
+
+/* ═══════════════════════ TRANSFER LOG ═══════════════════════ */
+function buildTransfers(){
+  var spec=new Spec('transfers');
+  var all=(typeof allTransfers!=='undefined'&&allTransfers)||[];
+  var inp=document.getElementById('transfer-search'); var search=((inp&&inp.value)||'').toLowerCase();
+  var ids=new Set(((typeof getFleetEquipment==='function'?getFleetEquipment():[])).map(function(e){ return e.id; }));
+  var rows=all.filter(function(t){ return !t.equipmentId||ids.has(t.equipmentId); });
+  if(search) rows=rows.filter(function(t){ return (t.code&&String(t.code).toLowerCase().indexOf(search)!==-1)||(t.equipmentName&&String(t.equipmentName).toLowerCase().indexOf(search)!==-1); });
+  if(!rows.length) return spec;
+  spec.scope='Fleet: '+fleetLabel(); spec.source=rows.length; if(search) spec.filters.push('Search = '+search);
+  var T=rows.map(function(t){
+    var d=toDate(t.date);
+    return {date:d,month:monthOf(d)||'(No Date)',eq:S(t.equipmentName||t.equipment)||'(Unknown)',code:S(t.code),from:S(t.from)||'(Unknown)',to:S(t.to||t.project)||'(Unknown)',
+      req:S(t.requestedBy)||'(Not recorded)',notes:S(t.notes),by:S(t.by),att:S(t.attachment)};
+  });
+  var N=T.length;
+  spec.add('KPI',[{h:'Section',t:'s'},{h:'Metric',t:'s'},{h:'Value',t:'i'},{h:'Note',t:'s'}],[
+    ['Transfers','Total transfers',N,'Rows in the Transfer Log for this fleet / search'],
+    ['Transfers','Distinct equipment (code)',distinct(T,function(t){ return t.code; }),''],
+    ['Transfers','Distinct destination projects',distinct(T,function(t){ return t.to; }),''],
+    ['Transfers','With attachment',T.filter(function(t){ return t.att; }).length,'']]);
+  var a=spec.addBreakdown('By_Month',breakdown(T,[D('Month',function(t){ return t.month; })],[M('Transfers',function(r){ return r.length; })],{share:1}));
+  var b=spec.addBreakdown('By_From_Project',breakdown(T,[D('From_Project',function(t){ return t.from; })],[M('Transfers',function(r){ return r.length; })],{share:1}));
+  var c=spec.addBreakdown('By_To_Project',breakdown(T,[D('To_Project',function(t){ return t.to; })],[M('Transfers',function(r){ return r.length; })],{share:1}));
+  var d=spec.addBreakdown('By_Equipment_Type',breakdown(T,[D('Equipment_Type',function(t){ return t.eq; })],[M('Transfers',function(r){ return r.length; })],{share:1}));
+  var e=spec.addBreakdown('By_Requested_By',breakdown(T,[D('Requested_By',function(t){ return t.req; })],[M('Transfers',function(r){ return r.length; })],{share:1}));
+  var f=spec.addBreakdown('Breakdown_Route',breakdown(T,[D('From_Project',function(t){ return t.from; }),D('To_Project',function(t){ return t.to; })],[M('Transfers',function(r){ return r.length; })]));
+  [['By_Month',a],['By_From_Project',b],['By_To_Project',c],['By_Equipment_Type',d],['By_Requested_By',e],['Breakdown_Route',f]].forEach(function(p){ spec.check(p[0]+' transfers = rows',spec.colTotal(p[1],'Transfers'),N); });
+  spec.add('Fact_Transfers',[{h:'Transfer_Date',t:'d'},{h:'Month',t:'s'},{h:'Equipment_Type',t:'s'},{h:'Code',t:'s'},{h:'From_Project',t:'s'},{h:'To_Project',t:'s'},
+    {h:'Requested_By',t:'s'},{h:'Notes',t:'s'},{h:'Recorded_By',t:'s'},{h:'Has_Attachment',t:'s'},{h:'Attachment_URL',t:'s'}],
+    T.map(function(t){ return [t.date,t.month,t.eq,t.code,t.from,t.to,t.req,t.notes,t.by,yn(!!t.att),t.att]; }));
+  return spec;
+}
+
+/* ═══════════════════════ CENTRAL WORKSHOP ═══════════════════════ */
+function buildWorkshop(){
+  var spec=new Spec('workshop');
+  var all=(typeof wsEquipment!=='undefined'&&wsEquipment)||[];
+  if(!all.length||typeof wsFilteredRows!=='function') return spec;
+  var view=wsFilteredRows();
+  var tab=(typeof currentWsTab!=='undefined')?currentWsTab:'active', st=(typeof wsStatusFilter!=='undefined')?wsStatusFilter:'All';
+  var q=((document.getElementById('ws-search')||{}).value||'').trim(), dept=(document.getElementById('ws-dept-filter')||{}).value||'All';
+  spec.scope='Central Workshop · tab: '+(tab==='archive'?'Dispatched / Archive':'Active Workshop'); spec.source=view.length;
+  if(st&&st!=='All') spec.filters.push('Status card = '+st); if(dept&&dept!=='All') spec.filters.push('Department = '+dept); if(q) spec.filters.push('Search = '+q);
+  var md=function(i){ try{ return _mgmtDays(i); }catch(e){ return 0; } };
+  var daysOf=function(i){
+    try{ var m=/^(\d+)/.exec(String(calculateDays(i.entryDate,i.exitDate,i.status))); return m?+m[1]:null; }catch(e){ return null; }
+  };
+  /* KPI = the cards on the page (all records, not only the filtered view) */
+  var cnt=function(s){ return all.filter(function(i){ return i.status===s; }).length; };
+  spec.add('KPI',[{h:'Section',t:'s'},{h:'Metric',t:'s'},{h:'Value',t:'i'},{h:'Note',t:'s'}],[
+    ['Workshop cards','Total in workshop (not dispatched)',all.filter(function(i){ return i.status!=='Dispatched'; }).length,'All records, ignores filters (like the cards)'],
+    ['Workshop cards','Ready',cnt('Ready'),''],['Workshop cards','In Progress',cnt('In Progress'),''],['Workshop cards','Waiting',cnt('Waiting'),''],
+    ['Workshop cards','Delay',cnt('Delay'),''],['Workshop cards','External',cnt('External'),''],['Workshop cards','Dispatched',cnt('Dispatched'),''],
+    ['Red flag','Active items over 15 days',all.filter(function(i){ return i.status!=='Dispatched'&&md(i)>15; }).length,'']]);
+  var R=view.map(function(i){
+    var en=toDate(i.entryDate), ex=toDate(i.exitDate), dd=daysOf(i);
+    return {name:S(i.name)||'(No Name)',code:S(i.code),report:S(i.report),pin:S(i.project)||'(No Project)',pout:S(i.exitProject),en:en,ex:ex,days:dd,
+      long:(i.status!=='Dispatched'&&md(i)>15),dept:S(i.dept)||'Mechanics',status:S(i.status)||'Waiting',tab:(i.status==='Dispatched')?'Archive':'Active'};
+  });
+  var N=R.length, meanD=function(r){ return rnd(avg(r,function(x){ return x.days; }),1); }, maxD=function(r){ return r.reduce(function(a,x){ return Math.max(a,x.days||0); },0); };
+  var Mx=[M('Items',function(r){ return r.length; }),M('Avg_Days',meanD,'n'),M('Max_Days',maxD)];
+  var a=spec.addBreakdown('By_Status',breakdown(R,[D('Status',function(x){ return x.status; })],Mx,{share:1}));
+  var b=spec.addBreakdown('By_Department',breakdown(R,[D('Department',function(x){ return x.dept; })],Mx,{share:1}));
+  var c=spec.addBreakdown('By_Project_In',breakdown(R,[D('Project_In',function(x){ return x.pin; })],Mx,{share:1}));
+  var bucket=function(x){ var d=x.days; if(d==null) return '9. Unknown'; if(d<=7) return '1. 0-7 days'; if(d<=15) return '2. 8-15 days'; if(d<=30) return '3. 16-30 days'; if(d<=60) return '4. 31-60 days'; return '5. Over 60 days'; };
+  var d=spec.addBreakdown('By_Aging',breakdown(R,[D('Aging_Bucket',bucket)],[M('Items',function(r){ return r.length; })],{share:1}));
+  var e=spec.addBreakdown('By_Entry_Month',breakdown(R,[D('Entry_Month',function(x){ return monthOf(x.en)||'(No Date)'; })],[M('Items',function(r){ return r.length; })],{share:1}));
+  var f=spec.addBreakdown('Breakdown_Status_Department',breakdown(R,[D('Status',function(x){ return x.status; }),D('Department',function(x){ return x.dept; })],[M('Items',function(r){ return r.length; })]));
+  [['By_Status',a],['By_Department',b],['By_Project_In',c],['By_Aging',d],['By_Entry_Month',e],['Breakdown_Status_Department',f]].forEach(function(p){ spec.check(p[0]+' items = rows',spec.colTotal(p[1],'Items'),N); });
+  spec.add('Fact_Workshop',[{h:'Tab',t:'s'},{h:'Equipment',t:'s'},{h:'Code',t:'s'},{h:'Condition_Report',t:'s'},{h:'Project_In',t:'s'},{h:'Project_Out',t:'s'},
+    {h:'Entry_Date',t:'d'},{h:'Exit_Date',t:'d'},{h:'Days_In_Workshop',t:'i0'},{h:'Over_15_Days',t:'s'},{h:'Department',t:'s'},{h:'Status',t:'s'}],
+    R.map(function(x){ return [x.tab,x.name,x.code,x.report,x.pin,x.pout,x.en,x.ex,x.days,yn(x.long),x.dept,x.status]; }));
+  spec.notes.push('Days_In_Workshop = same value the page shows (entry → exit, or → today while not dispatched). Over_15_Days applies to active items only.');
+  return spec;
+}
+
+/* ═══════════════════════ FOLLOW-UP ═══════════════════════ */
+function buildFollowUp(){
+  var spec=new Spec('followup');
+  if(typeof getFilteredFuData!=='function'||typeof getScopedFuData!=='function') return spec;
+  var view=getFilteredFuData(), scoped=getScopedFuData();
+  if(!view.length&&!scoped.length) return spec;
+  var ff=(typeof fuFilters!=='undefined'&&fuFilters)||{prov:[],deduction:false};
+  var el=function(id){ var x=document.getElementById(id); return x?x.value:''; };
+  spec.scope='Equipment Follow-Up'; spec.source=view.length;
+  if(el('fu-equip-filter')) spec.filters.push('Equipment = '+el('fu-equip-filter')); if(el('fu-proj-filter')) spec.filters.push('Project = '+el('fu-proj-filter'));
+  if(el('fu-month-filter')) spec.filters.push('Month = '+el('fu-month-filter')); if(ff.prov&&ff.prov.length) spec.filters.push('Provision = '+ff.prov.join(', ')); if(ff.deduction) spec.filters.push('Deduction only');
+  var ded=function(r){ try{ return fuIsDeduction(r); }catch(e){ return /خصم/.test(String(r.notes||'')); } };
+  var mk=function(v){ try{ return fuMonthKey(v)||'(No Date)'; }catch(e){ return monthOf(toDate(v))||'(No Date)'; } };
+  var mapRow=function(r){
+    var sd=toDate(r.submission_date), df=toDate(r.date_from), dt=toDate(r.date_to);
+    return {eq:S(r.equipment)||'(No Equipment)',cap:S(r.capacity),qty:n0(r.qty),sap:S(r.sap),proj:S(r.project)||'(No Project)',sd:sd,df:df,dt:dt,month:mk(r.submission_date),
+      prov:S(r.provision)||'(No Provision)',days:num(r.days),notes:S(r.notes),ded:ded(r),sn:r.sn};
+  };
+  var R=view.map(mapRow), SC=scoped.map(mapRow), N=R.length;
+  var cnt=function(p){ return SC.filter(function(x){ return x.prov===p; }); };
+  var kp=[['Cards (all provisions, before the provision filter)','All Requests',SC.length,'Requests = rows']];
+  ['Rental','Transfer','Hold','Pending','Cancel'].forEach(function(p){ kp.push(['Cards (all provisions, before the provision filter)',p,cnt(p).length,'Requests = rows']); });
+  kp.push(['Cards (all provisions, before the provision filter)','Deduction (خصم ع المقاول)',SC.filter(function(x){ return x.ded; }).length,'Notes contain "خصم"']);
+  kp.push(['Quantities','Total quantity (units) — all',sum(SC,function(x){ return x.qty; }),'Sum of Qty']);
+  ['Rental','Transfer','Hold','Pending','Cancel'].forEach(function(p){ kp.push(['Quantities','Quantity — '+p,sum(cnt(p),function(x){ return x.qty; }),'Sum of Qty']); });
+  spec.add('KPI',[{h:'Section',t:'s'},{h:'Metric',t:'s'},{h:'Value',t:'i'},{h:'Note',t:'s'}],kp);
+  var Mx=[M('Requests',function(r){ return r.length; }),M('Quantity',function(r){ return sum(r,function(x){ return x.qty; }); }),M('Days',function(r){ return sum(r,function(x){ return x.days; }); })];
+  var a=spec.addBreakdown('By_Provision',breakdown(R,[D('Provision',function(x){ return x.prov; })],Mx,{share:1}));
+  var b=spec.addBreakdown('By_Project',breakdown(R,[D('Project',function(x){ return x.proj; })],Mx,{share:1}));
+  var c=spec.addBreakdown('By_Equipment',breakdown(R,[D('Equipment',function(x){ return x.eq; })],Mx,{share:1}));
+  var d=spec.addBreakdown('By_Submission_Month',breakdown(R,[D('Submission_Month',function(x){ return x.month; })],Mx,{share:1}));
+  var e=spec.addBreakdown('By_Deduction',breakdown(R,[D('Deduction_To_Contractor',function(x){ return yn(x.ded); })],Mx,{share:1}));
+  var f=spec.addBreakdown('Breakdown_Provision_Project',breakdown(R,[D('Provision',function(x){ return x.prov; }),D('Project',function(x){ return x.proj; })],Mx));
+  var h=spec.addBreakdown('Breakdown_Provision_Equipment',breakdown(R,[D('Provision',function(x){ return x.prov; }),D('Equipment',function(x){ return x.eq; })],Mx));
+  [['By_Provision',a],['By_Project',b],['By_Equipment',c],['By_Submission_Month',d],['By_Deduction',e],['Breakdown_Provision_Project',f],['Breakdown_Provision_Equipment',h]].forEach(function(p){
+    spec.check(p[0]+' requests = rows',spec.colTotal(p[1],'Requests'),N); });
+  spec.check('By_Provision quantity = Σ Qty of rows',spec.colTotal(a,'Quantity'),sum(R,function(x){ return x.qty; }));
+  spec.add('Fact_FollowUp',[{h:'SN',t:'i0'},{h:'Equipment',t:'s'},{h:'Capacity',t:'s'},{h:'Qty',t:'i'},{h:'SAP',t:'s'},{h:'Project',t:'s'},{h:'Submission_Date',t:'d'},{h:'Submission_Month',t:'s'},
+    {h:'Provision',t:'s'},{h:'Date_From',t:'d'},{h:'Date_To',t:'d'},{h:'Days',t:'i0'},{h:'Is_Deduction',t:'s'},{h:'Notes',t:'s'}],
+    R.map(function(x){ return [num(x.sn),x.eq,x.cap,x.qty,x.sap,x.proj,x.sd,x.month==='(No Date)'?'':x.month,x.prov,x.df,x.dt,x.days,yn(x.ded),x.notes]; }));
+  spec.notes.push('Requests = number of rows; Quantity = Σ Qty. Month grouping uses the portal\'s own fuMonthKey (slash dates are read as day/month/year).');
+  return spec;
+}
+
+/* ═══════════════════════ RENTAL DATABASE ═══════════════════════ */
+function buildRentalDb(){
+  var spec=new Spec('rentaldb');
+  var H=(typeof window.__rdData==='function')?window.__rdData():null;
+  if(!H||!H.rows||!H.rows.length) return spec;
+  var rows=H.rows, F=H.F||{}, val=H.val;
+  spec.scope='Rental Database (EGP)'; spec.source=rows.length;
+  var lab={plant:'Plant',cat:'Category',rate:'Rate type',fuel:'Fuel',trans:'Transportation',sb:'Standby',month:'Month',vendor:'Vendor',project:'Project',item:'Item',model:'Model',check:'Data check'};
+  Object.keys(lab).forEach(function(k){ if(F[k]) spec.filters.push(lab[k]+' = '+F[k]); }); if(F.q) spec.filters.push('Search = '+F.q);
+  var R=rows.map(function(r){
+    var dly=val(r,'d'), mth=val(r,'m');
+    return {plant:S(r.plant)||'—',vendor:S(r.vendor)||'—',project:S(r.project)||'—',cat:S(r.catL||r.cat)||'Uncategorized',item:S(r.item),itemL:S(r.item)||'(No Item)',model:S(r.model),qty:(r.qty==null?1:r.qty),
+      rate:S(r.rateL)||'Unspecified',cost:num(r.cost),dly:dly,mth:mth,date:toDate(r.date),month:monthText(r.month||r.date)||'(No Date)',sb:(r.sb==null?null:num(r.sb)),
+      fuel:S(r.fuelL||r.fuel)||'Unspecified',trans:S(r.transL||r.trans)||'Unspecified',contract:S(r.contract),contact:S(r.contact),note:S(r.note),flags:(r.flags||[]).join(', '),isD:(r.rate==='daily'&&r.cost!=null)};
+  });
+  var N=R.length;
+  var Mx=[M('Records',function(r){ return r.length; }),M('Sum_Daily_Rates_EGP',function(r){ return r6(sum(r,function(x){ return x.dly; })); },'m'),
+    M('Sum_Monthly_Rates_EGP',function(r){ return r6(sum(r,function(x){ return x.mth; })); },'m'),
+    M('Avg_Unit_Daily_Rate_EGP',function(r){ return rnd(avg(r.filter(function(x){ return x.isD; }),function(x){ return x.cost; }),2); },'m')];
+  spec.add('KPI',[{h:'Section',t:'s'},{h:'Metric',t:'s'},{h:'Value',t:'m'},{h:'Note',t:'s'}],[
+    ['Rental Database','Records',N,'Rows matching the page filters'],['Rental Database','Distinct vendors',distinct(R,function(x){ return x.vendor; }),''],
+    ['Rental Database','Distinct plants',distinct(R,function(x){ return x.plant; }),''],['Rental Database','Distinct projects',distinct(R,function(x){ return x.project; }),''],
+    ['Rental Database','Sum of daily rates (EGP/day)',r6(sum(R,function(x){ return x.dly; })),'unit cost × qty, daily-rate rows only'],
+    ['Rental Database','Sum of monthly rates (EGP/month)',r6(sum(R,function(x){ return x.mth; })),'unit cost × qty, monthly-rate rows only — never add to daily'],
+    ['Rental Database','Rows flagged by data checks',R.filter(function(x){ return x.flags; }).length,'no category / high daily rate / fuel-transport unspecified / duplicate']]);
+  var dims=[['By_Plant','Plant','plant'],['By_Category','Category','cat'],['By_Vendor','Vendor','vendor'],['By_Project','Project','project'],['By_Month','Month','month'],
+    ['By_Rate_Type','Rate_Type','rate'],['By_Fuel_Responsibility','Fuel_By','fuel'],['By_Transportation','Transportation_By','trans'],['By_Item','Item','itemL']];
+  dims.forEach(function(d){
+    var sh=spec.addBreakdown(d[0],breakdown(R,[D(d[1],function(x){ return x[d[2]]; })],Mx,{share:1}));
+    spec.check(d[0]+' records = rows',spec.colTotal(sh,'Records'),N);
+  });
+  var lg=spec.addBreakdown('Breakdown_Category_Item',breakdown(R,[D('Category',function(x){ return x.cat; }),D('Item',function(x){ return x.itemL; })],Mx));
+  spec.check('Breakdown_Category_Item records = rows',spec.colTotal(lg,'Records'),N);
+  spec.add('Fact_Rental_Rates',[{h:'Plant',t:'s'},{h:'Vendor',t:'s'},{h:'Project',t:'s'},{h:'Category',t:'s'},{h:'Item',t:'s'},{h:'Model',t:'s'},{h:'Qty',t:'n'},{h:'Rate_Type',t:'s'},
+    {h:'Unit_Cost_EGP',t:'m'},{h:'Daily_Rate_Total_EGP',t:'m'},{h:'Monthly_Rate_Total_EGP',t:'m'},{h:'Rate_Date',t:'d'},{h:'Month',t:'s'},{h:'Standby_Rate',t:'p'},
+    {h:'Fuel_By',t:'s'},{h:'Transportation_By',t:'s'},{h:'Contract',t:'s'},{h:'Contact',t:'s'},{h:'Note',t:'s'},{h:'Data_Flags',t:'s'}],
+    R.map(function(x){ return [x.plant,x.vendor,x.project,x.cat,x.item,x.model,x.qty,x.rate,x.cost,x.dly,x.mth,x.date,x.month==='(No Date)'?'':x.month,x.sb,x.fuel,x.trans,x.contract,x.contact,x.note,x.flags]; }));
+  spec.notes.push('Daily and monthly rates are kept in separate columns on purpose (the page never adds them together).');
+  return spec;
+}
+
+/* ═══════════════════════ MASTER OWNED ═══════════════════════ */
+function utlPct(v){ var n=num(v); if(n==null) return null; return n<=1.5?n*100:n; }
+function buildMasterOwned(){
+  var spec=new Spec('masterowned'); var MO=window.MO;
+  if(!MO||typeof MO.view!=='function') return spec;
+  var rows=MO.view(); if(!rows.length) return spec;
+  var f=MO.filterState?MO.filterState():{};
+  spec.scope='Master Owned'; spec.source=rows.length;
+  if(f.month&&f.month.length) spec.filters.push('Month = '+f.month.join(', ')); if(f.od) spec.filters.push('O.D = '+f.od); if(f.cat) spec.filters.push('Category = '+f.cat);
+  if(f.proj) spec.filters.push('Project = '+f.proj); if(f.status) spec.filters.push('Status = '+f.status); if(f.q) spec.filters.push('Search = '+f.q);
+  var U=function(r){ return MO.units(r)||0; }, L=function(r){ return MO.lostOf(r)||0; }, nm=function(v){ return n0(v); };
+  var R=rows.map(function(r){
+    return {r:r,month:S(r.month)||monthText(r.hiring)||'(No Date)',od:S(r.od)||'(No O.D)',cat:S(r.cat)||'Uncategorized',proj:S(r.project)||'(No Project)',status:S(r.status)||'(No Status)',
+      u:U(r),worked:nm(r.worked),standby:nm(r.standby),repair:nm(r.repair),cost:nm(r.totalCost),lost:L(r),ot:nm(r.costOt),fuel:nm(r.totalFuel),utl:utlPct(r.utl)};
+  });
+  var N=R.length, months=function(x){ return distinct(x,function(y){ return y.month; })||1; };
+  var Mx=[M('Equipment_Rows',function(x){ return x.length; }),M('Unit_Months',function(x){ return r6(sum(x,function(y){ return y.u; })); },'n'),
+    M('Avg_Units_Per_Month',function(x){ return rnd(sum(x,function(y){ return y.u; })/months(x),1); },'n'),
+    M('Worked_Days',function(x){ return sum(x,function(y){ return y.worked; }); }),M('Standby_Days',function(x){ return sum(x,function(y){ return y.standby; }); }),
+    M('Repair_Days',function(x){ return sum(x,function(y){ return y.repair; }); }),M('Money_Made_EGP',function(x){ return r6(sum(x,function(y){ return y.cost; })); },'m'),
+    M('Standby_Cost_EGP',function(x){ return r6(sum(x,function(y){ return y.lost; })); },'m'),M('OT_Cost_EGP',function(x){ return r6(sum(x,function(y){ return y.ot; })); },'m'),
+    M('Fuel_Liters',function(x){ return r6(sum(x,function(y){ return y.fuel; })); },'n'),M('Avg_Utilization_Pct',function(x){ return rnd(avg(x,function(y){ return y.utl; }),1); },'n')];
+  var allU=sum(R,function(y){ return y.u; });
+  spec.add('KPI',[{h:'Section',t:'s'},{h:'Metric',t:'s'},{h:'Value',t:'n'},{h:'Note',t:'s'}],[
+    ['Master Owned','Equipment rows',N,'Rows matching the page filters'],['Master Owned','Unit-months (Σ units over rows)',round(allU,1),'A unit counted once per month (same code, same month = one machine)'],
+    ['Master Owned','Avg units per month',rnd(allU/months(R),1),'Unit-months ÷ distinct months — what the page shows for Fleet Equipment when more than one month is in scope'],
+    ['Master Owned','Months in scope',months(R),''],['Master Owned','Money made (EGP)',r6(sum(R,function(y){ return y.cost; })),'Σ Total Cost'],
+    ['Master Owned','Standby cost (EGP)',r6(sum(R,function(y){ return y.lost; })),'Unit price × standby days × 1.2, only when standby > 10 days (page rule)'],
+    ['Master Owned','OT cost (EGP)',r6(sum(R,function(y){ return y.ot; })),''],['Master Owned','Fuel (liters)',r6(sum(R,function(y){ return y.fuel; })),''],
+    ['Master Owned','Avg utilization %',rnd(avg(R,function(y){ return y.utl; }),1),'Rows that report a utilization value']]);
+  var dims=[['By_Month','Month','month'],['By_OD_Engineer','OD_Engineer','od'],['By_Category','Category','cat'],['By_Project','Project','proj'],['By_Status','Status','status']];
+  dims.forEach(function(d){
+    var sh=spec.addBreakdown(d[0],breakdown(R,[D(d[1],function(y){ return y[d[2]]; })],Mx,{sort:1,share:1}));
+    spec.check(d[0]+' rows = rows',spec.colTotal(sh,'Equipment_Rows'),N);
+    spec.check(d[0]+' unit-months = total',round(spec.colTotal(sh,'Unit_Months'),1),round(allU,1));
+  });
+  var lg=spec.addBreakdown('Breakdown_Month_OD_Category',breakdown(R,[D('Month',function(y){ return y.month; }),D('OD_Engineer',function(y){ return y.od; }),D('Category',function(y){ return y.cat; })],Mx,{sort:1}));
+  spec.check('Breakdown_Month_OD_Category rows = rows',spec.colTotal(lg,'Equipment_Rows'),N);
+  spec.add('Fact_Master_Owned',[{h:'Month',t:'s'},{h:'Hiring_Date',t:'d'},{h:'Profit_Center',t:'s'},{h:'OD_Engineer',t:'s'},{h:'Project',t:'s'},{h:'Category',t:'s'},{h:'Code',t:'s'},{h:'Equipment',t:'s'},
+    {h:'Model',t:'s'},{h:'Main_Capacity',t:'s'},{h:'Units',t:'n'},{h:'Worked_Days',t:'i'},{h:'Standby_Days',t:'i'},{h:'Repair_Days',t:'i'},{h:'Unit_Price_EGP',t:'m'},{h:'Money_Made_EGP',t:'m'},
+    {h:'Standby_Cost_EGP',t:'m'},{h:'OT_Per_Day',t:'n'},{h:'OT_Cost_EGP',t:'m'},{h:'Fuel_Liters',t:'n'},{h:'Utilization_Pct',t:'n'},{h:'Available',t:'i'},{h:'Status',t:'s'},{h:'BM_Status',t:'s'}],
+    R.map(function(y){ var r=y.r; return [y.month==='(No Date)'?'':y.month,toDate(r.hiring),S(r.pc),S(r.od),S(r.project),S(r.cat),S(r.code),S(r.equipment),S(r.model),S(r.mainCap),
+      y.u,y.worked,y.standby,y.repair,num(r.unitPrice),y.cost,rnd(y.lost,2),num(r.otPerDay),y.ot,y.fuel,rnd(y.utl,1),num(r.avail),y.status,S(r.bmStatus)]; }));
+  spec.notes.push('Units is the de-duplicated unit count the page uses (same code in the same month = one machine). Use Avg_Units_Per_Month, not Unit_Months, when comparing a fleet size across several months.');
+  return spec;
+}
+
+/* ═══════════════════════ MASTER RENTAL ═══════════════════════ */
+function buildMasterRental(){
+  var spec=new Spec('masterrental'); var MR=window.MR;
+  if(!MR||typeof MR.view!=='function') return spec;
+  var rows=MR.view(); if(!rows.length) return spec;
+  var f=MR.filterState?MR.filterState():{};
+  spec.scope='Master Rental'; spec.source=rows.length;
+  if(f.month) spec.filters.push('Month = '+f.month); if(f.od) spec.filters.push('O.D = '+f.od); if(f.cat) spec.filters.push('Category = '+f.cat); if(f.proj) spec.filters.push('Project = '+f.proj); if(f.q) spec.filters.push('Search = '+f.q);
+  var R=rows.map(function(r){
+    var q=n0(r.qty);
+    return {r:r,month:S(r.month)||'(No Date)',od:S(r.od)||'(No O.D)',cat:S(r.category)||'Uncategorized',proj:S(r.project)||'(No Project)',sub:S(r.subcon)||'(No Subcontractor)',
+      u:q>0?q:0,total:n0(r.totalPrice),ot:n0(r.otCost),ded:n0(r.totalDeduct),fuel:n0(r.fuel),utl:(r.util==null||r.util==='')?null:num(r.util)};
+  });
+  var N=R.length, months=function(x){ return distinct(x,function(y){ return y.month&&y.month!=='(No Date)'?y.month:''; })||1; };
+  var Mx=[M('Equipment_Rows',function(x){ return x.length; }),M('Units',function(x){ return sum(x,function(y){ return y.u; }); },'n'),
+    M('Avg_Units_Per_Month',function(x){ return rnd(sum(x,function(y){ return y.u; })/months(x),1); },'n'),
+    M('Total_Price_EGP',function(x){ return r6(sum(x,function(y){ return y.total; })); },'m'),M('OT_Cost_EGP',function(x){ return r6(sum(x,function(y){ return y.ot; })); },'m'),
+    M('Total_Deduct_EGP',function(x){ return r6(sum(x,function(y){ return y.ded; })); },'m'),
+    M('Net_Value_EGP',function(x){ return r6(sum(x,function(y){ return y.total+y.ot-y.ded; })); },'m'),
+    M('Fuel_Liters',function(x){ return r6(sum(x,function(y){ return y.fuel; })); },'n'),M('Avg_Utilization_Pct',function(x){ return rnd(avg(x,function(y){ return y.utl; }),1); },'n')];
+  var allU=sum(R,function(y){ return y.u; }), tot=sum(R,function(y){ return y.total; }), ot=sum(R,function(y){ return y.ot; }), de=sum(R,function(y){ return y.ded; });
+  spec.add('KPI',[{h:'Section',t:'s'},{h:'Metric',t:'s'},{h:'Value',t:'n'},{h:'Note',t:'s'}],[
+    ['Master Rental','Equipment rows',N,'Rows matching the page filters'],['Master Rental','Units (Σ qty, qty>0)',round(allU,1),'Rows with qty ≤ 0 are ignored for units, never for money (page rule)'],
+    ['Master Rental','Avg units per month',rnd(allU/months(R),1),''],['Master Rental','Total price (EGP)',rnd(tot,2),''],['Master Rental','OT cost (EGP)',rnd(ot,2),''],
+    ['Master Rental','Total deduct (EGP)',round(de,2),''],['Master Rental','Net value (EGP)',round(tot+ot-de,2),'Total price + OT − deduct (page formula)'],
+    ['Master Rental','Fuel (liters)',r6(sum(R,function(y){ return y.fuel; })),''],['Master Rental','Projects',distinct(R,function(y){ return y.proj; }),''],['Master Rental','O.D Engineers',distinct(R,function(y){ return y.od; }),'']]);
+  var dims=[['By_Month','Month','month'],['By_OD_Engineer','OD_Engineer','od'],['By_Category','Category','cat'],['By_Project','Project','proj'],['By_Subcontractor','Subcontractor','sub']];
+  dims.forEach(function(d){
+    var sh=spec.addBreakdown(d[0],breakdown(R,[D(d[1],function(y){ return y[d[2]]; })],Mx,{sort:3,share:1}));
+    spec.check(d[0]+' rows = rows',spec.colTotal(sh,'Equipment_Rows'),N);
+    spec.check(d[0]+' total price = total',round(spec.colTotal(sh,'Total_Price_EGP'),0),round(tot,0));
+  });
+  var lg=spec.addBreakdown('Breakdown_Month_OD_Category',breakdown(R,[D('Month',function(y){ return y.month; }),D('OD_Engineer',function(y){ return y.od; }),D('Category',function(y){ return y.cat; })],Mx,{sort:3}));
+  spec.check('Breakdown_Month_OD_Category rows = rows',spec.colTotal(lg,'Equipment_Rows'),N);
+  spec.add('Fact_Master_Rental',[{h:'Month',t:'s'},{h:'Hiring_Date',t:'d'},{h:'Sheet',t:'s'},{h:'Invoice',t:'s'},{h:'SAP',t:'s'},{h:'Plant',t:'s'},{h:'OD_Engineer',t:'s'},{h:'Project',t:'s'},{h:'Category',t:'s'},
+    {h:'Equipment',t:'s'},{h:'Model',t:'s'},{h:'Main_Capacity',t:'s'},{h:'Subcontractor',t:'s'},{h:'Qty',t:'n'},{h:'Units',t:'n'},{h:'Days',t:'n'},{h:'Unit_Price_EGP',t:'m'},{h:'Total_Price_EGP',t:'m'},
+    {h:'OT_Per_Day',t:'n'},{h:'OT_Cost_EGP',t:'m'},{h:'Utilization_Pct',t:'n'},{h:'Deduct_Per_Day',t:'n'},{h:'Total_Deduct_EGP',t:'m'},{h:'Net_Value_EGP',t:'m'},{h:'Hour_Meter',t:'n'},{h:'Fuel_Per_Hour',t:'n'},{h:'Fuel_Liters',t:'n'}],
+    R.map(function(y){ var r=y.r; return [y.month==='(No Date)'?'':y.month,toDate(r.hiringDate||r.hiringRaw),S(r.sheet),S(r.invoice),S(r.sap),S(r.plant),S(r.od),S(r.project),S(r.category),S(r.equipment),S(r.model),S(r.maincap),S(r.subcon),
+      num(r.qty),y.u,num(r.days),num(r.unitPrice),y.total,num(r.otPerDay),y.ot,rnd(y.utl,1),num(r.deduct),y.ded,rnd(y.total+y.ot-y.ded,2),num(r.hourMeter),num(r.fuelPerHour),y.fuel]; }));
+  return spec;
+}
+
+/* ═══════════════════════ RENTAL vs OWNED ═══════════════════════ */
+function buildComparison(){
+  var spec=new Spec('comparison'); var X=window.__cmpx;
+  if(!X||typeof X.owned!=='function') return spec;
+  var O=X.owned(), Rr=X.rental(); if(!O.length&&!Rr.length) return spec;
+  var st=X.state||{};
+  spec.scope='Rental vs Owned (Master Owned + Master Rental)'; spec.source=O.length+Rr.length;
+  if(st.month&&st.month!=='all') spec.filters.push('Month = '+st.month); if(st.od&&st.od!=='all') spec.filters.push('O.D = '+st.od); if(st.projectSearch) spec.filters.push('Project = '+st.projectSearch);
+  var S2=X.stats;
+  var sumRow=function(o,r){ return S2(o,r); };
+  var tot=sumRow(O,Rr);
+  spec.add('KPI',[{h:'Section',t:'s'},{h:'Metric',t:'s'},{h:'Owned',t:'n'},{h:'Rental',t:'n'},{h:'Note',t:'s'}],[
+    ['Fleet','Equipment (units)',tot.oU,tot.rU,'Σ qty where qty>0 (comparison page rule)'],['Cost','Cost (EGP)',round(tot.oC,2),round(tot.rC,2),'Owned = Σ Total Cost · Rental = Σ Total Price'],
+    ['Cost','OT cost (EGP)',round(tot.oOT,2),round(tot.rOT,2),''],['Cost','Fuel (liters)',round(tot.oF,1),round(tot.rF,1),''],
+    ['Owned only','Standby units',tot.oSbU,null,''],['Owned only','Standby days',tot.oSbD,null,''],['Owned only','Standby cost (EGP)',round(tot.oL,2),null,'Standby > 10 days × unit price × 1.2'],
+    ['Rental only','Deductions (EGP)',null,round(tot.rD,2),'']]);
+  var pt=X.projTable();
+  var projRows=pt.map(function(x){ return [x.name,(x.inO&&x.inR)?'Shared':(x.inO?'Owned only':'Rental only'),x.oU,round(x.oC,2),x.oSbU,x.oSbD,round(x.oL,2),round(x.oOT,2),round(x.oF,1),
+    x.rU,round(x.rC,2),round(x.rOT,2),round(x.rD,2),round(x.rF,1),x.rU-x.oU,round(x.oC+x.rC,2),round(x.oSbD>0?x.oL:0,2)]; });
+  /* the page's own project table skips rows that have no project name — keep them visible so totals reconcile */
+  var noProj=function(r){ return !S(r.project).toLowerCase().replace(/[\s\-_.]+/g,' ').trim(); };
+  var oNo=O.filter(noProj), rNo=Rr.filter(noProj);
+  if(oNo.length||rNo.length){
+    var z=S2(oNo,rNo);
+    projRows.push(['(No Project)',(oNo.length&&rNo.length)?'Shared':(oNo.length?'Owned only':'Rental only'),z.oU,round(z.oC),z.oSbU,z.oSbD,round(z.oL),round(z.oOT),round(z.oF),
+      z.rU,round(z.rC),round(z.rOT),round(z.rD),round(z.rF),z.rU-z.oU,round(z.oC+z.rC),round(z.oSbD>0?z.oL:0)]);
+    spec.notes.push('By_Project includes a "(No Project)" row for rows without a project name — the Rental vs Owned page leaves those out of its project table.');
+  }
+  var shP=spec.add('By_Project',[{h:'Project',t:'s'},{h:'Project_Type',t:'s'},{h:'Owned_Units',t:'i'},{h:'Owned_Cost_EGP',t:'m'},{h:'Owned_Standby_Units',t:'i'},{h:'Owned_Standby_Days',t:'i'},{h:'Owned_Standby_Cost_EGP',t:'m'},
+    {h:'Owned_OT_EGP',t:'m'},{h:'Owned_Fuel_L',t:'n'},{h:'Rental_Units',t:'i'},{h:'Rental_Cost_EGP',t:'m'},{h:'Rental_OT_EGP',t:'m'},{h:'Rental_Deduct_EGP',t:'m'},{h:'Rental_Fuel_L',t:'n'},
+    {h:'Delta_Units_Rental_minus_Owned',t:'i'},{h:'Total_Cost_EGP',t:'m'},{h:'Potential_Saving_EGP',t:'m'}],projRows);
+  var mt=X.monthTable();
+  var shM=spec.add('By_Month',[{h:'Month',t:'s'},{h:'Owned_Cost_EGP',t:'m'},{h:'Owned_Units',t:'i'},{h:'Owned_Standby_Cost_EGP',t:'m'},{h:'Rental_Cost_EGP',t:'m'},{h:'Rental_Units',t:'i'},{h:'Total_Cost_EGP',t:'m'}],
+    mt.map(function(x){ return [x.month,round(x.oC,2),x.oU,round(x.oL,2),round(x.rC,2),x.rU,round(x.oC+x.rC,2)]; }));
+  var cn=function(s){ var t=S(s).replace(/\s*equipments?\s*$/i,'').trim(); return t||'Uncategorised'; };
+  var ck=function(s){ return cn(s).toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/g,' ').trim(); };
+  var grp=function(name,hd,okey,rkey){
+    var keys=new Map();
+    O.forEach(function(r){ var k=okey(r); if(!keys.has(k.k)) keys.set(k.k,{label:k.l,o:[],r:[]}); keys.get(k.k).o.push(r); });
+    Rr.forEach(function(r){ var k=rkey(r); if(!keys.has(k.k)) keys.set(k.k,{label:k.l,o:[],r:[]}); keys.get(k.k).r.push(r); });
+    var rows=Array.from(keys.values()).map(function(x){ var s=S2(x.o,x.r); return [x.label,s.oU,round(s.oC,2),round(s.oL,2),round(s.oOT,2),s.rU,round(s.rC,2),round(s.rOT,2),round(s.rD,2),s.rU-s.oU,round(s.oC+s.rC,2)]; });
+    rows.sort(function(a,b){ return (b[10]-a[10])||String(a[0]).localeCompare(String(b[0])); });
+    var sh=spec.add(name,[{h:hd,t:'s'},{h:'Owned_Units',t:'i'},{h:'Owned_Cost_EGP',t:'m'},{h:'Owned_Standby_Cost_EGP',t:'m'},{h:'Owned_OT_EGP',t:'m'},{h:'Rental_Units',t:'i'},{h:'Rental_Cost_EGP',t:'m'},{h:'Rental_OT_EGP',t:'m'},{h:'Rental_Deduct_EGP',t:'m'},
+      {h:'Delta_Units_Rental_minus_Owned',t:'i'},{h:'Total_Cost_EGP',t:'m'}],rows);
+    spec.check(name+' total cost = KPI total',round(spec.colTotal(sh,'Total_Cost_EGP'),0),round(tot.oC+tot.rC,0));
+    return sh;
+  };
+  grp('By_OD_Engineer','OD_Engineer',function(r){ var v=S(r.od)||'(No O.D)'; return {k:v.toLowerCase(),l:v}; },function(r){ var v=S(r.od)||'(No O.D)'; return {k:v.toLowerCase(),l:v}; });
+  grp('By_Category','Category',function(r){ return {k:ck(r.cat),l:cn(r.cat)}; },function(r){ return {k:ck(r.category),l:cn(r.category)}; });
+  if(shP){ spec.check('By_Project owned cost = KPI',round(spec.colTotal(shP,'Owned_Cost_EGP'),0),round(tot.oC,0)); spec.check('By_Project rental cost = KPI',round(spec.colTotal(shP,'Rental_Cost_EGP'),0),round(tot.rC,0)); }
+  if(shM){ spec.check('By_Month owned cost = KPI',round(spec.colTotal(shM,'Owned_Cost_EGP'),0),round(tot.oC,0)); spec.check('By_Month rental cost = KPI',round(spec.colTotal(shM,'Rental_Cost_EGP'),0),round(tot.rC,0)); }
+  /* long fact: one table with a Source column so Power BI can slice owned vs rental */
+  var fact=[];
+  O.forEach(function(r){ var q=n0(r.qty); fact.push(['Owned',S(r.month)||'',S(r.od),S(r.project),cn(r.cat),S(r.equipment),S(r.code),q>0?q:0,n0(r.totalCost),n0(r.costOt),n0(r.totalFuel),n0(r.standby),round((window.MO&&window.MO.lostOf)?window.MO.lostOf(r):0),0]); });
+  Rr.forEach(function(r){ var q=n0(r.qty); fact.push(['Rental',S(r.month)||'',S(r.od),S(r.project),cn(r.category),S(r.equipment),S(r.sap),q>0?q:0,n0(r.totalPrice),n0(r.otCost),n0(r.fuel),null,null,n0(r.totalDeduct)]); });
+  spec.add('Fact_Owned_and_Rental',[{h:'Source',t:'s'},{h:'Month',t:'s'},{h:'OD_Engineer',t:'s'},{h:'Project',t:'s'},{h:'Category',t:'s'},{h:'Equipment',t:'s'},{h:'Code_or_SAP',t:'s'},{h:'Units',t:'n'},{h:'Cost_EGP',t:'m'},
+    {h:'OT_Cost_EGP',t:'m'},{h:'Fuel_Liters',t:'n'},{h:'Standby_Days',t:'n'},{h:'Standby_Cost_EGP',t:'m'},{h:'Deduct_EGP',t:'m'}],fact);
+  spec.notes.push('Numbers follow the Rental vs Owned page definitions (units = Σ qty where qty > 0), which can differ slightly from the de-duplicated unit count on the Master Owned page.');
+  return spec;
+}
+
+var BUILD={executive:buildExecutive,dashboard:buildDashboard,equipment:buildEquipment,transfers:buildTransfers,workshop:buildWorkshop,
+  followup:buildFollowUp,rentaldb:buildRentalDb,masterowned:buildMasterOwned,masterrental:buildMasterRental,comparison:buildComparison};
+
+/* ───────────────────────── finalise + write ───────────────────────── */
+var BAD_XML=/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g;
+function cleanVal(v){
+  if(v===undefined||v===null) return null;
+  if(typeof v==='number') return isFinite(v)?v:null;
+  if(v instanceof Date) return isNaN(v)?null:v;
+  var s=String(v).replace(BAD_XML,''); if(s.length>32000) s=s.slice(0,32000);
+  return s;
+}
+function safeSheetName(n,used){
+  var b=String(n).replace(/[\[\]:*?\/\\]/g,'_').slice(0,31)||'Sheet', x=b, i=2;
+  while(used[x.toLowerCase()]){ var suf='_'+i++; x=b.slice(0,31-suf.length)+suf; }
+  used[x.toLowerCase()]=1; return x;
+}
+function tableName(n,used){
+  var b='tbl_'+String(n).replace(/[^A-Za-z0-9_]/g,'_'), x=b, i=2;
+  while(used[x.toLowerCase()]){ x=b+'_'+i++; }
+  used[x.toLowerCase()]=1; return x;
+}
+function uniqueHeaders(cols){
+  var seen={}; return cols.map(function(c){ var h=String(c.h||'Column'), k=h.toLowerCase(), n=1, o=h; while(seen[k]){ n++; h=o+'_'+n; k=h.toLowerCase(); } seen[k]=1; return h; });
+}
+function finalize(spec,pageId){
+  var now=new Date(), stamp=now.getFullYear()+'-'+pad2(now.getMonth()+1)+'-'+pad2(now.getDate())+' '+pad2(now.getHours())+':'+pad2(now.getMinutes());
+  var info=[['Report','HAC · PMV — '+LABELS[pageId].replace(/_/g,' ')+' (Power BI export)'],['Exported_At',stamp],['Scope',spec.scope||''],
+    ['Filters_Applied',spec.filters.length?spec.filters.join(' · '):'None — all rows in scope'],['Source_Rows',spec.source]];
+  spec.sheets.forEach(function(s){ info.push(['Table: '+s.name,s.rows.length+' rows']); });
+  spec.checks.forEach(function(c){
+    var ok=Math.abs((+c.a||0)-(+c.b||0))<=0.01; info.push(['Check: '+c.label,ok?'OK':'MISMATCH ('+c.a+' vs '+c.b+')']);
+  });
+  spec.notes.forEach(function(n){ info.push(['Note',n]); });
+  info.push(['Share_Pct','Share of the sheet\'s main measure (Units / Items / Requests / Records / Unit_Months / Total_Price) — each sheet\'s shares add up to 100%.']);
+  info.push(['How_to_use','Power BI ▸ Get data ▸ Excel workbook ▸ pick this file ▸ tick the tables (tbl_…) you need. Every sheet is a clean flat table with a header row — no merged cells, no titles above the data.']);
+  spec.sheets.unshift({name:'Info',cols:[{h:'Item',t:'s'},{h:'Value',t:'s'}],rows:info.map(function(r){ return [r[0],String(r[1])]; }),kind:'info'});
+  var bad=spec.checks.filter(function(c){ return Math.abs((+c.a||0)-(+c.b||0))>0.01; });
+  return bad.length;
+}
+
+var FMT={i:'#,##0',i0:'0',n:'#,##0.00',m:'#,##0',p:'0.0%',d:'yyyy-mm-dd'};
+function widthFor(sh,j){
+  var w=String(sh.cols[j].h).length+3, lim=Math.min(sh.rows.length,200);
+  for(var i=0;i<lim;i++){ var v=sh.rows[i][j]; var l=(v instanceof Date)?10:(v==null?0:String(v).length); if(l+2>w) w=l+2; }
+  return Math.max(10,Math.min(w,52));
+}
+function writeEJ(EJ,spec){
+  var wb=new EJ.Workbook(); wb.creator='HAC · PMV'; wb.created=new Date();
+  var usedS={}, usedT={};
+  spec.sheets.forEach(function(sh){
+    var name=safeSheetName(sh.name,usedS), ws=wb.addWorksheet(name,{views:[{state:'frozen',ySplit:1}]});
+    var heads=uniqueHeaders(sh.cols);
+    ws.addTable({name:tableName(name,usedT),ref:'A1',headerRow:true,totalsRow:false,style:{theme:(sh.kind==='info'?'TableStyleLight9':'TableStyleMedium2'),showRowStripes:true},
+      columns:heads.map(function(h){ return {name:h,filterButton:true}; }),
+      rows:sh.rows.map(function(r){ return r.map(cleanVal); })});
+    sh.cols.forEach(function(c,j){
+      var fmt=FMT[c.t]; ws.getColumn(j+1).width=widthFor(sh,j);
+      if(fmt){ for(var i=0;i<sh.rows.length;i++){ var v=sh.rows[i][j]; if(v!=null&&v!==''){ ws.getCell(i+2,j+1).numFmt=fmt; } } }
+    });
+  });
+  return wb.xlsx.writeBuffer();
+}
+function writeSJS(X,spec){
+  var wb=X.utils.book_new(), usedS={};
+  spec.sheets.forEach(function(sh){
+    var aoa=[uniqueHeaders(sh.cols)].concat(sh.rows.map(function(r){ return r.map(cleanVal); }));
+    var ws=X.utils.aoa_to_sheet(aoa,{cellDates:true});
+    ws['!cols']=sh.cols.map(function(c,j){ return {wch:widthFor(sh,j)}; });
+    X.utils.book_append_sheet(wb,ws,safeSheetName(sh.name,usedS));
+  });
+  return Promise.resolve(X.write(wb,{bookType:'xlsx',type:'array',cellDates:true}));
+}
+function download(buf,fname){
+  var blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fname; document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1500);
+}
+function fleetSlug(){ var f=(typeof currentFleet!=='undefined')?currentFleet:''; return f?String(f).replace(/[^A-Za-z0-9]+/g,'_'):''; }
+
+function exportPage(pageId,btn){
+  var fn=BUILD[pageId]; if(!fn){ toast_('Power BI export is not available for this page','error'); return; }
+  var spec;
+  try{ spec=fn(); }catch(err){ console.error('[HAC Power BI]',err); toast_('Power BI export failed: '+(err&&err.message||err),'error'); return; }
+  if(!spec||!spec.sheets.length){
+    var dyn={masterowned:'Master Owned',masterrental:'Master Rental',rentaldb:'the Rental Database',comparison:'Master Owned / Master Rental'};
+    toast_(dyn[pageId]?('No data to export — wait until '+dyn[pageId]+' finishes loading, or clear the filters'):'Nothing to export with the current filters','error'); return;
+  }
+  var mismatches=finalize(spec,pageId);
+  var d=new Date(), stamp=d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());
+  var fleetPart=(['executive','dashboard','equipment','transfers'].indexOf(pageId)>=0&&fleetSlug())?('_'+fleetSlug()):'';
+  var fname='HAC_PMV_PowerBI_'+LABELS[pageId]+fleetPart+'_'+stamp+'.xlsx';
+  var old=btn?btn.innerHTML:''; if(btn){ btn.disabled=true; btn.innerHTML='⏳ Building…'; }
+  var done=function(){ if(btn){ btn.disabled=false; btn.innerHTML=old; } };
+  var EJ=window.ExcelJS, X=window.XLSX, p;
+  try{
+    if(EJ) p=writeEJ(EJ,spec); else if(X&&X.write) p=writeSJS(X,spec); else { done(); toast_('Excel library did not load — check the internet connection','error'); return; }
+  }catch(err){ console.error('[HAC Power BI]',err); done(); toast_('Power BI export failed: '+(err&&err.message||err),'error'); return; }
+  p.then(function(buf){
+    download(buf,fname); done();
+    toast_(mismatches?('⚠ Exported, but '+mismatches+' reconciliation check(s) failed — see the Info sheet'):('✓ Power BI workbook exported ('+(spec.sheets.length)+' tables)'),mismatches?'error':'success');
+  }).catch(function(err){ console.error('[HAC Power BI]',err); done(); toast_('Power BI export failed: '+(err&&err.message||err),'error'); });
+}
+
+/* ───────────────────────── UI: one button on every page ───────────────────────── */
+function injectCss(){
+  if(document.getElementById('hacbi-css')) return;
+  var st=document.createElement('style'); st.id='hacbi-css';
+  st.textContent='.hacbi-row{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin:0 0 8px}'
+    +'.hacbi-hint{font-size:11px;color:var(--text-muted)}'
+    +'.hacbi-btn{background:rgba(242,200,17,.14)!important;border:1px solid rgba(242,200,17,.55)!important;color:#f2c811!important;font-weight:700;display:inline-flex;align-items:center;gap:6px}'
+    +'.hacbi-btn:hover{background:rgba(242,200,17,.26)!important}.hacbi-btn:disabled{opacity:.6;cursor:wait}'
+    +'@media print{.hacbi-row{display:none!important}}';
+  document.head.appendChild(st);
+}
+function addButton(page){
+  if(!page||!page.id||page.id.indexOf('page-')!==0) return;
+  var id=page.id.slice(5); if(!BUILD[id]) return;
+  if(page.querySelector(':scope > .hacbi-row')) return;
+  var row=document.createElement('div'); row.className='hacbi-row';
+  var b=document.createElement('button'); b.type='button'; b.className='btn-sm hacbi-btn'; b.id='hacbi-btn-'+id;
+  b.title='Excel workbook for Power BI: KPIs + breakdown tables + the underlying rows (follows the filters on this page)';
+  b.innerHTML='📊 Power BI';
+  b.addEventListener('click',function(ev){ ev.preventDefault(); ev.stopPropagation(); exportPage(id,b); });
+  row.appendChild(b); page.insertBefore(row,page.firstChild);
+}
+function scan(){ document.querySelectorAll('.content > .page, .page').forEach(addButton); }
+function init(){
+  injectCss(); scan();
+  var c=document.querySelector('.content');
+  if(c&&window.MutationObserver) new MutationObserver(scan).observe(c,{childList:true});
+  var n=0, iv=setInterval(function(){ scan(); if(++n>40) clearInterval(iv); },750);
+}
+if(document.readyState!=='loading') init(); else document.addEventListener('DOMContentLoaded',init);
+
+window.HACBI={exportPage:exportPage,build:function(id){ var s=BUILD[id](); finalize(s,id); return s; },pages:Object.keys(BUILD)};
 })();
 </script>
 
