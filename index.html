@@ -13622,7 +13622,7 @@ function buildExecutive(){
   var spec=new Spec('executive'); var data=(typeof getFleetEquipment==='function'?getFleetEquipment():[]);
   if(!data.length) return spec;
   spec.scope='Fleet: '+fleetLabel(); spec.source=data.length;
-  var kp=[['Fleet','Total Fleet',data.length,'Every equipment record in the selected fleet'],
+  var kp=[['Fleet','Total Fleet',data.length,'Every equipment unit in the selected fleet'],
     ['Fleet','Active Projects',distinct(data.filter(function(e){ return !isCW(e.project); }),function(e){ return S(e.project); }),'Distinct projects, Central Workshop excluded (same as the page)'],
     ['Fleet','Categories',distinct(data,function(e){ return S(e.category); }),'Distinct non-empty categories (same as the page)'],
     ['Fleet','O.D Engineers',distinct(data,function(e){ return S(e.od); }),'Distinct non-empty O.D names'],
@@ -13683,7 +13683,7 @@ function buildTransfers(){
   var T=rows.map(function(t){
     var d=toDate(t.date);
     return {date:d,month:monthOf(d)||'(No Date)',eq:S(t.equipmentName||t.equipment)||'(Unknown)',code:S(t.code),from:S(t.from)||'(Unknown)',to:S(t.to||t.project)||'(Unknown)',
-      req:S(t.requestedBy)||'(Not recorded)',notes:S(t.notes),by:S(t.by),att:S(t.attachment)};
+      req:S(t.requestedBy)||'(Not specified)',notes:S(t.notes),by:S(t.by),att:S(t.attachment)};
   });
   var N=T.length;
   spec.add('KPI',[{h:'Section',t:'s'},{h:'Metric',t:'s'},{h:'Value',t:'i'},{h:'Note',t:'s'}],[
@@ -13699,7 +13699,7 @@ function buildTransfers(){
   var f=spec.addBreakdown('Breakdown_Route',breakdown(T,[D('From_Project',function(t){ return t.from; }),D('To_Project',function(t){ return t.to; })],[M('Transfers',function(r){ return r.length; })]));
   [['By_Month',a],['By_From_Project',b],['By_To_Project',c],['By_Equipment_Type',d],['By_Requested_By',e],['Breakdown_Route',f]].forEach(function(p){ spec.check(p[0]+' transfers = rows',spec.colTotal(p[1],'Transfers'),N); });
   spec.add('Fact_Transfers',[{h:'Transfer_Date',t:'d'},{h:'Month',t:'s'},{h:'Equipment_Type',t:'s'},{h:'Code',t:'s'},{h:'From_Project',t:'s'},{h:'To_Project',t:'s'},
-    {h:'Requested_By',t:'s'},{h:'Notes',t:'s'},{h:'Recorded_By',t:'s'},{h:'Has_Attachment',t:'s'},{h:'Attachment_URL',t:'s'}],
+    {h:'Requested_By',t:'s'},{h:'Notes',t:'s'},{h:'Entered_By',t:'s'},{h:'Has_Attachment',t:'s'},{h:'Attachment_URL',t:'s'}],
     T.map(function(t){ return [t.date,t.month,t.eq,t.code,t.from,t.to,t.req,t.notes,t.by,yn(!!t.att),t.att]; }));
   return spec;
 }
@@ -13718,10 +13718,10 @@ function buildWorkshop(){
   var daysOf=function(i){
     try{ var m=/^(\d+)/.exec(String(calculateDays(i.entryDate,i.exitDate,i.status))); return m?+m[1]:null; }catch(e){ return null; }
   };
-  /* KPI = the cards on the page (all records, not only the filtered view) */
+  /* KPI = the cards on the page (all rows, not only the filtered view) */
   var cnt=function(s){ return all.filter(function(i){ return i.status===s; }).length; };
   spec.add('KPI',[{h:'Section',t:'s'},{h:'Metric',t:'s'},{h:'Value',t:'i'},{h:'Note',t:'s'}],[
-    ['Workshop cards','Total in workshop (not dispatched)',all.filter(function(i){ return i.status!=='Dispatched'; }).length,'All records, ignores filters (like the cards)'],
+    ['Workshop cards','Total in workshop (not dispatched)',all.filter(function(i){ return i.status!=='Dispatched'; }).length,'All rows, ignores filters (like the cards)'],
     ['Workshop cards','Ready',cnt('Ready'),''],['Workshop cards','In Progress',cnt('In Progress'),''],['Workshop cards','Waiting',cnt('Waiting'),''],
     ['Workshop cards','Delay',cnt('Delay'),''],['Workshop cards','External',cnt('External'),''],['Workshop cards','Dispatched',cnt('Dispatched'),''],
     ['Red flag','Active items over 15 days',all.filter(function(i){ return i.status!=='Dispatched'&&md(i)>15; }).length,'']]);
@@ -13807,11 +13807,11 @@ function buildRentalDb(){
       fuel:S(r.fuelL||r.fuel)||'Unspecified',trans:S(r.transL||r.trans)||'Unspecified',contract:S(r.contract),contact:S(r.contact),note:S(r.note),flags:(r.flags||[]).join(', '),isD:(r.rate==='daily'&&r.cost!=null)};
   });
   var N=R.length;
-  var Mx=[M('Records',function(r){ return r.length; }),M('Sum_Daily_Rates_EGP',function(r){ return r6(sum(r,function(x){ return x.dly; })); },'m'),
+  var Mx=[M('Rows',function(r){ return r.length; }),M('Sum_Daily_Rates_EGP',function(r){ return r6(sum(r,function(x){ return x.dly; })); },'m'),
     M('Sum_Monthly_Rates_EGP',function(r){ return r6(sum(r,function(x){ return x.mth; })); },'m'),
     M('Avg_Unit_Daily_Rate_EGP',function(r){ return rnd(avg(r.filter(function(x){ return x.isD; }),function(x){ return x.cost; }),2); },'m')];
   spec.add('KPI',[{h:'Section',t:'s'},{h:'Metric',t:'s'},{h:'Value',t:'m'},{h:'Note',t:'s'}],[
-    ['Rental Database','Records',N,'Rows matching the page filters'],['Rental Database','Distinct vendors',distinct(R,function(x){ return x.vendor; }),''],
+    ['Rental Database','Distinct vendors',distinct(R,function(x){ return x.vendor; }),''],
     ['Rental Database','Distinct plants',distinct(R,function(x){ return x.plant; }),''],['Rental Database','Distinct projects',distinct(R,function(x){ return x.project; }),''],
     ['Rental Database','Sum of daily rates (EGP/day)',r6(sum(R,function(x){ return x.dly; })),'unit cost × qty, daily-rate rows only'],
     ['Rental Database','Sum of monthly rates (EGP/month)',r6(sum(R,function(x){ return x.mth; })),'unit cost × qty, monthly-rate rows only — never add to daily'],
@@ -13820,10 +13820,10 @@ function buildRentalDb(){
     ['By_Rate_Type','Rate_Type','rate'],['By_Fuel_Responsibility','Fuel_By','fuel'],['By_Transportation','Transportation_By','trans'],['By_Item','Item','itemL']];
   dims.forEach(function(d){
     var sh=spec.addBreakdown(d[0],breakdown(R,[D(d[1],function(x){ return x[d[2]]; })],Mx,{share:1}));
-    spec.check(d[0]+' records = rows',spec.colTotal(sh,'Records'),N);
+    spec.check(d[0]+' rows = total',spec.colTotal(sh,'Rows'),N);
   });
   var lg=spec.addBreakdown('Breakdown_Category_Item',breakdown(R,[D('Category',function(x){ return x.cat; }),D('Item',function(x){ return x.itemL; })],Mx));
-  spec.check('Breakdown_Category_Item records = rows',spec.colTotal(lg,'Records'),N);
+  spec.check('Breakdown_Category_Item rows = total',spec.colTotal(lg,'Rows'),N);
   spec.add('Fact_Rental_Rates',[{h:'Plant',t:'s'},{h:'Vendor',t:'s'},{h:'Project',t:'s'},{h:'Category',t:'s'},{h:'Item',t:'s'},{h:'Model',t:'s'},{h:'Qty',t:'n'},{h:'Rate_Type',t:'s'},
     {h:'Unit_Cost_EGP',t:'m'},{h:'Daily_Rate_Total_EGP',t:'m'},{h:'Monthly_Rate_Total_EGP',t:'m'},{h:'Rate_Date',t:'d'},{h:'Month',t:'s'},{h:'Standby_Rate',t:'p'},
     {h:'Fuel_By',t:'s'},{h:'Transportation_By',t:'s'},{h:'Contract',t:'s'},{h:'Contact',t:'s'},{h:'Note',t:'s'},{h:'Data_Flags',t:'s'}],
@@ -13856,8 +13856,7 @@ function buildMasterOwned(){
     M('Fuel_Liters',function(x){ return r6(sum(x,function(y){ return y.fuel; })); },'n'),M('Avg_Utilization_Pct',function(x){ return rnd(avg(x,function(y){ return y.utl; }),1); },'n')];
   var allU=sum(R,function(y){ return y.u; });
   spec.add('KPI',[{h:'Section',t:'s'},{h:'Metric',t:'s'},{h:'Value',t:'n'},{h:'Note',t:'s'}],[
-    ['Master Owned','Equipment rows',N,'Rows matching the page filters'],['Master Owned','Unit-months (Σ units over rows)',round(allU,1),'A unit counted once per month (same code, same month = one machine)'],
-    ['Master Owned','Avg units per month',rnd(allU/months(R),1),'Unit-months ÷ distinct months — what the page shows for Fleet Equipment when more than one month is in scope'],
+        ['Master Owned','Avg units per month',rnd(allU/months(R),1),'Unit-months ÷ distinct months — what the page shows for Fleet Equipment when more than one month is in scope'],
     ['Master Owned','Months in scope',months(R),''],['Master Owned','Money made (EGP)',r6(sum(R,function(y){ return y.cost; })),'Σ Total Cost'],
     ['Master Owned','Standby cost (EGP)',r6(sum(R,function(y){ return y.lost; })),'Unit price × standby days × 1.2, only when standby > 10 days (page rule)'],
     ['Master Owned','OT cost (EGP)',r6(sum(R,function(y){ return y.ot; })),''],['Master Owned','Fuel (liters)',r6(sum(R,function(y){ return y.fuel; })),''],
@@ -13901,7 +13900,7 @@ function buildMasterRental(){
     M('Fuel_Liters',function(x){ return r6(sum(x,function(y){ return y.fuel; })); },'n'),M('Avg_Utilization_Pct',function(x){ return rnd(avg(x,function(y){ return y.utl; }),1); },'n')];
   var allU=sum(R,function(y){ return y.u; }), tot=sum(R,function(y){ return y.total; }), ot=sum(R,function(y){ return y.ot; }), de=sum(R,function(y){ return y.ded; });
   spec.add('KPI',[{h:'Section',t:'s'},{h:'Metric',t:'s'},{h:'Value',t:'n'},{h:'Note',t:'s'}],[
-    ['Master Rental','Equipment rows',N,'Rows matching the page filters'],['Master Rental','Units (Σ qty, qty>0)',round(allU,1),'Rows with qty ≤ 0 are ignored for units, never for money (page rule)'],
+    ['Master Rental','Units (Σ qty, qty>0)',round(allU,1),'Rows with qty ≤ 0 are ignored for units, never for money (page rule)'],
     ['Master Rental','Avg units per month',rnd(allU/months(R),1),''],['Master Rental','Total price (EGP)',rnd(tot,2),''],['Master Rental','OT cost (EGP)',rnd(ot,2),''],
     ['Master Rental','Total deduct (EGP)',round(de,2),''],['Master Rental','Net value (EGP)',round(tot+ot-de,2),'Total price + OT − deduct (page formula)'],
     ['Master Rental','Fuel (liters)',r6(sum(R,function(y){ return y.fuel; })),''],['Master Rental','Projects',distinct(R,function(y){ return y.proj; }),''],['Master Rental','O.D Engineers',distinct(R,function(y){ return y.od; }),'']]);
@@ -14016,7 +14015,7 @@ function finalize(spec,pageId){
     var ok=Math.abs((+c.a||0)-(+c.b||0))<=0.01; info.push(['Check: '+c.label,ok?'OK':'MISMATCH ('+c.a+' vs '+c.b+')']);
   });
   spec.notes.forEach(function(n){ info.push(['Note',n]); });
-  info.push(['Share_Pct','Share of the sheet\'s main measure (Units / Items / Requests / Records / Unit_Months / Total_Price) — each sheet\'s shares add up to 100%.']);
+  info.push(['Share_Pct','Share of the sheet\'s main measure (Units / Items / Requests / Rows / Unit_Months / Total_Price) — each sheet\'s shares add up to 100%.']);
   info.push(['How_to_use','Power BI ▸ Get data ▸ Excel workbook ▸ pick this file ▸ tick the tables (tbl_…) you need. Every sheet is a clean flat table with a header row — no merged cells, no titles above the data.']);
   spec.sheets.unshift({name:'Info',cols:[{h:'Item',t:'s'},{h:'Value',t:'s'}],rows:info.map(function(r){ return [r[0],String(r[1])]; }),kind:'info'});
   var bad=spec.checks.filter(function(c){ return Math.abs((+c.a||0)-(+c.b||0))>0.01; });
