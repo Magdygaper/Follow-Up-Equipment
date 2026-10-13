@@ -380,6 +380,11 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
 .rd-tbl th[data-rd="sort"]:hover{color:var(--text);}
 .rd-warn{color:var(--accent);font-weight:600;}
 .rd-hist{cursor:pointer;}
+.rd-tbl th{vertical-align:top;}
+.rd-fsel{display:block;margin-top:4px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:11px;padding:3px 4px;max-width:150px;min-width:70px;text-transform:none;letter-spacing:0;font-family:inherit;}
+.rd-fsel.on{border-color:var(--accent);color:var(--accent);}
+.rd-dif{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;color:#f0a500;background:rgba(240,165,0,.14);border:1px solid rgba(240,165,0,.5);white-space:nowrap;}
+.rd-dif.ur{color:#ff7b72;background:rgba(248,81,73,.14);border-color:rgba(248,81,73,.5);}
 .rd-hist:hover{color:var(--blue);text-decoration:underline;}
 .rd-ur{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;color:#ff7b72;background:rgba(248,81,73,.14);border:1px solid rgba(248,81,73,.45);}
 .rd-muted{color:var(--text-dim);}
@@ -11950,7 +11955,7 @@ pmLoadOdMap();
 var COL='rental_database', DSID='_dataset', CHUNK=150, PAGE=150;
 var CCY='EGP', HIGH_DAILY=40000;          /* daily rates at/above this are flagged "verify basis" */
 var rows=[], meta=null, loaded=false;
-var F={plant:null,cat:null,rate:null,fuel:null,trans:null,sb:null,month:null,vendor:null,project:null,item:null,model:null,check:null,q:''};
+var F={plant:null,cat:null,rate:null,fuel:null,trans:null,sb:null,month:null,vendor:null,project:null,item:null,model:null,check:null,dif:null,q:''};
 var sortKey='date', sortDir=-1, limit=PAGE, allTypes=false, metric='n';
 var MN={n:'records',d:'sum of daily rates ('+CCY+'/day)',m:'sum of monthly rates ('+CCY+'/month)'};
 var FUELL={HA:'HA · fuel on HAC',Owner:'Owner · fuel on contractor'};
@@ -12213,7 +12218,7 @@ function decorate(){
   var seen={};
   rows.forEach(function(r){
     r.plant=r.plant||'—'; r.vendor=r.vendor||'—'; r.project=r.project||'—';
-    r.catL=r.cat||'Uncategorized';
+    r.catL=r.cat||'Uncategorized'; r.modelL=r.model||'\u2014';
     var rl=r.rate; r.rateL=rl?rl.charAt(0).toUpperCase()+rl.slice(1):'Unspecified';
     r.fuelL=r.fuel||'Unspecified'; r.transL=r.trans||'Unspecified';
     r.sbL=r.sb==null?'—':Math.round(r.sb*100)+'%';
@@ -12227,12 +12232,42 @@ function decorate(){
     r.flags=f;
     r._h=(r.item+' '+r.model+' '+r.vendor+' '+r.project+' '+r.contact+' '+r.plant+' '+r.note+' '+r.contract).toLowerCase();
   });
+  computeDif();
 }
-var FIELD={plant:'plant',cat:'catL',rate:'rateL',fuel:'fuelL',trans:'transL',sb:'sbL',month:'month',vendor:'vendor',project:'project',item:'item',model:'model'};
-function freshF(){ return {plant:null,cat:null,rate:null,fuel:null,trans:null,sb:null,month:null,vendor:null,project:null,item:null,model:null,check:null,q:''}; }
+/* DIF = same plant + project + vendor + equipment + capacity + rate basis, but the unit cost is NOT the usual one.
+   "Usual" = most frequent price among the rows NOT marked under-repair (tie -> latest date).
+   r.dif: 0 = normal, 1 = DIF, 2 = DIF + under repair (note says under repair / breakdown / صيانة ...) */
+function isUR(r){ return !!(UR_RX&&UR_RX.test(String(r.note||''))); }
+function computeDif(){
+  var g={};
+  rows.forEach(function(r){
+    r.dif=0; r.difBase=null; r.ur=isUR(r);
+    if(r.cost==null) return;
+    var k=[r.plant,r.project,r.vendor,r.item,modelKey(r.model||''),r.rate].join('|');
+    (g[k]=g[k]||[]).push(r);
+  });
+  Object.keys(g).forEach(function(k){
+    var G=g[k]; if(G.length<2) return;
+    var pool=G.filter(function(r){ return !r.ur; }); if(!pool.length) pool=G;
+    var cnt={}, last={};
+    pool.forEach(function(r){ cnt[r.cost]=(cnt[r.cost]||0)+1; if(!last[r.cost]||(r.date||'')>last[r.cost]) last[r.cost]=r.date||''; });
+    var base=null, bn=-1, bd='';
+    Object.keys(cnt).forEach(function(c){ var n=cnt[c], d=last[c]; if(n>bn||(n===bn&&d>bd)){ base=+c; bn=n; bd=d; } });
+    if(Object.keys(cnt).length<2 && G.every(function(r){ return r.cost===base; })) return;
+    G.forEach(function(r){ if(r.cost!==base){ r.difBase=base; r.dif=r.ur?2:1; } });
+  });
+}
+var FIELD={plant:'plant',cat:'catL',rate:'rateL',fuel:'fuelL',trans:'transL',sb:'sbL',month:'month',vendor:'vendor',project:'project',item:'item',model:'modelL'};
+function freshF(){ return {plant:null,cat:null,rate:null,fuel:null,trans:null,sb:null,month:null,vendor:null,project:null,item:null,model:null,check:null,dif:null,q:''}; }
 function pass(r,skip){
   for(var k in FIELD){ if(k!==skip&&F[k]!==null&&r[FIELD[k]]!==F[k]) return false; }
   if(skip!=='check'&&F.check){ if(F.check==='any'){ if(!r.flags.length) return false; } else if(r.flags.indexOf(F.check)<0) return false; }
+  if(skip!=='dif'&&F.dif){
+    if(F.dif==='dif'){ if(!r.dif) return false; }
+    else if(F.dif==='ur'){ if(r.dif!==2) return false; }
+    else if(F.dif==='oth'){ if(r.dif!==1) return false; }
+    else if(F.dif==='none'){ if(r.dif) return false; }
+  }
   if(F.q&&r._h.indexOf(F.q)<0) return false;
   return true;
 }
@@ -12277,13 +12312,14 @@ function syncSelects(){
 function syncSeg(){ document.querySelectorAll('#rd-seg [data-rd="metric"]').forEach(function(b){ b.classList.toggle('on',b.getAttribute('data-v')===metric); }); }
 function render(){ renderChips(); renderCards(); renderPanels(); renderTable(); syncSelects(); syncSeg(); }
 
-var CHIP={plant:'Plant',cat:'Category',rate:'Rate',fuel:'Fuel',trans:'Transport',sb:'S.B',month:'Month',vendor:'Vendor',project:'Project',item:'Equipment',model:'Capacity',check:'Check'};
+var CHIP={plant:'Plant',cat:'Category',rate:'Rate',fuel:'Fuel',trans:'Transport',sb:'S.B',month:'Month',vendor:'Vendor',project:'Project',item:'Equipment',model:'Capacity',dif:'DIF',check:'Check'};
+var DIFL={dif:'DIF (any)',ur:'DIF \u00b7 under repair',oth:'DIF \u00b7 other reason',none:'No DIF'};
 var CHECK={any:'Needs review',nocat:'No category',high:'Daily ≥ '+fmt(HIGH_DAILY),unspec:'Fuel/transport unspecified',dup:'Identical rows'};
 function renderChips(){
   var bar=$('rd-filterbar'), h='', any=false;
   Object.keys(CHIP).forEach(function(k){
     if(F[k]===null||F[k]==='') return; any=true;
-    var v=k==='month'?monLabel(F[k]):(k==='check'?CHECK[F[k]]:F[k]);
+    var v=k==='month'?monLabel(F[k]):(k==='check'?CHECK[F[k]]:(k==='dif'?DIFL[F[k]]:F[k]));
     h+='<span class="filter-chip" data-rd="clear" data-v="'+k+'">'+CHIP[k]+': <b>'+E(v)+'</b> <span class="filter-chip-close">✕</span></span>';
   });
   if(F.q){ any=true; h+='<span class="filter-chip" data-rd="clear" data-v="q">Search: <b>'+E(F.q)+'</b> <span class="filter-chip-close">✕</span></span>'; }
@@ -12315,6 +12351,7 @@ function renderCards(){
     +card(fmt(uniq(L,function(r){return r.item;})),'Equipment types',ofT(0,uniq(rows,function(r){return r.item;})))
     +card(compact(sumD),'Daily rates total ('+CCY+'/day)',fmt(nDaily)+' daily rows · sum of listed rates, not actual spend',{})
     +card(compact(sumM),'Monthly rates total ('+CCY+'/month)',fmt(nMonthly)+' monthly rows · sum of listed rates, not actual spend',{})
+    +card(fmt(L.filter(function(r){return r.dif;}).length),'DIF rows \u00b7 '+fmt(L.filter(function(r){return r.dif===2;}).length)+' under repair',fmt(L.filter(function(r){return r.dif;}).length)+' rows priced differently from the usual price of the same equipment',{act:'dif',v:'dif',on:F.dif==='dif',warn:L.some(function(r){return r.dif===2;})})
     +card(fmt(med),'Median daily rate ('+CCY+')',dc.length?'middle half: '+fmt(q1)+' – '+fmt(q3)+' · '+fmt(dc.length)+' daily rows':'no daily-rate rows')
     +card(L.length?Math.round(nDaily/L.length*100)+'%':'—','Priced per day',fmt(nDaily)+' daily · '+fmt(nMonthly)+' monthly · '+fmt(nOther)+' trip / hour / other',{act:'rate',v:'Daily',on:F.rate==='Daily'})
     +card(L.length?Math.round(nHA/L.length*100)+'%':'—','Fuel paid by HAC (HA)',fmt(nHA)+' HA · '+fmt(nOwn)+' owner (contractor pays) · '+fmt(L.length-nHA-nOwn)+' blank',{act:'fuel',v:'HA',on:F.fuel==='HA'});
@@ -12341,14 +12378,14 @@ function renderPanels(){
   var cc=(typeof CAT_COLORS!=='undefined')?CAT_COLORS:{}; var colors={}; Object.keys(cc).forEach(function(k){ colors[k]=cc[k]; }); colors['Uncategorized']='#7d8590';
   var h='';
 
-  var byCat=countBy(list('cat'),function(r){return r.catL;});
+  var byCat=countBy(list(),function(r){return r.catL;});
   h+=panel('Equipment categories','By '+MN[metric],barRows(byCat,'cat',{colors:colors}));
 
-  var byPlant=countBy(list('plant'),function(r){return r.plant;});
+  var byPlant=countBy(list(),function(r){return r.plant;});
   h+=panel('Plants','By '+MN[metric],barRows(byPlant,'plant',{color:'var(--blue)'}));
 
-  var allMonths=Object.keys(rows.reduce(function(o,r){ if(r.month) o[r.month]=1; return o; },{})).sort();
-  var mc={}; list('month').forEach(function(r){ if(r.month) mc[r.month]=(mc[r.month]||0)+val(r,metric); });
+  var allMonths=Object.keys(list().reduce(function(o,r){ if(r.month) o[r.month]=1; return o; },{})).sort();
+  var mc={}; list().forEach(function(r){ if(r.month) mc[r.month]=(mc[r.month]||0)+val(r,metric); });
   var mmax=Math.max.apply(null,allMonths.map(function(m){return mc[m]||0;}).concat([1]));
   h+=panel('By month','Rate date · '+MN[metric],
     '<div class="rd-months">'+allMonths.map(function(m){
@@ -12356,21 +12393,21 @@ function renderPanels(){
       return '<div class="rd-mcol'+(F.month===m?' on':'')+'" data-rd="month" data-v="'+enc(m)+'"><span class="rd-mn">'+(metric==='n'?fmt(n):compact(n))+'</span><span class="rd-mbw"><span class="rd-mb" style="height:'+(n/mmax*100)+'%"></span></span><span class="rd-ml">'+monLabel(m)+'</span></div>';
     }).join('')+'</div>');
 
-  var byV=countBy(list('vendor'),function(r){return r.vendor;});
+  var byV=countBy(list(),function(r){return r.vendor;});
   h+=panel('Top vendors','Top 10 of '+fmt(byV.length)+' by '+MN[metric],barRows(byV.slice(0,10),'vendor',{color:'#a371f7'}));
 
-  var byP=countBy(list('project'),function(r){return r.project;});
+  var byP=countBy(list(),function(r){return r.project;});
   h+=panel('Top projects','Top 10 of '+fmt(byP.length)+' by '+MN[metric],barRows(byP.slice(0,10),'project',{color:'var(--green)'}));
 
   var terms='<div class="rd-terms">'
-    +'<div><div class="rd-tblock-t">Rate basis</div>'+barRows(countBy(list('rate'),function(r){return r.rateL;}),'rate',{color:'var(--accent)'})+'</div>'
-    +'<div><div class="rd-tblock-t">Fuel cost — who pays</div>'+barRows(countBy(list('fuel'),function(r){return r.fuelL;}).map(function(i){ i.label=FUELL[i.v]||i.v; return i; }),'fuel',{color:'var(--blue)'})+'</div>'
-    +'<div><div class="rd-tblock-t">Transportation</div>'+barRows(countBy(list('trans'),function(r){return r.transL;}),'trans',{color:'#ffa657'})+'</div>'
-    +'<div><div class="rd-tblock-t">Stand-By (S.B) rate</div>'+barRows(countBy(list('sb'),function(r){return r.sbL;}).sort(function(a,b){ return (a.v==='—')-(b.v==='—')||b.n-a.n; }),'sb',{color:'#bc8cff'})+'</div></div>';
+    +'<div><div class="rd-tblock-t">Rate basis</div>'+barRows(countBy(list(),function(r){return r.rateL;}),'rate',{color:'var(--accent)'})+'</div>'
+    +'<div><div class="rd-tblock-t">Fuel cost — who pays</div>'+barRows(countBy(list(),function(r){return r.fuelL;}).map(function(i){ i.label=FUELL[i.v]||i.v; return i; }),'fuel',{color:'var(--blue)'})+'</div>'
+    +'<div><div class="rd-tblock-t">Transportation</div>'+barRows(countBy(list(),function(r){return r.transL;}),'trans',{color:'#ffa657'})+'</div>'
+    +'<div><div class="rd-tblock-t">Stand-By (S.B) rate</div>'+barRows(countBy(list(),function(r){return r.sbL;}).sort(function(a,b){ return (a.v==='—')-(b.v==='—')||b.n-a.n; }),'sb',{color:'#bc8cff'})+'</div></div>';
   h+=panel('Commercial terms','Owner = rate includes fuel, contractor pays the diesel · HA = rate is equipment only, HAC pays the diesel',terms,true);
 
   /* daily-rate benchmark per equipment type */
-  var LI=list('item'), g={};
+  var LI=list(), g={};
   LI.forEach(function(r){ var o=g[r.item]||(g[r.item]={n:0,d:[]}); o.n++; if(r.rate==='daily'&&r.cost!=null) o.d.push(r.cost); });
   var types=Object.keys(g).map(function(k){ var d=g[k].d.sort(function(a,b){return a-b;}); return {v:k,n:g[k].n,min:d.length?d[0]:null,med:pctl(d,.5),max:d.length?d[d.length-1]:null}; })
     .sort(function(a,b){ return b.n-a.n||a.v.localeCompare(b.v); });
@@ -12416,8 +12453,28 @@ function renderPanels(){
   $('rd-panels').innerHTML=h;
 }
 
-var COLS=[['contract','Contract'],['item','Equipment'],['model','Model / Capacity'],['catL','Category'],['rateL','Rate'],['cost','Unit cost'],['sb','S.B'],['vendor','Vendor'],
+var COLF={item:'item',modelL:'model',catL:'cat',rateL:'rate',cost:'dif',sb:'sb',vendor:'vendor',project:'project',plant:'plant',date:'month',fuelL:'fuel',transL:'trans'};
+var COLS=[['contract','Contract'],['item','Equipment'],['modelL','Model / Capacity'],['catL','Category'],['rateL','Rate'],['cost','Unit cost'],['sb','S.B'],['vendor','Vendor'],
           ['project','Project'],['plant','Plant'],['date','Date'],['fuelL','Fuel'],['transL','Transport'],['contact','Contact'],['note','Note']];
+function difBadge(r){
+  if(!r.dif) return '';
+  var tip='Usual price for this equipment: '+fmt(r.difBase,2)+(r.dif===2?' \u00b7 under repair'+(r.note?' \u2014 '+r.note:''):'');
+  return r.dif===2?' <span class="rd-dif ur" title="'+E(tip)+'">DIF \u00b7 \ud83d\udd27 Under repair</span>':' <span class="rd-dif" title="'+E(tip)+'">DIF</span>';
+}
+/* column-header filter dropdown (same idea as Master Rental): options follow every OTHER active filter */
+function fSel(key){
+  var cur=F[key], h='<select class="rd-fsel'+(cur?' on':'')+'" data-rdf="'+key+'"><option value="">All</option>';
+  if(key==='dif'){
+    [['dif','DIF (any)'],['ur','DIF \u00b7 under repair'],['oth','DIF \u00b7 other reason'],['none','No DIF']].forEach(function(o){ h+='<option value="'+o[0]+'"'+(cur===o[0]?' selected':'')+'>'+o[1]+'</option>'; });
+    return h+'</select>';
+  }
+  var fld=FIELD[key], set={};
+  list(key).forEach(function(r){ var v=r[fld]; if(v!=null&&v!=='') set[v]=1; });
+  if(cur&&!set[cur]) set[cur]=1;
+  var keys=Object.keys(set).sort(function(a,b){ return a.localeCompare(b,undefined,{numeric:true}); });
+  keys.forEach(function(k){ h+='<option value="'+E(k)+'"'+(cur===k?' selected':'')+'>'+E(key==='month'?monLabel(k):k)+'</option>'; });
+  return h+'</select>';
+}
 function renderTable(){
   var L=list();
   L.sort(function(a,b){
@@ -12430,7 +12487,7 @@ function renderTable(){
   var cc=(typeof CAT_COLORS!=='undefined')?CAT_COLORS:{};
   var th='<th>#</th>'+COLS.map(function(c){
     var arrow=sortKey===c[0]?(sortDir>0?' ▲':' ▼'):'';
-    return '<th data-rd="sort" data-v="'+c[0]+'">'+c[1]+arrow+'</th>';
+    return '<th><span data-rd="sort" data-v="'+c[0]+'" style="cursor:pointer;">'+c[1]+arrow+'</span>'+(COLF[c[0]]?fSel(COLF[c[0]]):'')+'</th>';
   }).join('');
   LASTL=L.slice(0,limit);
   var body=L.slice(0,limit).map(function(r,i){
@@ -12441,9 +12498,9 @@ function renderTable(){
       +'<td>'+E(r.model||'—')+'</td>'
       +'<td><span class="cat-badge"'+(cc[r.catL]?' style="border-left:3px solid '+cc[r.catL]+'"':'')+'>'+(r.cat?E(r.cat):'<span class="rd-muted">Uncategorized</span>')+'</span></td>'
       +'<td>'+E(r.rateL)+'</td>'
-      +'<td class="code-cell'+(flagged?' rd-warn':'')+'" title="'+(flagged?'Daily rate ≥ '+fmt(HIGH_DAILY)+' — verify basis':'')+'">'+fmt(r.cost,2)+'</td>'
+      +'<td class="code-cell'+(flagged?' rd-warn':'')+'" title="'+(flagged?'Daily rate ≥ '+fmt(HIGH_DAILY)+' — verify basis':'')+'">'+fmt(r.cost,2)+difBadge(r)+'</td>'
       +'<td>'+E(r.sbL)+'</td>'
-      +'<td class="rd-hist" data-rdh="'+i+'" title="Click: its work in the previous months">'+E(r.vendor||'—')+'</td><td class="rd-hist" data-rdh="'+i+'" title="Click: its work in the previous months">'+E(r.project||'—')+(UR_RX&&UR_RX.test(String(r.note||''))?' <span class="rd-ur" title="'+E(r.note)+'">🔧 Under repair</span>':'')+'</td><td>'+E(r.plant||'—')+'</td>'
+      +'<td class="rd-hist" data-rdh="'+i+'" title="Click: its work in the previous months">'+E(r.vendor||'—')+'</td><td class="rd-hist" data-rdh="'+i+'" title="Click: its work in the previous months">'+E(r.project||'—')+(r.dif!==2&&UR_RX&&UR_RX.test(String(r.note||''))?' <span class="rd-ur" title="'+E(r.note)+'">🔧 Under repair</span>':'')+'</td><td>'+E(r.plant||'—')+'</td>'
       +'<td class="code-cell" style="color:var(--text-muted);">'+dateLabel(r.date)+'</td>'
       +'<td>'+E(r.fuelL)+'</td><td>'+E(r.transL)+'</td><td>'+E(r.contact||'—')+'</td>'
       +'<td><div class="rd-note" dir="auto" title="'+E(r.note)+'">'+E(r.note||'—')+'</div></td></tr>';
@@ -12641,6 +12698,7 @@ window.rdLastPrice=function(equipmentName,projectName,cb,capacityText){
 
 /* ───────────── 5) EVENTS ───────────── */
 document.addEventListener('click',function(e){
+  if(e.target.closest&&e.target.closest('.rd-fsel')) return;
   var t=e.target.closest?e.target.closest('#page-rentaldb [data-rd]'):null; if(!t||!rows) return;
   var k=t.getAttribute('data-rd'), v=decodeURIComponent(t.getAttribute('data-v')||'');
   if(k==='clearall'){ F=freshF(); $('rd-q').value=''; }
@@ -12649,7 +12707,7 @@ document.addEventListener('click',function(e){
   else if(k==='more'){ limit+=PAGE; renderTable(); return; }
   else if(k==='metric'){ metric=v; syncSeg(); renderPanels(); return; }
   else if(k==='alltypes'){ allTypes=!allTypes; renderPanels(); return; }
-  else if(FIELD[k]||k==='check'){ F[k]=(F[k]===v)?null:v; if(k==='item') F.model=null; }
+  else if(FIELD[k]||k==='check'||k==='dif'){ F[k]=(F[k]===v)?null:v; if(k==='item') F.model=null; }
   else return;
   limit=PAGE; render();
 });
@@ -12660,6 +12718,8 @@ document.addEventListener('input',function(e){
   qT=setTimeout(function(){ F.q=clean(val).toLowerCase(); limit=PAGE; render(); },180);
 });
 document.addEventListener('change',function(e){
+  var fk=e.target&&e.target.getAttribute&&e.target.getAttribute('data-rdf');
+  if(fk){ F[fk]=e.target.value||null; if(fk==='item') F.model=null; limit=PAGE; render(); return; }
   var id=e.target&&e.target.id, map={'rd-sel-plant':'plant','rd-sel-cat':'cat','rd-sel-rate':'rate'};
   if(!map[id]) return; F[map[id]]=e.target.value||null; limit=PAGE; render();
 });
@@ -13394,7 +13454,7 @@ try{console.log('%cHAC \u00b7 PMV','color:#f0a500;font-size:18px;font-weight:700
     var L=(HM.byCode[normCode(code)]||[]).slice().sort(function(a,b){ return a.m<b.m?1:a.m>b.m?-1:b.n-a.n; });
     if(!L.length) return '';
     var h='<div style="margin:6px 0 12px;"><div style="font-size:11px;letter-spacing:1px;color:var(--text-muted);margin-bottom:6px;">HOUR METER READINGS</div><table style="width:100%;font-size:12px;border-collapse:collapse;"><thead><tr style="color:var(--text-muted);text-align:left;"><th style="padding:3px 6px;">Month</th><th>Start</th><th>End</th><th>Diff</th></tr></thead><tbody>';
-    L.forEach(function(r){ var d=(r.s!=null&&r.e>0)?(r.e-r.s):null; h+='<tr style="border-top:1px solid var(--border);"><td style="padding:4px 6px;">'+ymLabel(r.m)+'</td><td style="font-family:monospace;">'+(r.s!=null?fmtN(r.s):'—')+'</td><td style="font-family:monospace;font-weight:700;">'+fmtN(r.e)+'</td><td style="font-family:monospace;color:var(--text-muted);">'+(d!=null?fmtN(d):'—')+'</td></tr>'; });
+    L.forEach(function(r){ var d=(r.s!=null&&r.e>0)?(r.e-r.s):null; var _lw=(window.hmLowTag?window.hmLowTag(code,r.m,d):''); h+='<tr style="border-top:1px solid var(--border);"><td style="padding:4px 6px;">'+ymLabel(r.m)+'</td><td style="font-family:monospace;">'+(r.s!=null?fmtN(r.s):'—')+'</td><td style="font-family:monospace;font-weight:700;">'+fmtN(r.e)+'</td><td style="font-family:monospace;color:var(--text-muted);">'+(d!=null?fmtN(d)+_lw:'—')+'</td></tr>'; });
     return h+'</tbody></table></div>';
   };
   window.hmSetMonth=function(v){ HM.sel=v||''; if(typeof renderTable==='function') renderTable(); };
@@ -14280,7 +14340,7 @@ window.HACBI={exportPage:exportPage,dashboard:openDashboard,build:function(id){ 
 <script>
 /* ═════ Low H/M usage — units whose monthly hour-meter difference (End − Start) is below a limit ═════ */
 (function(){
-  var LS='hm_low_thr_v1', thr={eq:80,gen:125,inc:false}, ST={ym:'',fleet:'all',q:''}, LAST=[];
+  var LS='hm_low_thr_v1', thr={eq:80,gen:125,inc:false}, ST={ym:'',fleet:'all',q:'',ur:''}, LAST=[];
   try{ var o=JSON.parse(localStorage.getItem(LS)||'null'); if(o){ thr.eq=isFinite(+o.eq)?+o.eq:80; thr.gen=isFinite(+o.gen)?+o.gen:125; thr.inc=!!o.inc; } }catch(e){}
   function HMS(){ return window.HM_STATE||{byCode:{},months:[],latest:'',loaded:false,rows:[]}; }
   function esc(v){ return (typeof _hacEsc==='function')?_hacEsc(v):String(v==null?'':v); }
@@ -14293,6 +14353,49 @@ window.HACBI={exportPage:exportPage,dashboard:openDashboard,build:function(id){ 
   function catOf(e){ try{ return (typeof catKey==='function')?catKey(e):(e.category||''); }catch(x){ return e.category||''; } }
   function capOf(e){ try{ var c=eqCapacity(e); var v=c&&c.v; return (v&&v!=='\u2014')?v:''; }catch(x){ return ''; } }
   var FL={egypt:'Egypt',ksa:'Saudi Arabia',algeria:'Algeria',uae:'UAE',foundation:'Foundation',tunnelling:'Tunnelling'};
+  /* ---- Under-repair detection: Master Owned repair days for that month, or a Workshop record overlapping the month ---- */
+  var _mo={ref:null,len:-1,map:{}};
+  function moMap(){
+    var D=[]; try{ D=(window.MO&&typeof window.MO.data==='function')?(window.MO.data()||[]):[]; }catch(x){}
+    if(_mo.ref!==D||_mo.len!==D.length){
+      var m={}; D.forEach(function(r){ var rp=parseFloat(r.repair)||0; if(rp<=0) return; var ym=r.month||(r.hiring?String(r.hiring).slice(0,7):''); if(!ym||!r.code) return; var k=norm(r.code)+'|'+ym; m[k]=(m[k]||0)+rp; });
+      _mo={ref:D,len:D.length,map:m};
+    }
+    return _mo.map;
+  }
+  function repairInfo(code,ym){
+    if(!code||!ym) return null;
+    var d=moMap()[norm(code)+'|'+ym];
+    if(d>0) return {label:'Under Repair',days:d,detail:d+' repair day'+(d===1?'':'s')+' in '+lab(ym)+' (Master Owned)'};
+    var p=String(ym).split('-'), a=new Date(Date.UTC(+p[0],+p[1]-1,1)), b=new Date(Date.UTC(+p[0],+p[1],0,23,59,59)), hit=null, c=norm(code);
+    (typeof wsEquipment!=='undefined'?wsEquipment:[]).forEach(function(w){
+      if(norm(w.code)!==c) return;
+      var en=w.entryDate?new Date(w.entryDate):null, ex=w.exitDate?new Date(w.exitDate):null;
+      if(en&&isNaN(+en)) en=null; if(ex&&isNaN(+ex)) ex=null;
+      if(w.status==='Dispatched'&&!ex) return;
+      if(en&&en>b) return; if(ex&&ex<a) return;
+      hit=w;
+    });
+    if(hit){ var done=(hit.status==='Ready'||hit.status==='Dispatched'); return {label:done?'Workshop':'Under Repair',days:null,detail:'Workshop \u00b7 '+(hit.status||'In workshop')+(hit.entryDate?' \u00b7 since '+hit.entryDate:'')}; }
+    return null;
+  }
+  function urBadge(info){
+    if(!info) return '';
+    var red=info.label==='Under Repair', col=red?'#ff7b72':'#f0a500', bg=red?'rgba(248,81,73,.14)':'rgba(240,165,0,.14)', bd=red?'rgba(248,81,73,.5)':'rgba(240,165,0,.5)';
+    return '<span title="'+esc(info.detail)+'" style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;white-space:nowrap;color:'+col+';background:'+bg+';border:1px solid '+bd+';">\ud83d\udd27 '+esc(info.label)+(info.days?' \u00b7 '+fmt(info.days)+' d':'')+'</span>';
+  }
+  function limitFor(code){
+    var c=norm(code), e=null;
+    (typeof allEquipment!=='undefined'?allEquipment:[]).some(function(x){ if(norm(x.code)===c){ e=x; return true; } return false; });
+    return (e&&isGen(e))?thr.gen:thr.eq;
+  }
+  window.hmRepairInfo=repairInfo;
+  /* tag used inside the per-equipment "HOUR METER READINGS" table next to the DIFF value */
+  window.hmLowTag=function(code,ym,d){
+    if(d==null) return ''; var lim=limitFor(code); if(!(d<lim)) return '';
+    var info=repairInfo(code,ym);
+    return ' <span title="below the '+lim+' h limit" style="font-size:10px;font-weight:700;color:#e3a008;">LOW</span> '+(info?urBadge(info):'');
+  };
   function compute(){
     var out=[], withRead=0, total=0, q=ST.q.trim().toLowerCase();
     (typeof allEquipment!=='undefined'?allEquipment:[]).forEach(function(e){
@@ -14304,6 +14407,8 @@ window.HACBI={exportPage:exportPage,dashboard:openDashboard,build:function(id){ 
       if(!r){ if(thr.inc) item={e:e,g:g,lim:lim,r:null,d:null}; }
       else if(r.s!=null){ withRead++; var d=r.e-r.s; if(d<lim) item={e:e,g:g,lim:lim,r:r,d:d}; }
       if(!item) return;
+      item.ur=repairInfo(e.code,ST.ym);
+      if(ST.ur==='only'&&!item.ur) return; if(ST.ur==='hide'&&item.ur) return;
       if(q){ var hay=(String(e.code||'')+' '+(e.equipment||'')+' '+(e.project||'')+' '+(e.od||'')+' '+(e.brand||'')).toLowerCase(); if(hay.indexOf(q)<0) return; }
       out.push(item);
     });
@@ -14322,7 +14427,7 @@ window.HACBI={exportPage:exportPage,dashboard:openDashboard,build:function(id){ 
     var H=HMS(), body=document.getElementById('hm-low-body'); if(!body) return;
     if(!H.months.length){ body.innerHTML='<div style="padding:30px;text-align:center;color:var(--text-muted);">No hour-meter data loaded yet. Import the H/M sheet first.</div>'; return; }
     if(!ST.ym||H.months.indexOf(ST.ym)<0) ST.ym=H.latest;
-    var R=compute(), nG=R.rows.filter(function(x){return x.g&&x.d!=null;}).length, nE=R.rows.filter(function(x){return !x.g&&x.d!=null;}).length, nN=R.rows.filter(function(x){return x.d==null;}).length;
+    var R=compute(), nG=R.rows.filter(function(x){return x.g&&x.d!=null;}).length, nE=R.rows.filter(function(x){return !x.g&&x.d!=null;}).length, nN=R.rows.filter(function(x){return x.d==null;}).length, nR=R.rows.filter(function(x){return x.ur;}).length;
     var inp='background:var(--bg);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:6px;font-size:12px;';
     var h='<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:10px;font-size:12px;">'
       +'<label>Month <select id="hml-ym" style="'+inp+'">'+H.months.slice().reverse().map(function(m){ return '<option value="'+m+'"'+(m===ST.ym?' selected':'')+'>'+lab(m)+'</option>'; }).join('')+'</select></label>'
@@ -14331,21 +14436,23 @@ window.HACBI={exportPage:exportPage,dashboard:openDashboard,build:function(id){ 
       +'<label>Fleet <select id="hml-fl" style="'+inp+'"><option value="all">All fleets</option>'+Object.keys(FL).map(function(k){ return '<option value="'+k+'"'+(ST.fleet===k?' selected':'')+'>'+FL[k]+'</option>'; }).join('')+'</select></label>'
       +'<label><input id="hml-inc" type="checkbox"'+(thr.inc?' checked':'')+'> include units with no reading this month</label>'
       +'<input id="hml-q" placeholder="Search code / equipment / project / O.D" value="'+esc(ST.q)+'" style="'+inp+'min-width:230px;">'
+      +'<label>Repair <select id="hml-ur" style="'+inp+'"><option value="">All units</option><option value="only"'+(ST.ur==='only'?' selected':'')+'>Under repair only</option><option value="hide"'+(ST.ur==='hide'?' selected':'')+'>Hide under repair</option></select></label>'
       +'<button class="btn-sm accent" onclick="hmLowExport()">📊 Excel</button></div>';
     h+='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">'
       +'<span class="mr-chip" style="cursor:default;">'+fmt(R.rows.length)+' units listed</span>'
       +'<span class="mr-chip" style="cursor:default;">Equipment &lt; '+thr.eq+' h: <b>'+fmt(nE)+'</b></span>'
       +'<span class="mr-chip" style="cursor:default;">Generators &lt; '+thr.gen+' h: <b>'+fmt(nG)+'</b></span>'
+      +'<span class="mr-chip" style="cursor:default;border-color:rgba(248,81,73,.5);color:#ff7b72;">\ud83d\udd27 Under repair: <b>'+fmt(nR)+'</b></span>'
       +(thr.inc?'<span class="mr-chip" style="cursor:default;">No reading: <b>'+fmt(nN)+'</b></span>':'')
       +'<span style="font-size:11px;color:var(--text-muted);align-self:center;">'+fmt(R.withRead)+' of '+fmt(R.total)+' units have a '+lab(ST.ym)+' reading</span></div>';
     var th='style="text-align:left;padding:8px 10px;font-size:10px;letter-spacing:.8px;color:var(--text-muted);position:sticky;top:0;background:var(--surface,#161b22);"';
-    h+='<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr><th '+th+'>#</th><th '+th+'>Code</th><th '+th+'>Equipment</th><th '+th+'>Category</th><th '+th+'>Brand / Model</th><th '+th+'>Capacity</th><th '+th+'>Project</th><th '+th+'>O.D</th><th '+th+'>Start</th><th '+th+'>End</th><th '+th+'>Diff (h)</th><th '+th+'>Limit</th></tr></thead><tbody>';
+    h+='<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr><th '+th+'>#</th><th '+th+'>Code</th><th '+th+'>Equipment</th><th '+th+'>Category</th><th '+th+'>Brand / Model</th><th '+th+'>Capacity</th><th '+th+'>Project</th><th '+th+'>O.D</th><th '+th+'>Start</th><th '+th+'>End</th><th '+th+'>Diff (h)</th><th '+th+'>Limit</th><th '+th+'>Repair status</th></tr></thead><tbody>';
     var lim=Math.min(R.rows.length,800);
     for(var i=0;i<lim;i++){ var x=R.rows[i], e=x.e, td='style="padding:7px 10px;border-top:1px solid var(--border);"', mono='style="padding:7px 10px;border-top:1px solid var(--border);font-family:monospace;"';
       h+='<tr><td '+td+'>'+(i+1)+'</td><td '+mono+'><span style="color:#e3a008;">'+esc(e.code||'—')+'</span></td><td '+td+'><b>'+esc(e.equipment||'—')+'</b>'+(x.g?' <span style="font-size:10px;color:var(--text-muted);">gen</span>':'')+'</td><td '+td+'>'+esc(catOf(e)||'—')+'</td><td '+td+'>'+esc(e.brand||'—')+'</td><td '+mono+'>'+esc(capOf(e)||'—')+'</td><td '+td+'>'+esc(e.project||'—')+'</td><td '+td+'>'+esc(e.od||'—')+'</td>'
         +(x.r?('<td '+mono+'>'+fmt(x.r.s)+'</td><td '+mono+'>'+fmt(x.r.e)+'</td><td '+mono+'><b style="color:'+(x.d<0?'#e3a008':'var(--red,#f85149)')+';">'+fmt(x.d)+(x.d<0?' ⚠':'')+'</b></td>'):('<td '+mono+'>—</td><td '+mono+'>—</td><td '+mono+'><span style="color:var(--text-muted);">no reading</span></td>'))
-        +'<td '+mono+'>&lt; '+x.lim+'</td></tr>'; }
-    if(!R.rows.length) h+='<tr><td colspan="12" style="padding:30px;text-align:center;color:var(--text-muted);">No units below the limit in '+lab(ST.ym)+' 🎉</td></tr>';
+        +'<td '+mono+'>&lt; '+x.lim+'</td><td '+td+'>'+(x.ur?urBadge(x.ur):'<span style="color:var(--text-muted);">\u2014</span>')+'</td></tr>'; }
+    if(!R.rows.length) h+='<tr><td colspan="13" style="padding:30px;text-align:center;color:var(--text-muted);">No units below the limit in '+lab(ST.ym)+' 🎉</td></tr>';
     h+='</tbody></table>'+(R.rows.length>lim?'<div style="font-size:11px;color:var(--text-muted);margin-top:6px;">Showing the first '+lim+' — use Excel for the full list.</div>':'');
     var keepQ=(document.activeElement&&document.activeElement.id==='hml-q'), pos=keepQ?document.activeElement.selectionStart:0;
     body.innerHTML=h; wire();
@@ -14359,6 +14466,7 @@ window.HACBI={exportPage:exportPage,dashboard:openDashboard,build:function(id){ 
     on('hml-eq','change',function(){ thr.eq=Math.max(0,+this.value||0); save(); draw(); });
     on('hml-gen','change',function(){ thr.gen=Math.max(0,+this.value||0); save(); draw(); });
     on('hml-inc','change',function(){ thr.inc=this.checked; save(); draw(); });
+    on('hml-ur','change',function(){ ST.ur=this.value; draw(); });
     on('hml-q','input',function(){ ST.q=this.value; draw(); });
   }
   window.hmLowOpen=function(){
@@ -14370,7 +14478,7 @@ window.HACBI={exportPage:exportPage,dashboard:openDashboard,build:function(id){ 
   document.addEventListener('hm-loaded',function(){ var m=document.getElementById('hm-low-modal'); if(m&&m.classList.contains('open')) draw(); });
   window.hmLowExport=function(){
     if(!LAST.length){ if(typeof toast==='function') toast('Nothing to export','error'); return; }
-    var data=LAST.map(function(x,i){ var e=x.e; return {'#':i+1,'Code':e.code||'','Equipment':e.equipment||'','Category':catOf(e),'Brand / Model':e.brand||'','Capacity':capOf(e),'Fleet':FL[e.fleet||'egypt']||e.fleet||'','Project':e.project||'','O.D':e.od||'','Month':lab(ST.ym),'Start':x.r?x.r.s:'','End':x.r?x.r.e:'','Diff (h)':x.d==null?'no reading':x.d,'Limit (h)':x.lim,'Type':x.g?'Generator':'Equipment'}; });
+    var data=LAST.map(function(x,i){ var e=x.e; return {'#':i+1,'Code':e.code||'','Equipment':e.equipment||'','Category':catOf(e),'Brand / Model':e.brand||'','Capacity':capOf(e),'Fleet':FL[e.fleet||'egypt']||e.fleet||'','Project':e.project||'','O.D':e.od||'','Month':lab(ST.ym),'Start':x.r?x.r.s:'','End':x.r?x.r.e:'','Diff (h)':x.d==null?'no reading':x.d,'Limit (h)':x.lim,'Type':x.g?'Generator':'Equipment','Repair status':x.ur?(x.ur.label+' - '+x.ur.detail):''}; });
     var wb=XLSX.utils.book_new(), ws=XLSX.utils.json_to_sheet(data); ws['!cols']=[{wch:5},{wch:12},{wch:20},{wch:22},{wch:24},{wch:12},{wch:14},{wch:26},{wch:22},{wch:10},{wch:9},{wch:9},{wch:10},{wch:9},{wch:11}];
     XLSX.utils.book_append_sheet(wb,ws,'Low H-M usage'); XLSX.writeFile(wb,'Low_HM_Usage_'+ST.ym+'.xlsx');
   };
