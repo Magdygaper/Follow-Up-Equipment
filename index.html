@@ -1386,6 +1386,7 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js" integrity="sha384-Pqp51FUN2/qzfxZxBCtF0stpc9ONI6MYZpVqmo8m20SoaQCzf+arZvACkLkirlPz" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" integrity="sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG" crossorigin="anonymous"></script>
 
 <!-- ═══════════════════════════════════════════════════════════
      HAC — GLOBAL NAME CANONICALIZER  (O.D / Project / Category / Equipment / Subcontractor)
@@ -3802,28 +3803,502 @@ function renderFuPriceResult(res){
 
 /* Follow Up — same workbook on the follow-up requests. Follow-up rows have no O.D / category of their own, so both are looked up
    from the fleet (project -> its main O.D, equipment name -> its category). Provision (Rental / Transfer / Hold / ...) is shown as the "Provision" column. */
+/* ═══════════════════════════════════════════════════════════════════════════
+   FOLLOW-UP EXCEL REPORT  (formula-linked, same linking idea as Master Rental / Master Owned)
+   ───────────────────────────────────────────────────────────────────────────
+   • "Follow Up"   = the ONE master sheet, same look as the Follow-Up sheet (colour-coded rows by Provision, autofilter).
+   • Everything else is live formulas off that sheet:
+       Dashboard (pickers + cards + ranked tables) · Charts (native Excel charts) · By Month & Project · Deduction Breakdown
+   • Filter in either place: the pickers on the Dashboard, or the normal Excel filter arrows on "Follow Up"
+     (Dashboard + Charts follow the sheet filter too, when "Follow Follow-Up sheet filter" = Yes).
+   rows: [{sn,eq,cap,qty,sap,project,sub:Date|null,prov,from:Date|null,to:Date|null,days,sav,notes}]
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function(root){
+var PROVS=['Rental','Transfer','Hold','Pending','Cancel'];
+var ROWFILL={Rental:'A9D08E',Transfer:'FABF8F',Hold:'FFFF00',Pending:'D9D9D9',Cancel:'FF0000'};
+var CH_COL={Rental:'70AD47',Transfer:'F4A261',Hold:'F2C200',Pending:'8D99A6',Cancel:'D93025'};
+var MON='"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"';
+
+function cl(n){ var s=''; while(n>0){ var m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=Math.floor((n-1)/26); } return s; }
+
+function fuBuildWorkbook(EJ, rows, opt){
+  opt=opt||{};
+  var NAVY='0B2545', NAVY2='13315C', INK='1B2A41', MUTED='5C6B7A', LINE='DDE3EA', SOFT='F1F5F9', AMBER='F0A500', WHITE='FFFFFF', DKBLUE='1F3864', GRP='18294C';
+  var N=rows.length, SPARE=300, F=7, L=F+N+SPARE-1;
+  var MS=24, PS=150, ES=100, NM=12;
+  function A(h){ return 'FF'+h; }
+  function DR(c){ return "'Follow Up'!$"+c+"$"+F+":$"+c+"$"+L; }
+  function FM(f){ return {formula:f}; }
+  var thin={style:'thin',color:{argb:A(LINE)}};
+  var thinG={style:'thin',color:{argb:A('7F7F7F')}};
+
+  function S(ws,r,c,val,o){
+    o=o||{}; var r2=o.r2||r, c2=o.c2||c;
+    if(r2>r||c2>c) ws.mergeCells(r,c,r2,c2);
+    var cell=ws.getCell(r,c);
+    if(val!==undefined&&val!==null) cell.value=val;
+    for(var rr=r;rr<=r2;rr++) for(var cc=c;cc<=c2;cc++){ var x=ws.getCell(rr,cc);
+      if(o.fill) x.fill={type:'pattern',pattern:'solid',fgColor:{argb:A(o.fill)}};
+      var b=o.bd?JSON.parse(JSON.stringify(o.bd)):{}; if(o.bdL&&cc===c) b.left=o.bdL;
+      if(o.bd||o.bdL) x.border=b; }
+    cell.font={name:o.fn||'Calibri',size:o.sz||10,bold:!!o.b,italic:!!o.i,color:{argb:A(o.color||INK)}};
+    cell.alignment={horizontal:o.h||'left',vertical:o.v||'middle',wrapText:!!o.wrap,indent:o.ind||0};
+    if(o.fmt) cell.numFmt=o.fmt;
+    return cell;
+  }
+  function card(ws,r,c,c2,label,val,note,color,fmt){
+    var bl={style:'thick',color:{argb:A(color)}};
+    S(ws,r,c,label,{c2:c2,fill:SOFT,sz:8,b:1,color:MUTED,h:'center',bdL:bl});
+    S(ws,r+1,c,val,{c2:c2,fill:SOFT,sz:22,b:1,color:color,h:'center',fmt:fmt||'#,##0',bdL:bl});
+    S(ws,r+2,c,note,{c2:c2,fill:SOFT,sz:8,color:MUTED,h:'center',bdL:bl});
+    ws.getRow(r+1).height=34;
+  }
+  function band(ws,r,c,c2,txt,color){ S(ws,r,c,txt,{c2:c2,fill:color||NAVY2,color:WHITE,b:1,sz:11,ind:1}); ws.getRow(r).height=22; }
+  function colhdr(ws,r,c,c2,txt,h){ S(ws,r,c,txt,{c2:c2,fill:'E7EDF3',color:MUTED,b:1,sz:8,h:h||'left',ind:h?0:1,bd:{bottom:{style:'thin',color:{argb:A('B8C4D0')}}}}); }
+  function banner(ws,c2,title,sub,color){
+    S(ws,1,2,title,{c2:c2,fill:color||DKBLUE,color:WHITE,b:1,sz:18,h:'center'}); ws.getRow(1).height=36;
+    S(ws,2,2,sub,{c2:c2,fill:NAVY2,color:'C9D6E4',sz:9,h:'center',bd:{bottom:{style:'medium',color:{argb:A(AMBER)}}}}); ws.getRow(2).height=18;
+    ws.getRow(3).height=8;
+  }
+  function navStrip(ws,row,items,spans){
+    items.forEach(function(p,k){ var sp=spans[k]; S(ws,row,sp[0],{text:p[0]+'  →',hyperlink:"#'"+p[1]+"'!A1"},{c2:sp[1],fill:SOFT,color:NAVY,b:1,sz:9,h:'center'}); });
+  }
+  function hdrCell(ws,r,c,txt,fill){
+    var x=ws.getCell(r,c); x.value=txt; x.font={name:'Calibri',size:9,bold:true,color:{argb:A(WHITE)}};
+    x.fill={type:'pattern',pattern:'solid',fgColor:{argb:A(fill||'6C757D')}}; x.alignment={horizontal:'center',vertical:'middle',wrapText:true};
+  }
+  var SUBT=N.toLocaleString('en-US')+' requests  ·  '+(opt.stamp||'')+'  ·  every number is a live formula off the "Follow Up" sheet';
+
+  var wb=new EJ.Workbook(); wb.creator='HAC PMV'; wb.created=new Date(); wb.calcProperties={fullCalcOnLoad:true};
+  var wsD=wb.addWorksheet('Dashboard',{views:[{showGridLines:false,zoomScale:90}],properties:{tabColor:{argb:A(AMBER)}}});
+  var wsC=wb.addWorksheet('Charts',{views:[{showGridLines:false,zoomScale:90}],properties:{tabColor:{argb:A('12B886')}}});
+  var wsA=wb.addWorksheet('Follow Up',{views:[{showGridLines:true,state:'frozen',ySplit:6,xSplit:2,zoomScale:80}],properties:{tabColor:{argb:A('495057')}}});
+  var wsM=wb.addWorksheet('By Month & Project',{views:[{showGridLines:false,state:'frozen',ySplit:6,xSplit:2,zoomScale:90}],properties:{tabColor:{argb:A('339AF0')}}});
+  var wsX=wb.addWorksheet('Deduction Breakdown',{views:[{showGridLines:false,zoomScale:90}],properties:{tabColor:{argb:A('845EF7')}}});
+  var wsL=wb.addWorksheet('Lists',{views:[{showGridLines:true}],properties:{tabColor:{argb:A('ADB5BD')}}});
+  var wsK=wb.addWorksheet('Calc',{views:[{showGridLines:true}],properties:{tabColor:{argb:A('ADB5BD')}}});
+
+  /* control cells (Calc!M2:M7) — every formula in the file reads the selection from here */
+  var C_MK='Calc!$M$3', C_PV='Calc!$M$4', C_PJ='Calc!$M$5', C_EQ='Calc!$M$6', C_VIS='Calc!$M$7';
+
+  /* ═════════ FOLLOW UP (master sheet) ═════════
+     A S/N | B Equipment | C Capacity | D Qty | E SAP | F Project | G Submission | H Provision | I From | J To | K Days | L Savings | M Notes
+     helpers: O Month key | P Deduction | Q Visible | R Month# | S Project# | T Equipment# | U In selection            */
+  (function(){
+    var ws=wsA, i;
+    var BD={top:thinG,left:thinG,bottom:thinG,right:thinG};
+    S(ws,1,1,'H A Construction',{c2:2,b:1,sz:12,fn:'Arial',h:'center',bd:BD});
+    S(ws,2,1,'Support Division - PMV Department',{c2:2,b:1,sz:12,fn:'Arial',h:'center',bd:BD});
+    S(ws,3,1,'10th Of Ramadan Sector',{c2:2,b:1,sz:12,fn:'Arial',h:'center',bd:BD});
+    S(ws,1,3,'Follow Up Of  Equipment Required 2026',{c2:13,r2:3,b:1,sz:16,fn:'Arial',h:'center',color:'000000',bd:BD});
+    var vis=function(p){ return 'COUNTIFS('+DR('Q')+',1,'+DR('H')+',"'+p+'")'; };
+    var kp='"All Requests: ("&COUNTIFS('+DR('Q')+',1)&")   ·   "';
+    PROVS.forEach(function(p){ kp+='&"'+p+': ("&'+vis(p)+'&")   ·   "'; });
+    kp+='&"Supcontractor Deduct: ("&SUMIFS('+DR('P')+','+DR('Q')+',1)&")   ·   Savings (EGP): ("&TEXT(SUMIFS('+DR('L')+','+DR('Q')+',1),"#,##0")&")   [visible rows — follows the filter arrows]"';
+    S(ws,4,1,FM(kp),{c2:13,fill:'FFF6DA',color:'0D1B2E',b:1,sz:10.5,h:'center',bd:{bottom:{style:'medium',color:{argb:A(AMBER)}}}}); ws.getRow(4).height=30;
+    [['Type',1,4],['Project Details',5,7],['Processing Status',8,8],['Duration',9,11],['Savings',12,12],['',13,13]].forEach(function(g){
+      S(ws,5,g[1],g[0],{c2:g[2],fill:GRP,color:WHITE,b:1,sz:12,fn:'Arial',h:'center',bd:BD}); });
+    var H=['S/N','Equipment','Capacity','Qty','SAP Code','Project\n Description','Submission to HAC PMV Date','Provision Method\n(Owned Transfer/External Rental)','From','To','Days','Savings (EGP)\nHold / Cancel','Notes'];
+    H.forEach(function(t,k){ var x=ws.getCell(6,k+1); x.value=t; x.font={name:'Arial',size:13,bold:true,color:{argb:A(WHITE)}};
+      x.fill={type:'pattern',pattern:'solid',fgColor:{argb:A(k===0?'BFBFBF':DKBLUE)}}; x.alignment={horizontal:'center',vertical:'middle',wrapText:true}; x.border=BD; });
+    ws.getRow(6).height=52; ws.getRow(5).height=18;
+    [['O','Month key'],['P','Deduction'],['Q','Visible'],['R','Month #'],['S','Project #'],['T','Equip #'],['U','In selection']].forEach(function(h){ hdrCell(ws,6,h[0].charCodeAt(0)-64,h[1]); });
+    S(ws,5,15,'helpers — leave them',{c2:21,fill:'6C757D',color:WHITE,sz:8,i:1,h:'center'});
+    [8,24,22,7,13,40,16,16,12,12,8,17,46,3,10,9,8,8,9,9,10].forEach(function(w,k){ ws.getColumn(k+1).width=w; });
+
+    for(i=0;i<N;i++){
+      var d=rows[i], r=F+i;
+      ws.getCell(r,1).value=d.sn!=null&&d.sn!==''?d.sn:i+1;
+      ws.getCell(r,2).value=d.eq||''; ws.getCell(r,3).value=d.cap||''; ws.getCell(r,4).value=d.qty;
+      ws.getCell(r,5).value=d.sap||''; ws.getCell(r,6).value=d.project||'';
+      if(d.sub) ws.getCell(r,7).value=d.sub; ws.getCell(r,8).value=d.prov||'';
+      if(d.from) ws.getCell(r,9).value=d.from; if(d.to) ws.getCell(r,10).value=d.to;
+      ws.getCell(r,11).value=d.days; ws.getCell(r,12).value=d.sav||0; ws.getCell(r,13).value=d.notes||'';
+    }
+    for(i=0;i<N+SPARE;i++){
+      var r2=F+i;
+      /* look: Arial 12 centred, thin grey borders, S/N grey */
+      for(var c=1;c<=13;c++){ var x=ws.getCell(r2,c);
+        x.font={name:'Arial',size:12,bold:(c===1||c===4)}; x.alignment={horizontal:(c===13||c===6)?'left':'center',vertical:'middle',wrapText:c===13};
+        x.border=BD; if(c===1) x.fill={type:'pattern',pattern:'solid',fgColor:{argb:A('D9D9D9')}};
+        if(c===7||c===9||c===10) x.numFmt='dd-mmm-yy'; if(c===12) x.numFmt='#,##0;-#,##0;–'; }
+      ws.getCell(r2,15).value=FM('IF(ISNUMBER($G'+r2+'),YEAR($G'+r2+')*100+MONTH($G'+r2+'),"")');
+      ws.getCell(r2,16).value=FM('IF($B'+r2+'="","",IF(ISNUMBER(SEARCH("خصم",$M'+r2+')),1,0))');
+      ws.getCell(r2,17).value=FM('IF($B'+r2+'="","",SUBTOTAL(103,OFFSET($B'+r2+',0,0)))');
+      ws.getCell(r2,18).value=FM('IF($O'+r2+'="","",IF(COUNTIF($O$'+F+':$O'+r2+',$O'+r2+')=1,MAX($R$'+(F-1)+':$R'+(r2-1)+')+1,""))');
+      ws.getCell(r2,19).value=FM('IF($F'+r2+'="","",IF(COUNTIF($F$'+F+':$F'+r2+',$F'+r2+')=1,MAX($S$'+(F-1)+':$S'+(r2-1)+')+1,""))');
+      ws.getCell(r2,20).value=FM('IF($B'+r2+'="","",IF(COUNTIF($B$'+F+':$B'+r2+',$B'+r2+')=1,MAX($T$'+(F-1)+':$T'+(r2-1)+')+1,""))');
+      ws.getCell(r2,21).value=FM('IF($B'+r2+'="",0,IF(AND(OR('+C_MK+'=0,$O'+r2+'='+C_MK+'),OR('+C_PV+'="All",$H'+r2+'='+C_PV+'),OR('+C_PJ+'="All",$F'+r2+'='+C_PJ+'),OR('+C_EQ+'="All",$B'+r2+'='+C_EQ+'),OR('+C_VIS+'="No",$Q'+r2+'=1)),1,0))');
+    }
+    for(var c3=15;c3<=21;c3++){ ws.getColumn(c3).font={name:'Calibri',size:9,color:{argb:A('868E96')}}; }
+    /* the colour-coding of the original sheet: whole row follows Provision */
+    var ref='A'+F+':M'+L;
+    ws.addConditionalFormatting({ref:ref,rules:PROVS.map(function(p){ return {type:'expression',formulae:['$H'+F+'="'+p+'"'],
+      style:{fill:{type:'pattern',pattern:'solid',fgColor:{argb:A(ROWFILL[p])},bgColor:{argb:A(ROWFILL[p])}}}}; })});
+    ws.autoFilter={from:{row:6,column:1},to:{row:L,column:13}};
+
+    /* side tables (like the old export): Month / Equipment / Project, counted on the VISIBLE rows */
+    function side(c0,title,rankName,labelCol,nm,cntExpr,labelExpr){
+      hdrCell(ws,5,c0,title,'0D1B2E'); hdrCell(ws,5,c0+1,'Count','0D1B2E');
+      for(var k=1;k<=nm;k++){ var r3=5+k;
+        ws.getCell(r3,c0).value=FM(labelExpr(k)); ws.getCell(r3,c0).font={name:'Calibri',size:9};
+        var cc=ws.getCell(r3,c0+1); cc.value=FM('IF('+cl(c0)+r3+'="","",'+cntExpr(cl(c0)+r3)+')'); cc.font={name:'Calibri',size:9,bold:true}; cc.alignment={horizontal:'right'}; }
+      ws.addConditionalFormatting({ref:cl(c0+1)+'6:'+cl(c0+1)+(5+nm),rules:[{type:'dataBar',cfvo:[{type:'min'},{type:'max'}],color:{argb:A(AMBER)},priority:1}]});
+    }
+    side(23,'Month','',0,NM,function(a){ return 'COUNTIFS('+DR('Q')+',1,'+DR('O')+',INDEX(Calc!$A$5:$A$16,MATCH('+a+',Calc!$B$5:$B$16,0)))'; },function(k){ return 'IF(Calc!$B$'+(4+k)+'="","",Calc!$B$'+(4+k)+')'; });
+    side(26,'Equipment','',0,10,function(a){ return 'COUNTIFS('+DR('Q')+',1,'+DR('B')+','+a+')'; },function(k){ return 'IFERROR(INDEX(Lists!$P$5:$P$'+(4+ES)+',MATCH(LARGE(Lists!$T$5:$T$'+(4+ES)+','+k+'),Lists!$T$5:$T$'+(4+ES)+',0)),"")'; });
+    side(29,'Project','',0,10,function(a){ return 'COUNTIFS('+DR('Q')+',1,'+DR('F')+','+a+')'; },function(k){ return 'IFERROR(INDEX(Lists!$I$5:$I$'+(4+PS)+',MATCH(LARGE(Lists!$N$5:$N$'+(4+PS)+','+k+'),Lists!$N$5:$N$'+(4+PS)+',0)),"")'; });
+    [3,12,8,3,26,8,3,34,8].forEach(function(w,k){ ws.getColumn(22+k).width=w; });
+    ws.pageSetup={paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0};
+  })();
+
+  /* ═════════ LISTS ═════════ */
+  (function(){
+    var ws=wsL, i, ML=4+MS, PL=4+PS, EL=4+ES;
+    S(ws,1,1,'LISTS — built by formulas from "Follow Up" (do not edit)',{c2:22,fill:NAVY,color:WHITE,b:1,sz:12,ind:1});
+    var heads={A:'#',B:'Month key',C:'Sorted key',D:'Label',F:'Month picker',H:'#',I:'Project',J:'Alpha rank',K:'Project picker',L:'Units (sel)',M:'Deduct (sel)',N:'Rank key (all)',O:'#',P:'Equipment',Q:'Alpha rank',R:'Equipment picker',S:'Units (sel)',T:'Rank key (all)',U:'Rank key (sel)',V:'Rank key deduct',W:'Rank key (sel proj)'};
+    Object.keys(heads).forEach(function(k){ var x=ws.getCell(k+'4'); x.value=heads[k]; x.font={name:'Calibri',size:9,bold:true}; x.fill={type:'pattern',pattern:'solid',fgColor:{argb:A('E7EDF3')}}; });
+    ws.getCell('F5').value='All'; ws.getCell('K5').value='All'; ws.getCell('R5').value='All';
+    ws.getCell('AA1').value=FM('MAX(1,COUNT($C$5:$C$'+ML+'))');
+    ws.getCell('AB1').value=FM('MAX(0,COUNT($J$5:$J$'+PL+'))');
+    ws.getCell('AC1').value=FM('MAX(0,COUNT($Q$5:$Q$'+EL+'))');
+    for(i=1;i<=MS;i++){ var r=4+i;
+      ws.getCell('A'+r).value=i;
+      ws.getCell('B'+r).value=FM('IFERROR(INDEX('+DR('O')+',MATCH($A'+r+','+DR('R')+',0)),"")');
+      ws.getCell('C'+r).value=FM('IFERROR(SMALL($B$5:$B$'+ML+',$A'+r+'),"")');
+      ws.getCell('D'+r).value=FM('IF($C'+r+'="","",CHOOSE(MOD($C'+r+',100),'+MON+')&"-"&RIGHT(INT($C'+r+'/100),2))');
+      ws.getCell('F'+(r+1)).value=FM('IF($D'+r+'="","",$D'+r+')');
+    }
+    for(i=1;i<=PS;i++){ var r2=4+i;
+      ws.getCell('H'+r2).value=i;
+      ws.getCell('I'+r2).value=FM('IFERROR(INDEX('+DR('F')+',MATCH($H'+r2+','+DR('S')+',0)),"")');
+      ws.getCell('J'+r2).value=FM('IF($I'+r2+'="","",SUMPRODUCT(--($I$5:$I$'+PL+'<>""),--($I$5:$I$'+PL+'<$I'+r2+'))+1)');
+      ws.getCell('K'+(r2+1)).value=FM('IFERROR(INDEX($I$5:$I$'+PL+',MATCH($H'+r2+',$J$5:$J$'+PL+',0)),"")');
+      ws.getCell('L'+r2).value=FM('IF($I'+r2+'="",0,COUNTIFS('+DR('F')+',$I'+r2+','+DR('U')+',1))');
+      ws.getCell('M'+r2).value=FM('IF($I'+r2+'="",0,SUMIFS('+DR('P')+','+DR('F')+',$I'+r2+','+DR('U')+',1))');
+      ws.getCell('N'+r2).value=FM('IF($I'+r2+'="","",COUNTIFS('+DR('F')+',$I'+r2+')+(1000-$H'+r2+')/10000000)');
+      ws.getCell('V'+r2).value=FM('IF($L'+r2+'=0,"",$L'+r2+'+(1000-$H'+r2+')/10000000)');
+      ws.getCell('W'+r2).value=FM('IF($M'+r2+'=0,"",$M'+r2+'+(1000-$H'+r2+')/10000000)');
+    }
+    for(i=1;i<=ES;i++){ var r3=4+i;
+      ws.getCell('O'+r3).value=i;
+      ws.getCell('P'+r3).value=FM('IFERROR(INDEX('+DR('B')+',MATCH($O'+r3+','+DR('T')+',0)),"")');
+      ws.getCell('Q'+r3).value=FM('IF($P'+r3+'="","",SUMPRODUCT(--($P$5:$P$'+EL+'<>""),--($P$5:$P$'+EL+'<$P'+r3+'))+1)');
+      ws.getCell('R'+(r3+1)).value=FM('IFERROR(INDEX($P$5:$P$'+EL+',MATCH($O'+r3+',$Q$5:$Q$'+EL+',0)),"")');
+      ws.getCell('S'+r3).value=FM('IF($P'+r3+'="",0,COUNTIFS('+DR('B')+',$P'+r3+','+DR('U')+',1))');
+      ws.getCell('T'+r3).value=FM('IF($P'+r3+'="","",COUNTIFS('+DR('B')+',$P'+r3+')+(1000-$O'+r3+')/10000000)');
+      ws.getCell('U'+r3).value=FM('IF($S'+r3+'=0,"",$S'+r3+'+(1000-$O'+r3+')/10000000)');
+    }
+    [5,10,10,10,3,14,3,5,34,10,34,10,10,12,5,28,10,28,10,12,12,12,12].forEach(function(w,k){ ws.getColumn(k+1).width=w; });
+  })();
+
+  /* ═════════ CALC (chart feeds) ═════════ */
+  (function(){
+    var ws=wsK, i, ML=4+MS;
+    S(ws,1,1,'CALC — feeds the Dashboard and the Charts (do not edit)',{c2:10,fill:NAVY,color:WHITE,b:1,sz:12,ind:1});
+    var lab=['Month (picked)','Month key (0 = All)','Provision','Project','Equipment','Follow sheet filter'];
+    var val=['Dashboard!$B$5','IF($M$2="All",0,IFERROR(INDEX(Lists!$C$5:$C$'+ML+',MATCH($M$2,Lists!$D$5:$D$'+ML+',0)),0))','Dashboard!$E$5','Dashboard!$H$5','Dashboard!$K$5','Dashboard!$E$6'];
+    ws.getCell('L1').value='Controls';
+    lab.forEach(function(t,k){ ws.getCell('L'+(2+k)).value=t; ws.getCell('M'+(2+k)).value=FM(val[k]); });
+    /* month block: rows 5..16 */
+    ['Month key','Month'].concat(PROVS).concat(['Total','Savings','Deduct']).forEach(function(t,k){ hdrCell(ws,4,k+1,t,'6C757D'); });
+    for(i=0;i<NM;i++){ var r=5+i;
+      ws.getCell('A'+r).value=FM(i===0?'IF(Lists!$C$5="",0,Lists!$C$5)':'IF($A'+(r-1)+'=0,0,IF(MOD($A'+(r-1)+',100)=12,$A'+(r-1)+'+89,$A'+(r-1)+'+1))');
+      ws.getCell('B'+r).value=FM('IF($A'+r+'=0,"",CHOOSE(MOD($A'+r+',100),'+MON+')&"-"&RIGHT(INT($A'+r+'/100),2))');
+      PROVS.forEach(function(p,k){ ws.getCell(r,3+k).value=FM('IF($A'+r+'=0,0,COUNTIFS('+DR('U')+',1,'+DR('O')+',$A'+r+','+DR('H')+','+cl(3+k)+'$4))'); });
+      ws.getCell('H'+r).value=FM('SUM(C'+r+':G'+r+')');
+      ws.getCell('I'+r).value=FM('IF($A'+r+'=0,0,SUMIFS('+DR('L')+','+DR('U')+',1,'+DR('O')+',$A'+r+'))');
+      ws.getCell('J'+r).value=FM('IF($A'+r+'=0,0,SUMIFS('+DR('P')+','+DR('U')+',1,'+DR('O')+',$A'+r+'))');
+    }
+    /* provision block: rows 20..24 */
+    hdrCell(ws,19,1,'Provision','6C757D'); hdrCell(ws,19,2,'Requests','6C757D');
+    PROVS.forEach(function(p,k){ var r4=20+k; ws.getCell('A'+r4).value=p; ws.getCell('B'+r4).value=FM('COUNTIFS('+DR('U')+',1,'+DR('H')+',$A'+r4+')'); });
+    /* ranked blocks */
+    function ranked(r0,title,nmCol,rankCol,unitsCol,nmRange,srcCol,total){
+      ['#','Idx','Name'].concat(PROVS).concat(['Total']).forEach(function(t,k){ hdrCell(ws,r0-1,k+1,t,'6C757D'); });
+      ws.getCell('A'+(r0-2)).value=title; ws.getCell('A'+(r0-2)).font={bold:true};
+      for(var k=1;k<=10;k++){ var rr=r0+k-1;
+        var rk='Lists!$'+rankCol+'$5:$'+rankCol+'$'+total, un='Lists!$'+unitsCol+'$5:$'+unitsCol+'$'+total, nm='Lists!$'+nmCol+'$5:$'+nmCol+'$'+total;
+        ws.getCell('A'+rr).value=k;
+        ws.getCell('B'+rr).value=FM('IFERROR(IF(INDEX('+un+',MATCH(LARGE('+rk+',$A'+rr+'),'+rk+',0))>0,MATCH(LARGE('+rk+',$A'+rr+'),'+rk+',0),""),"")');
+        ws.getCell('C'+rr).value=FM('IF($B'+rr+'="","",INDEX('+nm+',$B'+rr+'))');
+        PROVS.forEach(function(p,j){ ws.getCell(rr,4+j).value=FM('IF($B'+rr+'="",0,COUNTIFS('+DR('U')+',1,'+DR(srcCol)+',$C'+rr+','+DR('H')+','+cl(4+j)+'$'+(r0-1)+'))'); });
+        ws.getCell('I'+rr).value=FM('SUM(D'+rr+':H'+rr+')');
+      }
+    }
+    ranked(30,'Top 10 Projects','I','V','L','',  'F',PL());
+    ranked(46,'Top 10 Equipment','P','U','S','','B',4+ES);
+    function PL(){ return 4+PS; }
+    /* deduction by project: rows 62..71 */
+    ['#','Idx','Project','Deduct'].forEach(function(t,k){ hdrCell(ws,61,k+1,t,'6C757D'); });
+    ws.getCell('A60').value='Top 10 Projects by Deduction'; ws.getCell('A60').font={bold:true};
+    for(i=1;i<=10;i++){ var r5=61+i, rk2='Lists!$W$5:$W$'+PL(), un2='Lists!$M$5:$M$'+PL();
+      ws.getCell('A'+r5).value=i;
+      ws.getCell('B'+r5).value=FM('IFERROR(IF(INDEX('+un2+',MATCH(LARGE('+rk2+',$A'+r5+'),'+rk2+',0))>0,MATCH(LARGE('+rk2+',$A'+r5+'),'+rk2+',0),""),"")');
+      ws.getCell('C'+r5).value=FM('IF($B'+r5+'="","",INDEX(Lists!$I$5:$I$'+PL()+',$B'+r5+'))');
+      ws.getCell('D'+r5).value=FM('IF($B'+r5+'="",0,INDEX('+un2+',$B'+r5+'))');
+    }
+    [10,10,34,10,10,10,10,10,10,10,3,22,40].forEach(function(w,k){ ws.getColumn(k+1).width=w; });
+  })();
+
+  /* ═════════ DASHBOARD ═════════ */
+  (function(){
+    var ws=wsD, i;
+    [2,13,13,13,13,13,13,13,13,13,13,13,13,2].forEach(function(w,k){ ws.getColumn(k+1).width=w; });
+    banner(ws,13,'HAC — Equipment Follow-Up 2026 Dashboard',SUBT);
+    var pbd={top:{style:'medium',color:{argb:A(AMBER)}},bottom:{style:'medium',color:{argb:A(AMBER)}},left:{style:'medium',color:{argb:A(AMBER)}},right:{style:'medium',color:{argb:A(AMBER)}}};
+    [['MONTH',2,4],['PROVISION',5,7],['PROJECT',8,10],['EQUIPMENT',11,13]].forEach(function(p){ S(ws,4,p[1],p[0]+'  ▸',{c2:p[2],fill:NAVY,color:WHITE,b:1,sz:9,h:'center'}); });
+    [[2,4],[5,7],[8,10],[11,13]].forEach(function(p){ S(ws,5,p[0],'All',{c2:p[1],fill:'FFF6DA',color:NAVY,b:1,sz:12,h:'center',bd:pbd}); });
+    ws.getRow(5).height=26;
+    ws.getCell('B5').dataValidation={type:'list',allowBlank:false,formulae:['OFFSET(Lists!$F$5,0,0,Lists!$AA$1+1,1)']};
+    ws.getCell('E5').dataValidation={type:'list',allowBlank:false,formulae:['"All,Rental,Transfer,Hold,Pending,Cancel"']};
+    ws.getCell('H5').dataValidation={type:'list',allowBlank:false,formulae:['OFFSET(Lists!$K$5,0,0,Lists!$AB$1+1,1)']};
+    ws.getCell('K5').dataValidation={type:'list',allowBlank:false,formulae:['OFFSET(Lists!$R$5,0,0,Lists!$AC$1+1,1)']};
+    S(ws,6,2,'Follow the filter arrows on "Follow Up" ▸',{c2:4,fill:SOFT,color:MUTED,b:1,sz:9,h:'center'});
+    S(ws,6,5,'Yes',{c2:5,fill:'FFF6DA',color:NAVY,b:1,sz:11,h:'center',bd:pbd});
+    ws.getCell('E6').dataValidation={type:'list',allowBlank:false,formulae:['"Yes,No"']};
+    S(ws,6,6,FM('IF(COUNTIFS('+DR('Q')+',1)<COUNTIFS('+DR('B')+',"<>"),"⚠ filter active on Follow Up: "&COUNTIFS('+DR('Q')+',1)&" of "&COUNTIFS('+DR('B')+',"<>")&" rows visible — set Yes/No at left","Pick any combination above — cards, tables and the Charts sheet follow it   ·   "&SUM('+DR('U')+')&" of "&COUNTIFS('+DR('B')+',"<>")&" requests selected")'),{c2:13,color:MUTED,sz:9,i:true,ind:1});
+    ws.getRow(6).height=20;
+    navStrip(ws,7,[['Charts','Charts'],['Follow Up','Follow Up'],['By Month & Project','By Month & Project'],['Deduction Breakdown','Deduction Breakdown']],[[2,4],[5,7],[8,10],[11,13]]);
+    ws.getRow(8).height=8;
+    var sel=function(p){ return 'COUNTIFS('+DR('U')+',1'+(p?','+DR('H')+',"'+p+'"':'')+')'; };
+    card(ws,9,2,4,'ALL REQUESTS',FM('SUM('+DR('U')+')'),'in the current selection','1F6AA5');
+    card(ws,9,5,7,'RENTAL',FM(sel('Rental')),'external rental','5E9E3E');
+    card(ws,9,8,10,'TRANSFER',FM(sel('Transfer')),'owned transfer','D9822B');
+    card(ws,9,11,13,'HOLD',FM(sel('Hold')),'on hold','B8860B');
+    ws.getRow(12).height=8;
+    card(ws,13,2,4,'PENDING',FM(sel('Pending')),'awaiting decision','6B7785');
+    card(ws,13,5,7,'CANCEL',FM(sel('Cancel')),'cancelled','C62828');
+    card(ws,13,8,10,'خصم ع المقاول',FM('SUMIFS('+DR('P')+','+DR('U')+',1)'),'Supcontractor Deduct requests','7B4FB8');
+    card(ws,13,11,13,'SAVINGS (EGP)',FM('SUMIFS('+DR('L')+','+DR('U')+',1)'),'Hold + Cancel savings','2B8A3E');
+    ws.getRow(16).height=10;
+
+    var top=17;
+    function table(title,color,n,labelF,provF,totF,savF,dedF,labelHdr,keyFn){
+      band(ws,top,2,13,title,color);
+      colhdr(ws,top+1,2,3,labelHdr);
+      PROVS.forEach(function(p,k){ colhdr(ws,top+1,4+k,4+k,p,'center'); });
+      colhdr(ws,top+1,9,9,'Total','center'); colhdr(ws,top+1,10,11,'','center'); colhdr(ws,top+1,12,12,'Savings','center'); colhdr(ws,top+1,13,13,'Deduct','center');
+      var r0=top+2, rN=top+1+n, k;
+      for(k=0;k<n;k++){ var r=r0+k, bd={bottom:thin};
+        S(ws,r,2,FM(labelF(k)),{c2:3,ind:1,bd:bd});
+        PROVS.forEach(function(p,j){ S(ws,r,4+j,FM(provF(k,j)),{h:'center',fmt:'#,##0;-#,##0;–',bd:bd,color:MUTED}); });
+        S(ws,r,9,FM('SUM(D'+r+':H'+r+')'),{h:'center',b:1,fmt:'#,##0',bd:bd});
+        S(ws,r,10,FM('IF(I'+r+'=0,"",REPT("█",ROUND(I'+r+'/MAX($I$'+r0+':$I$'+rN+')*8,0)))'),{c2:11,sz:9,color:color,bd:bd});
+        S(ws,r,12,FM(savF(k)),{h:'right',fmt:'#,##0;-#,##0;–',bd:bd});
+        S(ws,r,13,FM(dedF(k)),{h:'right',fmt:'#,##0;-#,##0;–',bd:bd});
+      }
+      var ro=rN+1, rt=rN+2;
+      S(ws,ro,2,'Other',{c2:3,fill:SOFT,i:1,color:MUTED,ind:1});
+      PROVS.forEach(function(p,j){ var cc=cl(4+j); S(ws,ro,4+j,FM('MAX(0,'+sel(p)+'-SUM('+cc+r0+':'+cc+rN+'))'),{fill:SOFT,color:MUTED,h:'center',fmt:'#,##0;-#,##0;\u2013'}); });
+      S(ws,ro,9,FM('SUM(D'+ro+':H'+ro+')'),{fill:SOFT,color:MUTED,h:'center',fmt:'#,##0;-#,##0;\u2013'});
+      S(ws,ro,10,'',{c2:11,fill:SOFT});
+      S(ws,ro,12,FM('SUMIFS('+DR('L')+','+DR('U')+',1)-SUM(L'+r0+':L'+rN+')'),{fill:SOFT,color:MUTED,h:'right',fmt:'#,##0;-#,##0;\u2013'});
+      S(ws,ro,13,FM('SUMIFS('+DR('P')+','+DR('U')+',1)-SUM(M'+r0+':M'+rN+')'),{fill:SOFT,color:MUTED,h:'right',fmt:'#,##0;-#,##0;\u2013'});
+      S(ws,rt,2,'Total (all in selection)',{c2:3,fill:color,color:WHITE,b:1,ind:1});
+      PROVS.forEach(function(p,j){ S(ws,rt,4+j,FM(sel(p)),{fill:color,color:WHITE,b:1,h:'center',fmt:'#,##0'}); });
+      S(ws,rt,9,FM('SUM(D'+rt+':H'+rt+')'),{fill:color,color:WHITE,b:1,h:'center',fmt:'#,##0'});
+      S(ws,rt,10,'',{c2:11,fill:color});
+      S(ws,rt,12,FM('SUMIFS('+DR('L')+','+DR('U')+',1)'),{fill:color,color:WHITE,b:1,h:'right',fmt:'#,##0'});
+      S(ws,rt,13,FM('SUMIFS('+DR('P')+','+DR('U')+',1)'),{fill:color,color:WHITE,b:1,h:'right',fmt:'#,##0'});
+      ws.addConditionalFormatting({ref:'B'+r0+':M'+rN,rules:[{type:'expression',formulae:['$B'+r0+'<>""'],style:{border:{bottom:{style:'thin',color:{argb:A(LINE)}}}}}]});
+      top=rt+2;
+    }
+    /* by month (Calc rows 5..16) */
+    table('BY SUBMISSION MONTH',NAVY2,NM,
+      function(k){ return 'Calc!$B$'+(5+k); },
+      function(k,j){ return 'Calc!'+cl(3+j)+(5+k); }, null,
+      function(k){ return 'Calc!$I$'+(5+k); }, function(k){ return 'Calc!$J$'+(5+k); },'Month');
+    table('TOP 10 PROJECTS',DKBLUE,10,
+      function(k){ return 'Calc!$C$'+(30+k); },
+      function(k,j){ return 'Calc!'+cl(4+j)+(30+k); }, null,
+      function(k){ return 'IF(Calc!$B$'+(30+k)+'="",0,SUMIFS('+DR('L')+','+DR('F')+',Calc!$C$'+(30+k)+','+DR('U')+',1))'; },
+      function(k){ return 'IF(Calc!$B$'+(30+k)+'="",0,SUMIFS('+DR('P')+','+DR('F')+',Calc!$C$'+(30+k)+','+DR('U')+',1))'; },'Project');
+    table('TOP 10 EQUIPMENT','0B5D3E',10,
+      function(k){ return 'Calc!$C$'+(46+k); },
+      function(k,j){ return 'Calc!'+cl(4+j)+(46+k); }, null,
+      function(k){ return 'IF(Calc!$B$'+(46+k)+'="",0,SUMIFS('+DR('L')+','+DR('B')+',Calc!$C$'+(46+k)+','+DR('U')+',1))'; },
+      function(k){ return 'IF(Calc!$B$'+(46+k)+'="",0,SUMIFS('+DR('P')+','+DR('B')+',Calc!$C$'+(46+k)+','+DR('U')+',1))'; },'Equipment');
+    ws.pageSetup={paperSize:9,orientation:'portrait',fitToPage:true,fitToWidth:1,fitToHeight:0};
+  })();
+
+  /* ═════════ CHARTS (sheet; the actual charts are injected after writing) ═════════ */
+  (function(){
+    var ws=wsC;
+    [2,13,13,13,13,13,13,13,13,13,13,13,13,2].forEach(function(w,k){ ws.getColumn(k+1).width=w; });
+    banner(ws,13,'HAC — Equipment Follow-Up 2026 · Charts',SUBT,'0F6B55');
+    S(ws,4,2,FM('"Selection  ▸  Month: "&Dashboard!$B$5&"   ·   Provision: "&Dashboard!$E$5&"   ·   Project: "&Dashboard!$H$5&"   ·   Equipment: "&Dashboard!$K$5&"   ·   "&SUM('+DR('U')+')&" requests"'),{c2:10,fill:'FFF6DA',color:NAVY,b:1,sz:10,h:'center',bd:{bottom:{style:'medium',color:{argb:A(AMBER)}}}});
+    S(ws,4,11,{text:'Change filters  →  Dashboard',hyperlink:"#'Dashboard'!B5"},{c2:13,fill:SOFT,color:NAVY,b:1,sz:9,h:'center'});
+    ws.getRow(4).height=24;
+  })();
+
+  /* ═════════ BY MONTH & PROJECT ═════════ */
+  (function(){
+    var ws=wsM, i, k;
+    [2,34].concat([9,9,9,9,9,9,9,9,9,9,9,9,10]).forEach(function(w,j){ ws.getColumn(j+1).width=w; });
+    banner(ws,15,'Requests by Month × Project',SUBT);
+    ws.getRow(3).height=8;
+    S(ws,4,2,'Follows the Dashboard pickers (Provision / Equipment / Month / Project) and the Follow Up filter. Top 40 projects by requests.',{c2:15,color:MUTED,sz:9,i:true,ind:1});
+    S(ws,6,2,'#',{fill:NAVY,color:WHITE,b:1,h:'center'}); S(ws,6,3,'Project',{fill:NAVY,color:WHITE,b:1,ind:1});
+    for(k=0;k<NM;k++){ var c=4+k; S(ws,6,c,FM('Calc!$B$'+(5+k)),{fill:NAVY,color:WHITE,b:1,h:'center'}); }
+    S(ws,6,16,'Total',{fill:NAVY,color:WHITE,b:1,h:'center'});
+    ws.getColumn(1).width=2; ws.getColumn(2).width=5; ws.getColumn(3).width=36;
+    for(i=1;i<=40;i++){ var r=6+i, rk='Lists!$V$5:$V$'+(4+PS), bd={bottom:thin};
+      S(ws,r,2,FM('IFERROR(IF(LARGE('+rk+','+i+')>0,'+i+',""),"")'),{h:'center',color:MUTED,bd:bd});
+      S(ws,r,3,FM('IF($B'+r+'="","",INDEX(Lists!$I$5:$I$'+(4+PS)+',MATCH(LARGE('+rk+','+i+'),'+rk+',0)))'),{ind:1,bd:bd});
+      for(k=0;k<NM;k++){ var cc=4+k;
+        S(ws,r,cc,FM('IF($B'+r+'="","",IF(Calc!$A$'+(5+k)+'=0,"",COUNTIFS('+DR('F')+',$C'+r+','+DR('O')+',Calc!$A$'+(5+k)+','+DR('U')+',1)))'),{h:'center',fmt:'#,##0;-#,##0;–',bd:bd}); }
+      S(ws,r,16,FM('IF($B'+r+'="","",COUNTIFS('+DR('F')+',$C'+r+','+DR('U')+',1))'),{h:'center',b:1,bd:bd});
+    }
+    var rt=47;
+    S(ws,rt,2,'',{c2:3,fill:NAVY2}); ws.getCell(rt,3).value='Total (all in selection)'; ws.getCell(rt,3).font={name:'Calibri',size:10,bold:true,color:{argb:A(WHITE)}};
+    for(k=0;k<NM;k++){ S(ws,rt,4+k,FM('IF(Calc!$A$'+(5+k)+'=0,"",COUNTIFS('+DR('O')+',Calc!$A$'+(5+k)+','+DR('U')+',1))'),{fill:NAVY2,color:WHITE,b:1,h:'center'}); }
+    S(ws,rt,16,FM('SUM('+DR('U')+')'),{fill:NAVY2,color:WHITE,b:1,h:'center'});
+    ws.addConditionalFormatting({ref:'D7:O46',rules:[{type:'colorScale',cfvo:[{type:'num',value:0},{type:'max'}],color:[{argb:'FFFFFFFF'},{argb:'FF5B9BD5'}]}]});
+    navStrip(ws,5,[['Dashboard','Dashboard'],['Charts','Charts']],[[3,3],[4,6]]);
+  })();
+
+  /* ═════════ DEDUCTION BREAKDOWN ═════════ */
+  (function(){
+    var ws=wsX, i;
+    [2,16,12,3,38,12,3].forEach(function(w,k){ ws.getColumn(k+1).width=w; });
+    banner(ws,6,'خصم ع المقاول — Deduction Breakdown',SUBT,'5B3E96');
+    S(ws,4,2,'Requests whose Notes contain خصم  ·  follows the Dashboard pickers',{c2:6,color:MUTED,sz:9,i:true,ind:1});
+    S(ws,5,2,'Month',{fill:NAVY,color:WHITE,b:1,ind:1}); S(ws,5,3,'Deduct',{fill:NAVY,color:WHITE,b:1,h:'center'});
+    S(ws,5,5,'Project',{fill:NAVY,color:WHITE,b:1,ind:1}); S(ws,5,6,'Deduct',{fill:NAVY,color:WHITE,b:1,h:'center'});
+    for(i=0;i<NM;i++){ var r=6+i;
+      S(ws,r,2,FM('Calc!$B$'+(5+i)),{ind:1,bd:{bottom:thin}}); S(ws,r,3,FM('IF(Calc!$B$'+(5+i)+'="","",Calc!$J$'+(5+i)+')'),{h:'center',b:1,fmt:'#,##0;-#,##0;–',bd:{bottom:thin}});
+    }
+    for(i=0;i<10;i++){ var r2=6+i;
+      S(ws,r2,5,FM('Calc!$C$'+(62+i)),{ind:1,bd:{bottom:thin}}); S(ws,r2,6,FM('IF(Calc!$C$'+(62+i)+'="","",Calc!$D$'+(62+i)+')'),{h:'center',b:1,fmt:'#,##0',bd:{bottom:thin}});
+    }
+    S(ws,18,2,'Total',{fill:'7B4FB8',color:WHITE,b:1,ind:1}); S(ws,18,3,FM('SUMIFS('+DR('P')+','+DR('U')+',1)'),{fill:'7B4FB8',color:WHITE,b:1,h:'center'});
+    S(ws,18,5,'Total',{fill:'7B4FB8',color:WHITE,b:1,ind:1}); S(ws,18,6,FM('SUMIFS('+DR('P')+','+DR('U')+',1)'),{fill:'7B4FB8',color:WHITE,b:1,h:'center'});
+    ws.addConditionalFormatting({ref:'C6:C17',rules:[{type:'dataBar',cfvo:[{type:'min'},{type:'max'}],color:{argb:'FFBC8CFF'},priority:1}]});
+    ws.addConditionalFormatting({ref:'F6:F15',rules:[{type:'dataBar',cfvo:[{type:'min'},{type:'max'}],color:{argb:'FFBC8CFF'},priority:1}]});
+    navStrip(ws,20,[['Dashboard','Dashboard'],['Charts','Charts']],[[2,3],[5,5]]);
+  })();
+
+  return wb;
+}
+
+/* ═══════════════ native Excel charts: injected into the written .xlsx with JSZip ═══════════════ */
+function fuChartSpecs(){
+  var P=PROVS;
+  function provSeries(r0,r1,c0,hdrRow,sheet){ return P.map(function(p,k){ return {name:sheet+'!$'+cl(c0+k)+'$'+hdrRow, val:sheet+'!$'+cl(c0+k)+'$'+r0+':$'+cl(c0+k)+'$'+r1, color:CH_COL[p]}; }); }
+  return [
+    {title:'Requests by submission month — split by provision', kind:'col', grouping:'stacked', cat:'Calc!$B$5:$B$16', series:provSeries(5,16,3,4,'Calc'), anchor:[1,5,13,24], legend:'b', labels:true},
+    {title:'Provision split', kind:'doughnut', cat:'Calc!$A$20:$A$24', series:[{name:'Calc!$B$19',val:'Calc!$B$20:$B$24',color:'1F3864'}], pointColors:P.map(function(p){ return CH_COL[p]; }), anchor:[1,25,7,43], legend:'r', labels:true},
+    {title:'Top 10 projects — by provision', kind:'bar', grouping:'stacked', cat:'Calc!$C$30:$C$39', series:provSeries(30,39,4,29,'Calc'), anchor:[7,25,13,43], legend:'b', labels:true},
+    {title:'Top 10 equipment — requests', kind:'bar', grouping:'clustered', cat:'Calc!$C$46:$C$55', series:[{name:'Calc!$I$45',val:'Calc!$I$46:$I$55',color:'1F3864'}], anchor:[1,44,7,62], legend:null, labels:true},
+    {title:'Savings by month (EGP) — Hold + Cancel', kind:'col', grouping:'clustered', cat:'Calc!$B$5:$B$16', series:[{name:'Calc!$I$4',val:'Calc!$I$5:$I$16',color:'2B8A3E'}], anchor:[7,44,13,62], legend:null, labels:false, numFmt:'#,##0'},
+    {title:'Supcontractor Deduct (خصم) — by month', kind:'col', grouping:'clustered', cat:'Calc!$B$5:$B$16', series:[{name:'Calc!$J$4',val:'Calc!$J$5:$J$16',color:'7B4FB8'}], anchor:[1,63,7,81], legend:null, labels:true},
+    {title:'Supcontractor Deduct (خصم) — top projects', kind:'bar', grouping:'clustered', cat:'Calc!$C$62:$C$71', series:[{name:'Calc!$D$61',val:'Calc!$D$62:$D$71',color:'7B4FB8'}], anchor:[7,63,13,81], legend:null, labels:true}
+  ];
+}
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function txPr(sz,color,bold){ return '<c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="'+sz+'" b="'+(bold?1:0)+'"><a:solidFill><a:srgbClr val="'+color+'"/></a:solidFill><a:latin typeface="Calibri"/></a:defRPr></a:pPr><a:endParaRPr lang="en-US"/></a:p></c:txPr>'; }
+function fuChartXml(s){
+  var ax1=111111+Math.floor(Math.random()*1000), ax2=ax1+1;
+  var title='<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1200" b="1"><a:solidFill><a:srgbClr val="1B2A41"/></a:solidFill></a:defRPr></a:pPr><a:r><a:rPr lang="en-US" sz="1200" b="1"><a:solidFill><a:srgbClr val="1B2A41"/></a:solidFill><a:latin typeface="Calibri"/></a:rPr><a:t>'+esc(s.title)+'</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>';
+  var fmt=s.numFmt||(s.grouping==='stacked'?'[>=8]#,##0;':'#,##0;;;');
+  function dl(pos){ return '<c:dLbls><c:numFmt formatCode="'+esc(s.kind==='doughnut'?'#,##0':fmt)+'" sourceLinked="0"/><c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr>'+txPr(900,s.kind==='doughnut'?'1B2A41':'1B2A41',true)+(pos?'<c:dLblPos val="'+pos+'"/>':'')+'<c:showLegendKey val="0"/><c:showVal val="1"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/><c:showBubbleSize val="0"/></c:dLbls>'; }
+  function ser(x,i){
+    var o='<c:ser><c:idx val="'+i+'"/><c:order val="'+i+'"/><c:tx><c:strRef><c:f>'+esc(x.name)+'</c:f></c:strRef></c:tx>';
+    o+='<c:spPr><a:solidFill><a:srgbClr val="'+x.color+'"/></a:solidFill>'+(s.kind==='doughnut'?'<a:ln w="19050"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></a:ln>':'')+'</c:spPr>';
+    if(s.kind!=='doughnut') o+='<c:invertIfNegative val="0"/>';
+    if(s.kind==='doughnut') (s.pointColors||[]).forEach(function(c,k){ o+='<c:dPt><c:idx val="'+k+'"/><c:bubble3D val="0"/><c:spPr><a:solidFill><a:srgbClr val="'+c+'"/></a:solidFill><a:ln w="19050"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></a:ln></c:spPr></c:dPt>'; });
+    if(s.labels) o+=dl(s.kind==='doughnut'?null:(s.grouping==='stacked'?'ctr':'outEnd'));
+    o+='<c:cat><c:strRef><c:f>'+esc(s.cat)+'</c:f></c:strRef></c:cat><c:val><c:numRef><c:f>'+esc(x.val)+'</c:f></c:numRef></c:val></c:ser>';
+    return o;
+  }
+  var plot;
+  if(s.kind==='doughnut'){
+    plot='<c:doughnutChart><c:varyColors val="1"/>'+s.series.map(ser).join('')+'<c:firstSliceAng val="0"/><c:holeSize val="55"/></c:doughnutChart>';
+  } else {
+    var horiz=s.kind==='bar';
+    plot='<c:barChart><c:barDir val="'+(horiz?'bar':'col')+'"/><c:grouping val="'+s.grouping+'"/><c:varyColors val="0"/>'+s.series.map(ser).join('')+
+      '<c:gapWidth val="'+(s.grouping==='stacked'?55:70)+'"/>'+(s.grouping==='stacked'?'<c:overlap val="100"/>':'')+'<c:axId val="'+ax1+'"/><c:axId val="'+ax2+'"/></c:barChart>'+
+      '<c:catAx><c:axId val="'+ax1+'"/><c:scaling><c:orientation val="'+(horiz?'maxMin':'minMax')+'"/></c:scaling><c:delete val="0"/><c:axPos val="'+(horiz?'l':'b')+'"/><c:numFmt formatCode="General" sourceLinked="0"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:spPr><a:ln w="9525"><a:solidFill><a:srgbClr val="B8C4D0"/></a:solidFill></a:ln></c:spPr>'+txPr(horiz?800:900,'1B2A41',false)+'<c:crossAx val="'+ax2+'"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:tickLblSkip val="1"/><c:noMultiLvlLbl val="0"/></c:catAx>'+
+      '<c:valAx><c:axId val="'+ax2+'"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="'+(horiz?'t':'l')+'"/><c:majorGridlines><c:spPr><a:ln w="6350"><a:solidFill><a:srgbClr val="E3E8EE"/></a:solidFill></a:ln></c:spPr></c:majorGridlines><c:numFmt formatCode="#,##0" sourceLinked="0"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:spPr><a:ln><a:noFill/></a:ln></c:spPr>'+txPr(900,'5C6B7A',false)+'<c:crossAx val="'+ax1+'"/><c:crosses val="'+(horiz?'max':'autoZero')+'"/><c:crossBetween val="between"/></c:valAx>';
+  }
+  var legend=s.legend?'<c:legend><c:legendPos val="'+s.legend+'"/><c:overlay val="0"/>'+txPr(900,'1B2A41',false)+'</c:legend>':'';
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><c:roundedCorners val="0"/><c:chart>'+title+'<c:autoTitleDeleted val="0"/><c:plotArea><c:layout/>'+plot+'<c:spPr><a:noFill/></c:spPr></c:plotArea>'+legend+'<c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart><c:spPr><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:ln w="9525"><a:solidFill><a:srgbClr val="DDE3EA"/></a:solidFill></a:ln></c:spPr></c:chartSpace>';
+}
+
+/* buf: ArrayBuffer/Uint8Array from wb.xlsx.writeBuffer() → Promise<Uint8Array> with the charts added to the "Charts" sheet */
+function fuInjectCharts(JSZip, buf, sheetName){
+  var specs=fuChartSpecs();
+  return JSZip.loadAsync(buf).then(function(zip){
+    return Promise.all([zip.file('xl/workbook.xml').async('string'),zip.file('xl/_rels/workbook.xml.rels').async('string'),zip.file('[Content_Types].xml').async('string')]).then(function(a){
+      var wbx=a[0], rels=a[1], ct=a[2];
+      var m=new RegExp('<sheet [^>]*name="'+sheetName+'"[^>]*?r:id="([^"]+)"').exec(wbx) || new RegExp('<sheet [^>]*r:id="([^"]+)"[^>]*name="'+sheetName+'"').exec(wbx);
+      if(!m) throw new Error('Charts sheet not found');
+      var rid=m[1];
+      var t=new RegExp('<Relationship [^>]*Id="'+rid+'"[^>]*>').exec(rels)[0];
+      var target=/Target="([^"]+)"/.exec(t)[1].replace(/^\/?(xl\/)?/,'');
+      var sheetPath='xl/'+target, relPath='xl/worksheets/_rels/'+target.split('/').pop()+'.rels';
+      return Promise.all([zip.file(sheetPath).async('string'), zip.file(relPath)?zip.file(relPath).async('string'):Promise.resolve(null)]).then(function(b){
+        var sx=b[0], sr=b[1];
+        specs.forEach(function(s,k){ zip.file('xl/charts/chart'+(k+1)+'.xml',fuChartXml(s)); });
+        var anchors='', drels='';
+        specs.forEach(function(s,k){
+          var an=s.anchor; /* [col0,row0,col1,row1] zero-based */
+          anchors+='<xdr:twoCellAnchor><xdr:from><xdr:col>'+an[0]+'</xdr:col><xdr:colOff>60000</xdr:colOff><xdr:row>'+an[1]+'</xdr:row><xdr:rowOff>40000</xdr:rowOff></xdr:from><xdr:to><xdr:col>'+an[2]+'</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>'+an[3]+'</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="'+(k+2)+'" name="Chart '+(k+1)+'"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" r:id="rId'+(k+1)+'"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor>';
+          drels+='<Relationship Id="rId'+(k+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="../charts/chart'+(k+1)+'.xml"/>';
+        });
+        zip.file('xl/drawings/drawing1.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'+anchors+'</xdr:wsDr>');
+        zip.file('xl/drawings/_rels/drawing1.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+drels+'</Relationships>');
+        var drel='<Relationship Id="rIdFuDrawing1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/>';
+        if(sr) sr=sr.replace('</Relationships>',drel+'</Relationships>');
+        else sr='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+drel+'</Relationships>';
+        zip.file(relPath,sr);
+        if(!/<worksheet[^>]*xmlns:r=/.test(sx)) sx=sx.replace('<worksheet ','<worksheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ');
+        var tag='<drawing r:id="rIdFuDrawing1"/>', pos=-1, k2, tails=['<legacyDrawing','<legacyDrawingHF','<picture','<oleObjects','<controls','<webPublishItems','<tableParts','<extLst','</worksheet>'];
+        for(k2=0;k2<tails.length;k2++){ pos=sx.indexOf(tails[k2]); if(pos>=0) break; }
+        sx=sx.slice(0,pos)+tag+sx.slice(pos);
+        zip.file(sheetPath,sx);
+        var add='<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>';
+        specs.forEach(function(s,k){ add+='<Override PartName="/xl/charts/chart'+(k+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>'; });
+        zip.file('[Content_Types].xml',ct.replace('</Types>',add+'</Types>'));
+        return zip.generateAsync({type:'uint8array',compression:'DEFLATE'});
+      });
+    });
+  });
+}
+
+root.fuBuildWorkbook=fuBuildWorkbook; root.fuInjectCharts=fuInjectCharts;
+})(typeof window!=='undefined'?window:globalThis);
+
+
 function fuDashXlsx(scoped){
   var EJ=window.ExcelJS;
   if(!EJ){ if(typeof toast==='function') toast('Excel library did not load \u2014 check the internet connection','error'); return; }
   if(!scoped||!scoped.length){ if(typeof toast==='function') toast('Nothing to export','error'); return; }
-  function projKey(s){return (s||'').toString().trim().toLowerCase().replace(/[\s\-_.]+/g,' ').trim();}
-  var pm={}, em={};
-  function addMap(m,k,v){ if(!k||!v) return; k=projKey(k); if(!k) return; var o=m[k]||(m[k]={}); o[v]=(o[v]||0)+1; }
-  function best(m,k){ var o=m[projKey(k)]; if(!o) return ''; var b='',n=-1; Object.keys(o).forEach(function(x){ if(o[x]>n){ n=o[x]; b=x; } }); return b; }
-  try{ (typeof allEquipment!=='undefined'?allEquipment:[]).forEach(function(e){ var od=e.od&&e.od!=='(none)'?e.od:''; addMap(pm,e.project,od); var c=''; try{ c=catKey(e); }catch(x){} addMap(em,e.equipment,c); }); }catch(e0){}
-  try{ ((window.MO&&typeof window.MO.data==='function')?(window.MO.data()||[]):[]).forEach(function(r){ addMap(pm,r.project,r.od); addMap(em,r.equipment,r.cat); }); }catch(e1){}
-  var rows=scoped.map(function(r){
-    var sav=0; try{ sav=Number(fuSavingOf(r))||0; }catch(x){}
-    return {month:fuMonthKey(r.submission_date)||'', hiring:(typeof fuFmtMDY==='function'?fuFmtMDY(r.date_from):'')||'', od:best(pm,r.project)||'(No O.D)',
-      project:String(r.project||'').trim()||'(No project)', cat:best(em,r.equipment)||'(No category)', eq:String(r.equipment||''), cap:String(r.capacity||''),
-      sub:String(r.provision||''), qty:Number(r.qty)||0, days:Number(r.days)||0, unit:0, total:sav, ot:0, ded:fuIsDeduction(r)?1:0, fuel:0, util:null, type:'Equipment'};
+  function toDate(v){ var s=''; try{ s=formatExcelDate(v); }catch(x){ s=String(v||''); } var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(s||''); return m?new Date(Date.UTC(+m[1],+m[2]-1,+m[3])):null; }
+  var rows=scoped.map(function(r,i){
+    var sav=0; if(r.provision==='Hold'||r.provision==='Cancel'){ try{ sav=Math.round(Number(fuSavingOf(r))||0); }catch(x){} }
+    return {sn:i+1, eq:String(r.equipment||'').trim(), cap:String(r.capacity||'').trim(), qty:Number(r.qty)||1, sap:String(r.sap||'').trim(),
+      project:String(r.project||'').trim(), sub:toDate(r.submission_date), prov:String(r.provision||'').trim(),
+      from:toDate(r.date_from), to:toDate(r.date_to), days:Number(r.days)||0, sav:sav, notes:String(r.notes||'').trim()};
   });
   var wb;
-  try{ wb=window.hacRentalWorkbook(EJ,rows,{name:'Follow Up',fleet:'Equipment requests',sub:'Provision',total:'Savings',totalNote:'cancel / hold savings (EGP)',ded:'Deduction',ded2:'Deduction Requests',dedNote:'requests marked \u062e\u0635\u0645 \u0639 \u0627\u0644\u0645\u0642\u0627\u0648\u0644',days:'Days'}); }
+  try{ wb=window.fuBuildWorkbook(EJ,rows,{stamp:new Date().toISOString().slice(0,10)}); }
   catch(err){ console.error(err); if(typeof toast==='function') toast('Excel export failed: '+(err&&err.message||err),'error'); return; }
-  window.hacDownloadWb(wb,'Follow_Up_Report');
+  var d=new Date(); function two(n){ return n<10?'0'+n:''+n; }
+  var name='Follow_Up_Report_'+d.getFullYear()+'-'+two(d.getMonth()+1)+'-'+two(d.getDate())+'.xlsx';
+  function save(buf){
+    var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+    a.download=name; document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1500);
+  }
+  wb.xlsx.writeBuffer().then(function(buf){
+    if(window.JSZip && window.fuInjectCharts){
+      return window.fuInjectCharts(window.JSZip,buf,'Charts').then(function(u8){ save(u8); if(typeof toast==='function') toast('Excel exported \u2014 Dashboard + Charts included','success'); })
+        .catch(function(e){ console.error(e); save(buf); if(typeof toast==='function') toast('Excel exported (charts could not be added: '+(e&&e.message||e)+')','error'); });
+    }
+    save(buf); if(typeof toast==='function') toast('Excel exported (charts library did not load)','error');
+  }).catch(function(err){ if(typeof toast==='function') toast('Excel export failed: '+(err&&err.message||err),'error'); });
 }
-
 
 function exportFuPDF(kind) {
   const data = getFilteredFuData();
