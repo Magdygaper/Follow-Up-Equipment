@@ -14913,7 +14913,7 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
   var MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   function lab(m){ if(m==='all') return 'All months'; if(!m) return '—'; var p=String(m).split('-'); return (MN[parseInt(p[1],10)-1]||p[1])+' '+p[0]; }
   function fmt(n){ return Number(n).toLocaleString('en-US'); }
-  function isGen(e){ return /generator|gen[\s\-]?set|\u0645\u0648\u0644\u062f/i.test(String(e.equipment||''))||/^GN/i.test(String(e.code||'').trim()); }
+  function isGen(e){ return /generator|gen[\s\-]?set|light[\s\-]?(ing\s*)?tower|\u0645\u0648\u0644\u062f|\u0628\u0631\u062c\s*\u0627\u0646\u0627\u0631|\u0628\u0631\u062c\s*\u0625\u0646\u0627\u0631/i.test(String(e.equipment||'')+' '+String(e.category||''))||/^GN/i.test(String(e.code||'').trim()); }
   function reading(code,ym){ var L=HMS().byCode[norm(code)]||[], b=null; L.forEach(function(r){ if(r.m!==ym||!(r.e>0)) return; if(!b||r.e>b.e||(r.e===b.e&&r.n>b.n)) b=r; }); return b; }
   function catOf(e){ try{ return (typeof catKey==='function')?catKey(e):(e.category||''); }catch(x){ return e.category||''; } }
   function capOf(e){ try{ var c=eqCapacity(e); var v=c&&c.v; return (v&&v!=='\u2014')?v:''; }catch(x){ return ''; } }
@@ -15000,7 +15000,7 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
     var h='<style>.hml-r{cursor:pointer;}.hml-r:hover td{background:rgba(240,165,0,.08);}</style><div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:10px;font-size:12px;">'
       +'<label>Month <select id="hml-ym" style="'+inp+'"><option value="all"'+(ST.ym==='all'?' selected':'')+'>All months</option>'+H.months.slice().reverse().map(function(m){ return '<option value="'+m+'"'+(m===ST.ym?' selected':'')+'>'+lab(m)+'</option>'; }).join('')+'</select></label>'
       +'<label>Equipment below <input id="hml-eq" type="number" min="0" value="'+thr.eq+'" style="'+inp+'width:70px;"> h</label>'
-      +'<label>Generators below <input id="hml-gen" type="number" min="0" value="'+thr.gen+'" style="'+inp+'width:70px;"> h</label>'
+      +'<label>Generators / Light towers below <input id="hml-gen" type="number" min="0" value="'+thr.gen+'" style="'+inp+'width:70px;"> h</label>'
       +'<label>Fleet <select id="hml-fl" style="'+inp+'"><option value="all">All fleets</option>'+Object.keys(FL).map(function(k){ return '<option value="'+k+'"'+(ST.fleet===k?' selected':'')+'>'+FL[k]+'</option>'; }).join('')+'</select></label>'
       +'<label><input id="hml-inc" type="checkbox"'+(thr.inc?' checked':'')+'> include units with no reading this month</label>'
       +'<input id="hml-q" placeholder="Search code / equipment / project / O.D" value="'+esc(ST.q)+'" style="'+inp+'min-width:230px;">'
@@ -15009,7 +15009,7 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
     h+='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">'
       +'<span class="mr-chip" style="cursor:default;">'+fmt(R.rows.length)+(ST.ym==='all'?' unit-months listed':' units listed')+'</span>'
       +'<span class="mr-chip" style="cursor:default;">Equipment &lt; '+thr.eq+' h: <b>'+fmt(nE)+'</b></span>'
-      +'<span class="mr-chip" style="cursor:default;">Generators &lt; '+thr.gen+' h: <b>'+fmt(nG)+'</b></span>'
+      +'<span class="mr-chip" style="cursor:default;">Gen. / Light towers &lt; '+thr.gen+' h: <b>'+fmt(nG)+'</b></span>'
       +'<span class="mr-chip" style="cursor:default;border-color:rgba(248,81,73,.5);color:#ff7b72;">\ud83d\udd27 Under repair: <b>'+fmt(nR)+'</b></span>'
       +(thr.inc?'<span class="mr-chip" style="cursor:default;">No reading: <b>'+fmt(nN)+'</b></span>':'')
       +'<span style="font-size:11px;color:var(--text-muted);align-self:center;">'+(ST.ym==='all'?fmt(R.withRead)+' monthly readings checked across all months':fmt(R.withRead)+' of '+fmt(R.total)+' units have a '+lab(ST.ym)+' reading')+'</span></div>';
@@ -15095,7 +15095,7 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
     function navStrip(ws,row,items,spans){ items.forEach(function(p,k){ var sp=spans[k]; S(ws,row,sp[0],{text:p[0]+'  \u2192',hyperlink:"#'"+p[1]+"'!A1"},{c2:sp[1],fill:SOFT,color:NAVY,b:1,sz:9,h:'center'}); }); }
 
     /* ── data ── */
-    var eqName='Equipment (<'+thr.eq+'h)', gnName='Generators (<'+thr.gen+'h)';
+    var eqName='Low HM (<'+thr.eq+' & <'+thr.gen+')', gnName=eqName, GEN='Generators & Light Towers', GSH='Gen. & Light Towers';
     var recs=LAST.map(function(x){
       var e=x.e, fl=e.fleet||'egypt', ymk=x.ym||ST.ym||'';
       return {g:!!x.g, ymk:ymk, code:String(e.code||''), month:lab(ymk), eq:String(e.equipment||''), cat:String(catOf(e)||'').trim()||'(No category)',
@@ -15110,16 +15110,15 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
     var monthLabels=months.map(lab);
     var projects=uniq(function(r){ return r.project; }).sort(), cats=uniq(function(r){ return r.cat; }).sort(), ods=uniq(function(r){ return r.od; }).sort(), fleets=uniq(function(r){ return r.fleet; }).sort();
     var SPARE=150, F=5;
-    var LE=F+Math.max(eqRows.length,1)+SPARE-1, LG=F+Math.max(gnRows.length,1)+SPARE-1;
+    var LE=F+Math.max(recs.length,1)+SPARE-1, LG=LE;
     function RE(c){ return "'"+eqName+"'!$"+c+"$"+F+":$"+c+"$"+LE; }
-    function RG(c){ return "'"+gnName+"'!$"+c+"$"+F+":$"+c+"$"+LG; }
+    function RG(c){ c=({T:'W',U:'X'})[c]||c; return "'"+gnName+"'!$"+c+"$"+F+":$"+c+"$"+LG; }
     var SUBT=recs.length.toLocaleString('en-US')+' unit-months  \u00b7  '+new Date().toISOString().slice(0,10)+'  \u00b7  every number is a live formula off the two data tabs';
 
     var wb=new EJ.Workbook(); wb.creator='HAC PMV'; wb.created=new Date(); wb.calcProperties={fullCalcOnLoad:true};
     var wsD=wb.addWorksheet('Dashboard',{views:[{showGridLines:false,zoomScale:90}],properties:{tabColor:{argb:A(AMBER)}}});
     var wsC=wb.addWorksheet('Charts',{views:[{showGridLines:false,zoomScale:90}],properties:{tabColor:{argb:A('12B886')}}});
     var wsE=wb.addWorksheet(eqName,{views:[{showGridLines:true,state:'frozen',ySplit:4,xSplit:3,zoomScale:90}],properties:{tabColor:{argb:A('1F6AA5')}}});
-    var wsG=wb.addWorksheet(gnName,{views:[{showGridLines:true,state:'frozen',ySplit:4,xSplit:3,zoomScale:90}],properties:{tabColor:{argb:A('E8590C')}}});
     var wsL=wb.addWorksheet('Lists',{views:[{showGridLines:true}],properties:{tabColor:{argb:A('ADB5BD')}}});
     var wsK=wb.addWorksheet('Calc',{views:[{showGridLines:true}],properties:{tabColor:{argb:A('ADB5BD')}}});
 
@@ -15130,16 +15129,16 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
        helpers: R Visible | S Under repair | T Pre-filter (all pickers except Month) | U In selection */
     function dataSheet(ws,list,title,typeName,limit,color){
       var Lr=F+Math.max(list.length,1)+SPARE-1, i;
-      banner(ws,1,17,'HAC \u2014 '+title,'Low H/M usage  \u00b7  monthly hour-meter difference (End \u2212 Start) below '+limit+' h  \u00b7  '+SUBT,color);
+      banner(ws,1,17,'HAC \u2014 '+title,'Low H/M usage  \u00b7  monthly hour-meter difference (End \u2212 Start) below the limit  \u00b7  '+SUBT,color);
       var kp='"Units: ("&COUNTIFS($R$'+F+':$R$'+Lr+',1)&")   \u00b7   Under repair: ("&SUMIFS($S$'+F+':$S$'+Lr+',$R$'+F+':$R$'+Lr+',1)&")   \u00b7   Hours short: ("&TEXT(SUMIFS($O$'+F+':$O$'+Lr+',$R$'+F+':$R$'+Lr+',1),"#,##0")&")   [visible rows \u2014 follows the filter arrows]"';
       S(ws,3,1,FM(kp),{c2:17,fill:'FFF6DA',color:'0D1B2E',b:1,sz:10.5,h:'center',bd:{bottom:{style:'medium',color:{argb:A(AMBER)}}}}); ws.getRow(3).height=26;
       var H=['S/N','Code','Month','Equipment','Category','Brand / Model','Capacity','Project','O.D','Fleet','H/M Start','H/M End','Diff (h)','Limit (h)','Hours short','Repair status','Repair days'];
       H.forEach(function(t,k){ hdrCell(ws,4,k+1,t,k===0?'6C757D':color); ws.getCell(4,k+1).font={name:'Calibri',size:10,bold:true,color:{argb:A(WHITE)}}; });
-      [['R','Visible'],['S','Under repair'],['T','Pre-filter'],['U','In selection']].forEach(function(h){ hdrCell(ws,4,h[0].charCodeAt(0)-64,h[1]); });
+      [['R','Visible'],['S','Under repair'],['T','Pre-filter (Eq)'],['U','In selection (Eq)'],['V','Type'],['W','Pre-filter (Gen)'],['X','In selection (Gen)']].forEach(function(h){ hdrCell(ws,4,h[0].charCodeAt(0)-64,h[1]); });
       ws.getRow(4).height=30;
-      [6,12,10,26,22,22,14,36,12,14,11,11,10,10,11,20,10,3,9,9,9,9].forEach(function(w,k){ ws.getColumn(k+1).width=w; });
+      [6,12,10,26,22,22,14,36,12,14,11,11,10,10,11,20,10,3,9,9,9,9,24,9,9].forEach(function(w,k){ ws.getColumn(k+1).width=w; });
       for(i=0;i<list.length;i++){ var d=list[i], r=F+i;
-        var vals=[i+1,d.code,d.month,d.eq,d.cat,d.brand,d.cap,d.project,d.od,d.fleet,d.s,d.en,d.d,d.lim,null,d.rep,d.repd||null];
+        var vals=[i+1,d.code,d.month,d.eq,d.cat,d.brand,d.cap,d.project,d.od,d.fleet,d.s,d.en,d.d,d.lim,null,d.rep,d.repd||null,null,null,null,null,d.g?GEN:'Equipment'];
         for(var k=0;k<vals.length;k++){ var v=vals[k]; if(v===null||v===undefined||v==='') continue; ws.getCell(r,k+1).value=v; }
       }
       for(i=0;i<list.length+SPARE;i++){
@@ -15147,12 +15146,15 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
         ws.getCell(r2,15).value=FM('IF(ISNUMBER($M'+r2+'),MAX(0,$N'+r2+'-$M'+r2+'),"")');
         ws.getCell(r2,18).value=FM('IF($B'+r2+'="","",SUBTOTAL(103,OFFSET($B'+r2+',0,0)))');
         ws.getCell(r2,19).value=FM('IF($B'+r2+'="",0,IF(LEN($P'+r2+')>0,1,0))');
-        ws.getCell(r2,20).value=FM('IF($B'+r2+'="",0,IF(AND(OR('+C_TYP+'="All",'+C_TYP+'="'+typeName+'"),OR('+C_FLT+'="All",$J'+r2+'='+C_FLT+'),OR('+C_PRJ+'="All",$H'+r2+'='+C_PRJ+'),OR('+C_REP+'="All",AND('+C_REP+'="Under repair only",$S'+r2+'=1),AND('+C_REP+'="Hide under repair",$S'+r2+'=0)),OR('+C_VIS+'="No",$R'+r2+'=1)),1,0))');
+        function cond(tn){ return 'OR('+C_TYP+'="All",'+C_TYP+'="'+tn+'"),OR('+C_FLT+'="All",$J'+r2+'='+C_FLT+'),OR('+C_PRJ+'="All",$H'+r2+'='+C_PRJ+'),OR('+C_REP+'="All",AND('+C_REP+'="Under repair only",$S'+r2+'=1),AND('+C_REP+'="Hide under repair",$S'+r2+'=0)),OR('+C_VIS+'="No",$R'+r2+'=1)'; }
+        ws.getCell(r2,20).value=FM('IF($B'+r2+'="",0,IF(AND($V'+r2+'="Equipment",'+cond('Equipment')+'),1,0))');
         ws.getCell(r2,21).value=FM('IF($T'+r2+'=1,IF(OR('+C_MON+'="All",$C'+r2+'='+C_MON+'),1,0),0)');
+        ws.getCell(r2,23).value=FM('IF($B'+r2+'="",0,IF(AND($V'+r2+'="'+GEN+'",'+cond(GEN)+'),1,0))');
+        ws.getCell(r2,24).value=FM('IF($W'+r2+'=1,IF(OR('+C_MON+'="All",$C'+r2+'='+C_MON+'),1,0),0)');
       }
       for(var c=1;c<=17;c++){ var col=ws.getColumn(c); col.font={name:'Calibri',size:10}; }
       [11,12,13,14,15,17].forEach(function(c){ ws.getColumn(c).numFmt=(c===15||c===17)?'#,##0;-#,##0;':'#,##0;-#,##0;0'; ws.getColumn(c).alignment={horizontal:'right'}; });
-      for(var c3=18;c3<=21;c3++){ ws.getColumn(c3).font={name:'Calibri',size:9,color:{argb:A('868E96')}}; }
+      for(var c3=18;c3<=24;c3++){ ws.getColumn(c3).font={name:'Calibri',size:9,color:{argb:A('868E96')}}; }
       ws.addConditionalFormatting({ref:'A'+F+':Q'+Lr,rules:[
         {type:'expression',formulae:['$S'+F+'=1'],style:{fill:{type:'pattern',pattern:'solid',fgColor:{argb:A('FDE8E8')},bgColor:{argb:A('FDE8E8')}}}},
         {type:'expression',formulae:['AND($B'+F+'<>"",MOD(ROW(),2)=0)'],style:{fill:{type:'pattern',pattern:'solid',fgColor:{argb:A('F5F8FB')},bgColor:{argb:A('F5F8FB')}}}}]});
@@ -15160,8 +15162,7 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
       ws.autoFilter={from:{row:4,column:1},to:{row:Lr,column:17}};
       ws.pageSetup={paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0};
     }
-    dataSheet(wsE,eqRows,'Equipment below '+thr.eq+' h','Equipment',thr.eq,'1F6AA5');
-    dataSheet(wsG,gnRows,'Generators below '+thr.gen+' h','Generators',thr.gen,'E8590C');
+    dataSheet(wsE,recs,'Equipment < '+thr.eq+' h  \u00b7  '+GEN+' < '+thr.gen+' h','',0,'1F4E9E');
 
     /* ═════════ LISTS (static names, live counts) ═════════ */
     var NM=Math.max(months.length,1), NP=Math.max(projects.length,1), NC=Math.max(cats.length,1), NO=Math.max(ods.length,1);
@@ -15195,7 +15196,7 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
         ws.getCell('L'+(3+k)).value=p[0]; ws.getCell('M'+(3+k)).value=FM(p[1]); });
       hdrCell(ws,4,1,'Type','6C757D'); hdrCell(ws,4,2,'Units','6C757D');
       ws.getCell('A5').value='Equipment'; ws.getCell('B5').value=FM('COUNTIFS('+RE('U')+',1)');
-      ws.getCell('A6').value='Generators'; ws.getCell('B6').value=FM('COUNTIFS('+RG('U')+',1)');
+      ws.getCell('A6').value=GSH; ws.getCell('B6').value=FM('COUNTIFS('+RG('U')+',1)');
       [14,10,10,10,10,10,10,10,10,10,3,22,40].forEach(function(w,k){ ws.getColumn(k+1).width=w; });
     })();
 
@@ -15212,7 +15213,7 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
       [[2,4],[5,7],[8,10],[11,13]].forEach(function(p){ S(ws,5,p[0],'All',{c2:p[1],fill:'FFF6DA',color:NAVY,b:1,sz:12,h:'center',bd:pbd}); });
       ws.getRow(5).height=26;
       ws.getCell('B5').dataValidation={type:'list',allowBlank:false,formulae:['Lists!$S$5:$S$'+(5+monthLabels.length)]};
-      ws.getCell('E5').dataValidation={type:'list',allowBlank:false,formulae:['"All,Equipment,Generators"']};
+      ws.getCell('E5').dataValidation={type:'list',allowBlank:false,formulae:['"All,Equipment,'+GEN+'"']};
       ws.getCell('H5').dataValidation={type:'list',allowBlank:false,formulae:['Lists!$T$5:$T$'+(5+fleets.length)]};
       ws.getCell('K5').dataValidation={type:'list',allowBlank:false,formulae:['Lists!$U$5:$U$'+(5+projects.length)]};
       S(ws,6,2,'REPAIR  \u25b8',{c2:4,fill:NAVY,color:WHITE,b:1,sz:9,h:'center'});
@@ -15222,12 +15223,12 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
       S(ws,6,11,'Yes',{c2:13,fill:'FFF6DA',color:NAVY,b:1,sz:11,h:'center',bd:pbd});
       ws.getCell('K6').dataValidation={type:'list',allowBlank:false,formulae:['"Yes,No"']};
       ws.getRow(6).height=22;
-      navStrip(ws,7,[['Charts','Charts'],[eqName,eqName],[gnName,gnName],['Lists','Lists']],[[2,4],[5,7],[8,10],[11,13]]);
+      navStrip(ws,7,[['Charts','Charts'],[eqName,eqName],['Lists','Lists']],[[2,5],[6,9],[10,13]]);
       ws.getRow(8).height=8;
       var tot='(COUNTIFS('+RE('U')+',1)+COUNTIFS('+RG('U')+',1))';
       card(ws,9,2,4,'UNITS LISTED',FM(tot),'in the current selection','1F6AA5');
       card(ws,9,5,7,'EQUIPMENT < '+thr.eq+' H',FM('COUNTIFS('+RE('U')+',1)'),'monthly H/M diff below limit','1F4E9E');
-      card(ws,9,8,10,'GENERATORS < '+thr.gen+' H',FM('COUNTIFS('+RG('U')+',1)'),'monthly H/M diff below limit','E8590C');
+      card(ws,9,8,10,(GSH.toUpperCase())+' < '+thr.gen+' H',FM('COUNTIFS('+RG('U')+',1)'),'monthly H/M diff below limit','E8590C');
       card(ws,9,11,13,'UNDER REPAIR',FM('SUMIFS('+RE('S')+','+RE('U')+',1)+SUMIFS('+RG('S')+','+RG('U')+',1)'),'units flagged in repair','C62828');
       ws.getRow(12).height=8;
       card(ws,13,2,4,'HOURS SHORT',FM('SUMIFS('+RE('O')+','+RE('U')+',1)+SUMIFS('+RG('O')+','+RG('U')+',1)'),'total hours below the limits','B8860B');
@@ -15235,11 +15236,11 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
       card(ws,13,8,10,'NO READING',FM('COUNTIFS('+RE('U')+',1,'+RE('M')+',"")+COUNTIFS('+RG('U')+',1,'+RG('M')+',"")'),'listed without a reading','6B7785');
       card(ws,13,11,13,'PROJECTS',FM('COUNTIF(Lists!$F$5:$F$'+(4+NP)+',">0")'),'with low-usage units','6A2E7F');
       ws.getRow(16).height=10;
-      S(ws,17,2,FM('IF(OR('+C_VIS+'="No",COUNTIFS('+RE('R')+',1)+COUNTIFS('+RG('R')+',1)=COUNTIFS('+RE('B')+',"<>")+COUNTIFS('+RG('B')+',"<>")),"Pick any combination above \u2014 cards, tables and the Charts sheet follow it","\u26a0 a filter is active on a data tab \u2014 set FOLLOW SHEET FILTER to No to ignore it")'),{c2:13,color:MUTED,sz:9,i:true,ind:1});
+      S(ws,17,2,FM('IF(OR('+C_VIS+'="No",COUNTIFS('+RE('R')+',1)=COUNTIFS('+RE('B')+',"<>")),"Pick any combination above \u2014 cards, tables and the Charts sheet follow it","\u26a0 a filter is active on a data tab \u2014 set FOLLOW SHEET FILTER to No to ignore it")'),{c2:13,color:MUTED,sz:9,i:true,ind:1});
       var top=19;
       function table(title,color,n,label,nameF,cntF,flag,tag){
         band(ws,top,2,13,title,color);
-        colhdr(ws,top+1,2,3,label); colhdr(ws,top+1,4,4,'Equipment','center'); colhdr(ws,top+1,5,5,'Generators','center'); colhdr(ws,top+1,6,6,'Total','center');
+        colhdr(ws,top+1,2,3,label); colhdr(ws,top+1,4,4,'Equipment','center'); colhdr(ws,top+1,5,5,GSH,'center'); colhdr(ws,top+1,6,6,'Total','center');
         colhdr(ws,top+1,7,8,'','center'); colhdr(ws,top+1,9,9,'Under repair','center'); colhdr(ws,top+1,10,10,'Avg diff (h)','center'); colhdr(ws,top+1,11,11,'Hours short','center'); colhdr(ws,top+1,12,13,'Share','center');
         var r0=top+2, rN=top+1+n, k; CH[tag]={r0:r0,n:n,hdr:top+1};
         for(k=0;k<n;k++){ var r=r0+k, bd={bottom:thin};
@@ -15275,7 +15276,7 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
       /* BY MONTH — ignores the Month picker (uses the pre-filter flag T), highlights the picked month */
       (function(){
         band(ws,top,2,13,'BY MONTH  \u2014  all months (ignores the Month picker)','44546A');
-        colhdr(ws,top+1,2,3,'Month'); colhdr(ws,top+1,4,4,'Equipment','center'); colhdr(ws,top+1,5,5,'Generators','center'); colhdr(ws,top+1,6,6,'Total','center');
+        colhdr(ws,top+1,2,3,'Month'); colhdr(ws,top+1,4,4,'Equipment','center'); colhdr(ws,top+1,5,5,GSH,'center'); colhdr(ws,top+1,6,6,'Total','center');
         colhdr(ws,top+1,7,8,'','center'); colhdr(ws,top+1,9,9,'Under repair','center'); colhdr(ws,top+1,10,10,'Avg diff (h)','center'); colhdr(ws,top+1,11,11,'Hours short','center'); colhdr(ws,top+1,12,13,'Share','center');
         var r0=top+2, n=Math.max(months.length,1), rN=r0+n-1, k; CH.month={r0:r0,n:n,hdr:top+1};
         var tt='(COUNTIFS('+RE('T')+',1)+COUNTIFS('+RG('T')+',1))';
@@ -15319,9 +15320,9 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
       function hd(c,t){ return 'Dashboard!$'+c+'$'+t.hdr; }
       var m=CH.month, p=CH.proj, c=CH.cat, o=CH.od;
       var specs=[
-        {title:'Low H/M units by month \u2014 Equipment vs Generators', kind:'col', grouping:'stacked', cat:rg('B',m), series:[{name:hd('D',m),val:rg('D',m),color:'1F6AA5'},{name:hd('E',m),val:rg('E',m),color:'E8590C'}], anchor:[1,5,7,23], legend:'b', labels:true, numFmt:'#,##0;;;'},
+        {title:'Low H/M units by month \u2014 Equipment vs Gen. & Light Towers', kind:'col', grouping:'stacked', cat:rg('B',m), series:[{name:hd('D',m),val:rg('D',m),color:'1F6AA5'},{name:hd('E',m),val:rg('E',m),color:'E8590C'}], anchor:[1,5,7,23], legend:'b', labels:true, numFmt:'#,##0;;;'},
         {title:'Hours short by month (below the limit)', kind:'col', grouping:'clustered', cat:rg('B',m), series:[{name:hd('K',m),val:rg('K',m),color:'C62828'}], anchor:[7,5,13,23], legend:null, labels:true, numFmt:'#,##0;;;'},
-        {title:'Equipment vs Generators \u2014 follows the pickers', kind:'doughnut', cat:'Calc!$A$5:$A$6', series:[{name:'Calc!$B$4',val:'Calc!$B$5:$B$6',color:'1F3864'}], pointColors:['1F6AA5','E8590C'], anchor:[1,24,7,42], legend:'r', labels:true},
+        {title:'Equipment vs Gen. & Light Towers \u2014 follows the pickers', kind:'doughnut', cat:'Calc!$A$5:$A$6', series:[{name:'Calc!$B$4',val:'Calc!$B$5:$B$6',color:'1F3864'}], pointColors:['1F6AA5','E8590C'], anchor:[1,24,7,42], legend:'r', labels:true},
         {title:'Top 10 projects \u2014 follows the pickers', kind:'bar', grouping:'stacked', cat:rg('B',p), series:[{name:hd('D',p),val:rg('D',p),color:'1F6AA5'},{name:hd('E',p),val:rg('E',p),color:'E8590C'}], anchor:[7,24,13,42], legend:'b', labels:true, numFmt:'#,##0;;;'},
         {title:'By category \u2014 follows the pickers', kind:'bar', grouping:'stacked', cat:rg('B',c), series:[{name:hd('D',c),val:rg('D',c),color:'1F6AA5'},{name:hd('E',c),val:rg('E',c),color:'E8590C'}], anchor:[1,43,7,61], legend:'b', labels:true, numFmt:'#,##0;;;'},
         {title:'By O.D \u2014 follows the pickers', kind:'bar', grouping:'stacked', cat:rg('B',o), series:[{name:hd('D',o),val:rg('D',o),color:'1F6AA5'},{name:hd('E',o),val:rg('E',o),color:'E8590C'}], anchor:[7,43,13,61], legend:'b', labels:true, numFmt:'#,##0;;;'}
