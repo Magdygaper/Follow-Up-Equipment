@@ -516,6 +516,11 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
 
       </div>
 
+      <button class="nav-item" id="nav-alldash" onclick="if(window.HACBI)HACBI.hub(this)" title="Every page's interactive dashboard in one place">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
+        📈 All Dashboards
+      </button>
+
       <!-- SECTION 1: ASSETS -->
       <div class="nav-divider">
         <span class="nav-divider-text">Fleet Assets</span>
@@ -14818,8 +14823,11 @@ function dashPayload(spec,pageId){
 function ensureDash(){
   var o=document.getElementById('hacdash-ov'); if(o) return o;
   o=document.createElement('div'); o.id='hacdash-ov';
-  o.innerHTML='<div class="hd-bar"><b id="hd-title"></b><span id="hd-sub"></span><span class="hd-sp"></span><button type="button" class="btn-sm" id="hd-refresh" title="Rebuild from the page\'s current data and filters">↻ Refresh</button><button type="button" class="btn-sm" id="hd-close">✕ Close</button></div><iframe id="hd-frame" title="Dashboard"></iframe>';
+  o.innerHTML='<div class="hd-bar"><b id="hd-title"></b><span id="hd-sub"></span><span class="hd-sp"></span><button type="button" class="btn-sm" id="hd-refresh" title="Rebuild from the page\'s current data and filters">↻ Refresh</button><button type="button" class="btn-sm" id="hd-close">✕ Close</button></div><div class="hd-tabs" id="hd-tabs"></div><iframe id="hd-frame" title="Dashboard"></iframe>';
   document.body.appendChild(o);
+  var tb=o.querySelector('#hd-tabs');
+  Object.keys(BUILD).forEach(function(id){ var b=document.createElement('button'); b.type='button'; b.className='hd-tab'; b.setAttribute('data-id',id); b.textContent=LABELS[id].replace(/_/g,' ');
+    b.addEventListener('click',function(){ openDashboard(id,null); }); tb.appendChild(b); });
   var close=function(){ o.classList.remove('on'); document.body.style.overflow=''; o.querySelector('iframe').srcdoc=''; };
   o.querySelector('#hd-close').addEventListener('click',close);
   o.querySelector('#hd-refresh').addEventListener('click',function(){ if(DASH_LAST) openDashboard(DASH_LAST,null); });
@@ -14841,6 +14849,7 @@ function openDashboard(pageId,btn){
       ov.querySelector('#hd-title').textContent=pl.title;
       ov.querySelector('#hd-sub').textContent=[spec.scope].concat(spec.filters&&spec.filters.length?['Filters: '+spec.filters.join(' · ')]:[]).filter(Boolean).join('  ·  ');
       DASH_LAST=pageId; ov.classList.add('on'); document.body.style.overflow='hidden';
+      ov.querySelectorAll('.hd-tab').forEach(function(t){ t.classList.toggle('on',t.getAttribute('data-id')===pageId); });
       var got=false;
       fr.onload=function(){ /* the browser also fires load for the initial blank frame — ignore it until the dashboard document is ready */
         var w=null; try{ w=fr.contentWindow; }catch(e){}
@@ -14865,6 +14874,7 @@ function injectCss(){
     +'.hacdash-btn{background:rgba(88,166,255,.14)!important;border:1px solid rgba(88,166,255,.55)!important;color:#58a6ff!important}.hacdash-btn:hover{background:rgba(88,166,255,.26)!important}'
     +'#hacdash-ov{position:fixed;inset:0;z-index:99999;background:#0d1117;display:none;flex-direction:column}#hacdash-ov.on{display:flex}'
     +'.hd-bar{display:flex;align-items:center;gap:10px;padding:8px 16px;background:#161b22;border-bottom:1px solid #30363d;color:#e6edf3;font-size:14px}.hd-bar b{font-size:15px}#hd-sub{color:#7d8590;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.hd-sp{flex:1}'
+    +'.hd-tabs{display:flex;gap:6px;padding:8px 16px;background:#0d1117;border-bottom:1px solid #30363d;overflow-x:auto;flex-shrink:0}.hd-tab{background:#161b22;border:1px solid #30363d;color:#9da7b3;padding:6px 14px;border-radius:999px;cursor:pointer;font-size:12px;font-weight:600;white-space:nowrap}.hd-tab:hover{color:#e6edf3;border-color:#58a6ff}.hd-tab.on{background:rgba(88,166,255,.18);border-color:#58a6ff;color:#58a6ff}'
     +'#hd-frame{flex:1;border:0;width:100%;background:#0d1117}'
     +'@media print{.hacbi-row,#hacdash-ov{display:none!important}}';
   document.head.appendChild(st);
@@ -14888,7 +14898,7 @@ function init(){
 }
 if(document.readyState!=='loading') init(); else document.addEventListener('DOMContentLoaded',init);
 
-window.HACBI={exportPage:exportPage,dashboard:openDashboard,build:function(id){ var s=BUILD[id](); finalize(s,id); return s; },pages:Object.keys(BUILD)};
+window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executive',btn||null); },exportPage:exportPage,dashboard:openDashboard,build:function(id){ var s=BUILD[id](); finalize(s,id); return s; },pages:Object.keys(BUILD)};
 })();
 </script>
 
