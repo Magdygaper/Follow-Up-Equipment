@@ -2585,13 +2585,13 @@ function renderCatBreakdown(){
 }
 function cbExport(){
   if(!_cbRows.types||!_cbRows.types.length){ toast('Nothing to export','error'); return; }
-  var wb=XLSX.utils.book_new();
-  [['Types',_cbRows.types,'Equipment'],['O.D',_cbRows.ods,'O.D'],['Projects',_cbRows.projs,'Project']].forEach(function(x){
+  var catName=String(multiFilter.cat||'');
+  var sheets=[['Types',_cbRows.types,'Equipment'],['O.D',_cbRows.ods,'O.D'],['Projects',_cbRows.projs,'Project']].map(function(x){
     var t=x[1].reduce(function(a,p){return a+p[1];},0)||1;
     var d=x[1].map(function(p){ var o={}; o[x[2]]=p[0]; o['Count']=p[1]; o['%']=Math.round(p[1]/t*1000)/10; return o; });
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(d),x[0]);
+    return window.hacXlsxJson(d,{title:'Category Breakdown \u2014 '+catName+' \u00b7 '+x[0],sheetName:x[0],sum:['Count']});
   });
-  XLSX.writeFile(wb,'Category_Breakdown_'+String(multiFilter.cat).replace(/[^\w]+/g,'_')+'.xlsx');
+  window.hacXlsxMulti('Category_Breakdown_'+catName.replace(/[^\w]+/g,'_'),sheets);
 }
 window.cbToggleAll=cbToggleAll; window.cbExport=cbExport;
 
@@ -2643,8 +2643,8 @@ function renderFleetAnalytics(){
 function odaExport(){
   if(!_odaData||!_odaData.list.length){ toast('Nothing to export','error'); return; }
   var d=_odaData.list.map(function(o){ var r={}; r[ODA_DIMS[ODA.by].l]=o.k; r['Total']=o.n; _odaData.skeys.forEach(function(k){ r[k]=o.s[k]||0; }); return r; });
-  var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(d),'Chart');
-  XLSX.writeFile(wb,'Fleet_'+ODA_DIMS[ODA.by].l.replace(/\W+/g,'_')+'_Chart.xlsx');
+  var sumKeys=['Total'].concat(_odaData.skeys);
+  window.hacXlsxTable(window.hacXlsxJson(d,{title:'Fleet by '+ODA_DIMS[ODA.by].l+' \u2014 Chart',sum:sumKeys}));
 }
 window.odaSet=odaSet; window.odaClick=odaClick; window.odaExport=odaExport;
 
@@ -5614,17 +5614,13 @@ function exportEquipByOD(){
   var rows=getFleetEquipment(); if(!rows.length){ toast('No equipment to export','error'); return; }
   var by={}; rows.forEach(function(e){ var k=(e.od&&String(e.od).trim())||'No O.D'; (by[k]=by[k]||[]).push(e); });
   var skip={id:1,sn:1,timestamp:1,createdAt:1,updatedAt:1};
-  var wb=XLSX.utils.book_new(), used={summary:1};
   var sum=Object.keys(by).sort().map(function(k){ return {'O.D':k,'Equipment Count':by[k].length}; });
-  sum.push({'O.D':'TOTAL','Equipment Count':rows.length});
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(sum),'Summary');
+  var sheets=[window.hacXlsxJson(sum,{title:'Equipment by O.D \u2014 Summary',sheetName:'Summary',sum:['Equipment Count']})];
   Object.keys(by).sort().forEach(function(k){
     var data=by[k].map(function(e,i){ var o={'S/N':i+1}; Object.keys(e).forEach(function(f){ if(!skip[f]&&typeof e[f]!=='object') o[f]=e[f]; }); return o; });
-    var base=k.replace(/[\\\/\?\*\[\]:]/g,' ').trim().slice(0,26)||'OD', nm=base, n=1;
-    while(used[nm.toLowerCase()]){ nm=base+'_'+(++n); } used[nm.toLowerCase()]=1;
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(data),nm);
+    sheets.push(window.hacXlsxJson(data,{title:'Equipment \u2014 '+k,sheetName:k}));
   });
-  XLSX.writeFile(wb,'Equipment_by_OD_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  window.hacXlsxMulti('Equipment_by_OD',sheets);
 }
 window.exportEquipByOD=exportEquipByOD;
 function exportEquipPDF(kind) {
@@ -7230,9 +7226,7 @@ function moExport(){
       'Quantity':units(r),'Availability':r.avail,'Total Fuel (L)':r.totalFuel,'Fuel Per Hour':r.fuelPerHr,
       'Utilization%':r.utl,'B.M':r.bm,'B.M Status':r.bmStatus,'Status':r.status};
   });
-  var ws=XLSX.utils.json_to_sheet(out), wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,'Filtered');
-  XLSX.writeFile(wb,'Master_Owned_'+(moFilter.month.length?moFilter.month.join('_'):'All')+'_filtered.xlsx');
+  window.hacXlsxTable(window.hacXlsxJson(out,{title:'Master Owned \u2014 Filtered Export',sub:(moFilter.month.length?moFilter.month.join(', '):'All months')}));
   if(typeof toast==='function') toast('⬇ Exported '+out.length+' rows','success');
 }
 
@@ -12959,13 +12953,13 @@ window.__rdData=function(){ return {rows:list(), all:rows, meta:meta, F:F, metri
   /* ═════ Excel export — same table as the PDF, as a formatted sheet ═════
      navy header · zebra rows · frozen header + filter buttons · totals row with SUBTOTAL (follows the filter,
      like the PDF footer) · A4 landscape print setup with the header repeated on every page. */
-  var XL_FMT={i:'#,##0',d:'#,##0.0',m:'#,##0',z:'#,##0;-#,##0;"\u2013"',dz:'#,##0.0;-#,##0.0;"\u2013"',p:'0"%"'};
+  var XL_FMT={f:'#,##0.00',i:'#,##0',d:'#,##0.0',m:'#,##0',z:'#,##0;-#,##0;"\u2013"',dz:'#,##0.0;-#,##0.0;"\u2013"',p:'0"%"'};
   function colLetter(n){ var s='',m; while(n>0){ m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=Math.floor((n-1)/26); } return s; }
   function buildXlsx(o,EJ){
     var kpiRows=(o.kpis&&o.kpis.length)?1:0, hdrRow=3+kpiRows;
     var cols=o.cols, rows=o.rows, nC=cols.length, nR=rows.length, first=hdrRow+1, last=hdrRow+nR, tot=last+1, lastCol=colLetter(nC);
-    var wb=new EJ.Workbook(); wb.creator='HAC PMV'; wb.created=new Date();
-    var ws=wb.addWorksheet(String(o.title||'Export').replace(/^\s*HAC\s*\u00b7\s*PMV\s*\u2014\s*/,'').replace(/[\\\/\?\*\[\]:]/g,' ').slice(0,31),
+    var wb=o.wb||new EJ.Workbook(); if(!o.wb){ wb.creator='HAC PMV'; wb.created=new Date(); }
+    var ws=wb.addWorksheet(o.sheetName||String(o.title||'Export').replace(/^\s*HAC\s*\u00b7\s*PMV\s*\u2014\s*/,'').replace(/[\\\/\?\*\[\]:]/g,' ').slice(0,31),
       {views:[{state:'frozen',ySplit:hdrRow,activeCell:'A'+first}],properties:{tabColor:{argb:'FFF0A500'}}});
     var NAVY='FF0D1B2E', AMBER='FFF0A500', thinB={style:'thin',color:{argb:'FFE3E7ED'}};
     ws.mergeCells('A1:'+lastCol+'1'); ws.mergeCells('A2:'+lastCol+'2');
@@ -13005,7 +12999,7 @@ window.__rdData=function(){ return {rows:list(), all:rows, meta:meta, F:F, metri
           if(v.length+2>w[j]) w[j]=Math.min(46,v.length+2);
         } else {
           var n=Number(v); if(!isFinite(n)) n=0;
-          if(col.t==='i'||col.t==='m'||col.t==='z'||col.t==='p') n=Math.round(n); else n=+n.toFixed(1);
+          if(col.t==='i'||col.t==='m'||col.t==='z'||col.t==='p') n=Math.round(n); else n=+n.toFixed(col.t==='f'?2:1);
           cell.value=n; cell.numFmt=XL_FMT[col.t]||'#,##0';
           cell.alignment={vertical:'middle',horizontal:'right'};
           if(col.t==='p'&&n<75) cell.font={name:'Calibri',size:10,bold:true,color:{argb:'FFD93025'}};
@@ -13048,6 +13042,49 @@ window.__rdData=function(){ return {rows:list(), all:rows, meta:meta, F:F, metri
       document.body.appendChild(a); a.click();
       setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1500);
     }).catch(function(err){ if(typeof toast==='function') toast('Excel export failed: '+(err&&err.message||err),'error'); });
+  };
+
+  /* ─── unified helpers: every plain export now goes through the SAME styled engine (navy header · amber rule · zebra · totals · filters) ─── */
+  function xlDownload(wb,base){
+    var d=new Date(), stamp=d.getFullYear()+'-'+two(d.getMonth()+1)+'-'+two(d.getDate());
+    wb.xlsx.writeBuffer().then(function(buf){
+      var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+      a.download=String(base).replace(/[\\\/:*?"<>|]+/g,'_')+'_'+stamp+'.xlsx'; document.body.appendChild(a); a.click();
+      setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1500);
+      if(typeof toast==='function') toast('Excel exported','success');
+    }).catch(function(err){ if(typeof toast==='function') toast('Excel export failed: '+(err&&err.message||err),'error'); });
+  }
+  /* array of plain objects -> sheet spec for buildXlsx. Column types are detected: integers 'i', decimals 'f', everything else text.
+     Year / code / SAP / serial style columns always stay text (so 2019 is not shown as 2,019). o: {title, sub, sheetName, sum:['Header',...]} */
+  window.hacXlsxJson=function(objs,o){
+    o=o||{}; objs=objs||[];
+    var keys=[], seen={}; objs.forEach(function(r){ Object.keys(r).forEach(function(k){ if(!seen[k]){ seen[k]=1; keys.push(k); } }); });
+    var sum={}; (o.sum||[]).forEach(function(k){ sum[k]=1; });
+    var cols=keys.map(function(k){
+      var vals=objs.map(function(r){ return r[k]; }).filter(function(v){ return v!==''&&v!=null; });
+      var blanks=vals.length<objs.length, t='t';
+      if(vals.length&&!/year|code|sap|serial|plate|chassis|\bno\b|number|phone/i.test(k)&&vals.every(function(v){ return typeof v==='number'&&isFinite(v); })){
+        t=vals.every(function(v){ return Math.floor(v)===v; })?(blanks?'z':'i'):'f';
+      }
+      return {h:k,g:function(r){ return r[k]; },t:t,s:!!sum[k]&&t!=='t'};
+    });
+    return {title:o.title||'Export',sub:o.sub||'',sheetName:o.sheetName,cols:cols,rows:objs,kpis:o.kpis};
+  };
+  /* several styled sheets in ONE workbook. sheets: [spec,...] (spec from hacXlsxJson or {title,cols,rows,sheetName}) */
+  window.hacXlsxMulti=function(base,sheets){
+    var EJ=window.ExcelJS;
+    if(!EJ){ if(typeof toast==='function') toast('Excel library did not load \u2014 check the internet connection','error'); return; }
+    sheets=(sheets||[]).filter(function(sh){ return sh&&sh.rows&&sh.rows.length; });
+    if(!sheets.length){ if(typeof toast==='function') toast('Nothing to export','error'); return; }
+    var wb=new EJ.Workbook(), used={}; wb.creator='HAC PMV'; wb.created=new Date();
+    try{
+      sheets.forEach(function(sh){
+        var b0=String(sh.sheetName||sh.title||'Sheet').replace(/^\s*HAC\s*\u00b7\s*PMV\s*\u2014\s*/,'').replace(/[\\\/\?\*\[\]:]/g,' ').trim().slice(0,26)||'Sheet', nm=b0, n=1;
+        while(used[nm.toLowerCase()]){ nm=b0+'_'+(++n); } used[nm.toLowerCase()]=1;
+        buildXlsx(Object.assign({},sh,{wb:wb,sheetName:nm}),EJ);
+      });
+    }catch(err){ console.error(err); if(typeof toast==='function') toast('Excel export failed: '+(err&&err.message||err),'error'); return; }
+    xlDownload(wb,base);
   };
 
   /* opts: {title, sub, cols:[{h:'Header', g:function(row,i){...}, t:'t'|'i'|..., s:true(sum)}], rows:[...]}  ·  kind 'xlsx' -> Excel instead of PDF */
@@ -14486,11 +14523,22 @@ window.HACBI={exportPage:exportPage,dashboard:openDashboard,build:function(id){ 
     document.getElementById('hm-low-modal').classList.add('open'); draw();
   };
   document.addEventListener('hm-loaded',function(){ var m=document.getElementById('hm-low-modal'); if(m&&m.classList.contains('open')) draw(); });
+  /* Same formula workbook as Master Owned / Master Rental / Follow-Up (Dashboard, Index, O.D Overview/Detail, Project x Month, Project x Category, All Data) */
   window.hmLowExport=function(){
+    var EJ=window.ExcelJS;
+    if(!EJ||typeof window.hacRentalWorkbook!=='function'){ if(typeof toast==='function') toast('Excel library did not load \u2014 check the internet connection','error'); return; }
     if(!LAST.length){ if(typeof toast==='function') toast('Nothing to export','error'); return; }
-    var data=LAST.map(function(x,i){ var e=x.e; return {'#':i+1,'Code':e.code||'','Equipment':e.equipment||'','Category':catOf(e),'Brand / Model':e.brand||'','Capacity':capOf(e),'Fleet':FL[e.fleet||'egypt']||e.fleet||'','Project':e.project||'','O.D':e.od||'','Month':lab(x.ym||ST.ym),'Start':x.r?x.r.s:'','End':x.r?x.r.e:'','Diff (h)':x.d==null?'no reading':x.d,'Limit (h)':x.lim,'Type':x.g?'Generator':'Equipment','Repair status':x.ur?(x.ur.label+' - '+x.ur.detail):''}; });
-    var wb=XLSX.utils.book_new(), ws=XLSX.utils.json_to_sheet(data); ws['!cols']=[{wch:5},{wch:12},{wch:20},{wch:22},{wch:24},{wch:12},{wch:14},{wch:26},{wch:22},{wch:10},{wch:9},{wch:9},{wch:10},{wch:9},{wch:11}];
-    XLSX.utils.book_append_sheet(wb,ws,'Low H-M usage'); XLSX.writeFile(wb,'Low_HM_Usage_'+ST.ym+'.xlsx');
+    var rows=LAST.map(function(x){
+      var e=x.e;
+      return {month:String(x.ym||ST.ym||''), hiring:'', od:String(e.od||'').trim()||'(No O.D)', project:String(e.project||'').trim()||'(No project)',
+        cat:String(catOf(e)||'').trim()||'(No category)', eq:String(e.equipment||'')+(e.code?' ('+e.code+')':''), cap:String(capOf(e)||''),
+        sub:x.ur?(x.ur.label+(x.ur.days?' \u00b7 '+x.ur.days+' d':'')):'\u2014',
+        qty:1, days:x.d, unit:null, total:(x.d==null)?null:Math.max(0,x.lim-x.d), ot:null, ded:(x.ur&&x.ur.days)?x.ur.days:0, fuel:null, util:null, type:'Equipment'};
+    });
+    var wb;
+    try{ wb=window.hacRentalWorkbook(EJ,rows,{name:'Low H/M Usage',fleet:'Low H/M units',sub:'Repair status',total:'Hours Short',totalNote:'hours below the limit',ded:'Repair Days',ded2:'Repair Days',dedNote:'under-repair days',days:'H/M Diff (h)'}); }
+    catch(err){ console.error(err); if(typeof toast==='function') toast('Excel export failed: '+(err&&err.message||err),'error'); return; }
+    window.hacDownloadWb(wb,'Low_HM_Usage_'+(ST.ym==='all'?'All_Months':ST.ym));
   };
 })();
 </script>
