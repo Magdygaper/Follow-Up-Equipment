@@ -14346,7 +14346,7 @@ window.HACBI={exportPage:exportPage,dashboard:openDashboard,build:function(id){ 
   function esc(v){ return (typeof _hacEsc==='function')?_hacEsc(v):String(v==null?'':v); }
   function norm(c){ return String(c==null?'':c).toUpperCase().replace(/\s+/g,''); }
   var MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  function lab(m){ if(!m) return '—'; var p=String(m).split('-'); return (MN[parseInt(p[1],10)-1]||p[1])+' '+p[0]; }
+  function lab(m){ if(m==='all') return 'All months'; if(!m) return '—'; var p=String(m).split('-'); return (MN[parseInt(p[1],10)-1]||p[1])+' '+p[0]; }
   function fmt(n){ return Number(n).toLocaleString('en-US'); }
   function isGen(e){ return /generator|gen[\s\-]?set|\u0645\u0648\u0644\u062f/i.test(String(e.equipment||''))||/^GN/i.test(String(e.code||'').trim()); }
   function reading(code,ym){ var L=HMS().byCode[norm(code)]||[], b=null; L.forEach(function(r){ if(r.m!==ym||!(r.e>0)) return; if(!b||r.e>b.e||(r.e===b.e&&r.n>b.n)) b=r; }); return b; }
@@ -14402,15 +14402,18 @@ window.HACBI={exportPage:exportPage,dashboard:openDashboard,build:function(id){ 
       var fl=e.fleet||'egypt'; if(fl==='archive') return;
       if(ST.fleet!=='all'&&fl!==ST.fleet) return;
       total++;
-      var g=isGen(e), lim=g?thr.gen:thr.eq, r=reading(e.code,ST.ym);
-      var item=null;
-      if(!r){ if(thr.inc) item={e:e,g:g,lim:lim,r:null,d:null}; }
-      else if(r.s!=null){ withRead++; var d=r.e-r.s; if(d<lim) item={e:e,g:g,lim:lim,r:r,d:d}; }
-      if(!item) return;
-      item.ur=repairInfo(e.code,ST.ym);
-      if(ST.ur==='only'&&!item.ur) return; if(ST.ur==='hide'&&item.ur) return;
+      var g=isGen(e), lim=g?thr.gen:thr.eq;
       if(q){ var hay=(String(e.code||'')+' '+(e.equipment||'')+' '+(e.project||'')+' '+(e.od||'')+' '+(e.brand||'')).toLowerCase(); if(hay.indexOf(q)<0) return; }
-      out.push(item);
+      var ALL=(ST.ym==='all'), months=ALL?HMS().months:[ST.ym];
+      months.forEach(function(ym){
+        var r=reading(e.code,ym), item=null;
+        if(!r){ if(thr.inc&&!ALL) item={e:e,g:g,lim:lim,r:null,d:null}; }
+        else if(r.s!=null){ withRead++; var d=r.e-r.s; if(d<lim) item={e:e,g:g,lim:lim,r:r,d:d}; }
+        if(!item) return;
+        item.ym=ym; item.ur=repairInfo(e.code,ym);
+        if(ST.ur==='only'&&!item.ur) return; if(ST.ur==='hide'&&item.ur) return;
+        out.push(item);
+      });
     });
     out.sort(function(a,b){ if(a.d==null&&b.d==null) return String(a.e.code).localeCompare(String(b.e.code)); if(a.d==null) return 1; if(b.d==null) return -1; return a.d-b.d; });
     LAST=out; return {rows:out,withRead:withRead,total:total};
@@ -14426,11 +14429,11 @@ window.HACBI={exportPage:exportPage,dashboard:openDashboard,build:function(id){ 
   function draw(){
     var H=HMS(), body=document.getElementById('hm-low-body'); if(!body) return;
     if(!H.months.length){ body.innerHTML='<div style="padding:30px;text-align:center;color:var(--text-muted);">No hour-meter data loaded yet. Import the H/M sheet first.</div>'; return; }
-    if(!ST.ym||H.months.indexOf(ST.ym)<0) ST.ym=H.latest;
+    if(!ST.ym||(ST.ym!=='all'&&H.months.indexOf(ST.ym)<0)) ST.ym=H.latest;
     var R=compute(), nG=R.rows.filter(function(x){return x.g&&x.d!=null;}).length, nE=R.rows.filter(function(x){return !x.g&&x.d!=null;}).length, nN=R.rows.filter(function(x){return x.d==null;}).length, nR=R.rows.filter(function(x){return x.ur;}).length;
     var inp='background:var(--bg);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:6px;font-size:12px;';
-    var h='<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:10px;font-size:12px;">'
-      +'<label>Month <select id="hml-ym" style="'+inp+'">'+H.months.slice().reverse().map(function(m){ return '<option value="'+m+'"'+(m===ST.ym?' selected':'')+'>'+lab(m)+'</option>'; }).join('')+'</select></label>'
+    var h='<style>.hml-r{cursor:pointer;}.hml-r:hover td{background:rgba(240,165,0,.08);}</style><div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:10px;font-size:12px;">'
+      +'<label>Month <select id="hml-ym" style="'+inp+'"><option value="all"'+(ST.ym==='all'?' selected':'')+'>All months</option>'+H.months.slice().reverse().map(function(m){ return '<option value="'+m+'"'+(m===ST.ym?' selected':'')+'>'+lab(m)+'</option>'; }).join('')+'</select></label>'
       +'<label>Equipment below <input id="hml-eq" type="number" min="0" value="'+thr.eq+'" style="'+inp+'width:70px;"> h</label>'
       +'<label>Generators below <input id="hml-gen" type="number" min="0" value="'+thr.gen+'" style="'+inp+'width:70px;"> h</label>'
       +'<label>Fleet <select id="hml-fl" style="'+inp+'"><option value="all">All fleets</option>'+Object.keys(FL).map(function(k){ return '<option value="'+k+'"'+(ST.fleet===k?' selected':'')+'>'+FL[k]+'</option>'; }).join('')+'</select></label>'
@@ -14439,20 +14442,20 @@ window.HACBI={exportPage:exportPage,dashboard:openDashboard,build:function(id){ 
       +'<label>Repair <select id="hml-ur" style="'+inp+'"><option value="">All units</option><option value="only"'+(ST.ur==='only'?' selected':'')+'>Under repair only</option><option value="hide"'+(ST.ur==='hide'?' selected':'')+'>Hide under repair</option></select></label>'
       +'<button class="btn-sm accent" onclick="hmLowExport()">📊 Excel</button></div>';
     h+='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">'
-      +'<span class="mr-chip" style="cursor:default;">'+fmt(R.rows.length)+' units listed</span>'
+      +'<span class="mr-chip" style="cursor:default;">'+fmt(R.rows.length)+(ST.ym==='all'?' unit-months listed':' units listed')+'</span>'
       +'<span class="mr-chip" style="cursor:default;">Equipment &lt; '+thr.eq+' h: <b>'+fmt(nE)+'</b></span>'
       +'<span class="mr-chip" style="cursor:default;">Generators &lt; '+thr.gen+' h: <b>'+fmt(nG)+'</b></span>'
       +'<span class="mr-chip" style="cursor:default;border-color:rgba(248,81,73,.5);color:#ff7b72;">\ud83d\udd27 Under repair: <b>'+fmt(nR)+'</b></span>'
       +(thr.inc?'<span class="mr-chip" style="cursor:default;">No reading: <b>'+fmt(nN)+'</b></span>':'')
-      +'<span style="font-size:11px;color:var(--text-muted);align-self:center;">'+fmt(R.withRead)+' of '+fmt(R.total)+' units have a '+lab(ST.ym)+' reading</span></div>';
+      +'<span style="font-size:11px;color:var(--text-muted);align-self:center;">'+(ST.ym==='all'?fmt(R.withRead)+' monthly readings checked across all months':fmt(R.withRead)+' of '+fmt(R.total)+' units have a '+lab(ST.ym)+' reading')+'</span></div>';
     var th='style="text-align:left;padding:8px 10px;font-size:10px;letter-spacing:.8px;color:var(--text-muted);position:sticky;top:0;background:var(--surface,#161b22);"';
-    h+='<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr><th '+th+'>#</th><th '+th+'>Code</th><th '+th+'>Equipment</th><th '+th+'>Category</th><th '+th+'>Brand / Model</th><th '+th+'>Capacity</th><th '+th+'>Project</th><th '+th+'>O.D</th><th '+th+'>Start</th><th '+th+'>End</th><th '+th+'>Diff (h)</th><th '+th+'>Limit</th><th '+th+'>Repair status</th></tr></thead><tbody>';
+    h+='<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr><th '+th+'>#</th><th '+th+'>Code</th><th '+th+'>Month</th><th '+th+'>Equipment</th><th '+th+'>Category</th><th '+th+'>Brand / Model</th><th '+th+'>Capacity</th><th '+th+'>Project</th><th '+th+'>O.D</th><th '+th+'>Start</th><th '+th+'>End</th><th '+th+'>Diff (h)</th><th '+th+'>Limit</th><th '+th+'>Repair status</th></tr></thead><tbody>';
     var lim=Math.min(R.rows.length,800);
     for(var i=0;i<lim;i++){ var x=R.rows[i], e=x.e, td='style="padding:7px 10px;border-top:1px solid var(--border);"', mono='style="padding:7px 10px;border-top:1px solid var(--border);font-family:monospace;"';
-      h+='<tr><td '+td+'>'+(i+1)+'</td><td '+mono+'><span style="color:#e3a008;">'+esc(e.code||'—')+'</span></td><td '+td+'><b>'+esc(e.equipment||'—')+'</b>'+(x.g?' <span style="font-size:10px;color:var(--text-muted);">gen</span>':'')+'</td><td '+td+'>'+esc(catOf(e)||'—')+'</td><td '+td+'>'+esc(e.brand||'—')+'</td><td '+mono+'>'+esc(capOf(e)||'—')+'</td><td '+td+'>'+esc(e.project||'—')+'</td><td '+td+'>'+esc(e.od||'—')+'</td>'
+      h+='<tr class="hml-r" data-eid="'+esc(e.id||'')+'" title="Click to open equipment details"><td '+td+'>'+(i+1)+'</td><td '+mono+'><span style="color:#e3a008;">'+esc(e.code||'—')+'</span></td><td '+mono+'>'+lab(x.ym||ST.ym)+'</td><td '+td+'><b>'+esc(e.equipment||'—')+'</b>'+(x.g?' <span style="font-size:10px;color:var(--text-muted);">gen</span>':'')+'</td><td '+td+'>'+esc(catOf(e)||'—')+'</td><td '+td+'>'+esc(e.brand||'—')+'</td><td '+mono+'>'+esc(capOf(e)||'—')+'</td><td '+td+'>'+esc(e.project||'—')+'</td><td '+td+'>'+esc(e.od||'—')+'</td>'
         +(x.r?('<td '+mono+'>'+fmt(x.r.s)+'</td><td '+mono+'>'+fmt(x.r.e)+'</td><td '+mono+'><b style="color:'+(x.d<0?'#e3a008':'var(--red,#f85149)')+';">'+fmt(x.d)+(x.d<0?' ⚠':'')+'</b></td>'):('<td '+mono+'>—</td><td '+mono+'>—</td><td '+mono+'><span style="color:var(--text-muted);">no reading</span></td>'))
         +'<td '+mono+'>&lt; '+x.lim+'</td><td '+td+'>'+(x.ur?urBadge(x.ur):'<span style="color:var(--text-muted);">\u2014</span>')+'</td></tr>'; }
-    if(!R.rows.length) h+='<tr><td colspan="13" style="padding:30px;text-align:center;color:var(--text-muted);">No units below the limit in '+lab(ST.ym)+' 🎉</td></tr>';
+    if(!R.rows.length) h+='<tr><td colspan="14" style="padding:30px;text-align:center;color:var(--text-muted);">No units below the limit in '+lab(ST.ym)+' 🎉</td></tr>';
     h+='</tbody></table>'+(R.rows.length>lim?'<div style="font-size:11px;color:var(--text-muted);margin-top:6px;">Showing the first '+lim+' — use Excel for the full list.</div>':'');
     var keepQ=(document.activeElement&&document.activeElement.id==='hml-q'), pos=keepQ?document.activeElement.selectionStart:0;
     body.innerHTML=h; wire();
@@ -14466,6 +14469,13 @@ window.HACBI={exportPage:exportPage,dashboard:openDashboard,build:function(id){ 
     on('hml-eq','change',function(){ thr.eq=Math.max(0,+this.value||0); save(); draw(); });
     on('hml-gen','change',function(){ thr.gen=Math.max(0,+this.value||0); save(); draw(); });
     on('hml-inc','change',function(){ thr.inc=this.checked; save(); draw(); });
+    var bd=document.getElementById('hm-low-body');
+    if(bd&&!bd._hmc){ bd._hmc=1; bd.addEventListener('click',function(ev){
+      var tr=ev.target&&ev.target.closest?ev.target.closest('tr[data-eid]'):null; if(!tr) return;
+      var id=tr.getAttribute('data-eid'); if(!id||typeof showEquipHistory!=='function') return;
+      showEquipHistory(id);
+      var hm=document.getElementById('history-modal'); if(hm) hm.style.zIndex='10001';   /* keep the details window above the Low H/M list */
+    }); }
     on('hml-ur','change',function(){ ST.ur=this.value; draw(); });
     on('hml-q','input',function(){ ST.q=this.value; draw(); });
   }
@@ -14478,7 +14488,7 @@ window.HACBI={exportPage:exportPage,dashboard:openDashboard,build:function(id){ 
   document.addEventListener('hm-loaded',function(){ var m=document.getElementById('hm-low-modal'); if(m&&m.classList.contains('open')) draw(); });
   window.hmLowExport=function(){
     if(!LAST.length){ if(typeof toast==='function') toast('Nothing to export','error'); return; }
-    var data=LAST.map(function(x,i){ var e=x.e; return {'#':i+1,'Code':e.code||'','Equipment':e.equipment||'','Category':catOf(e),'Brand / Model':e.brand||'','Capacity':capOf(e),'Fleet':FL[e.fleet||'egypt']||e.fleet||'','Project':e.project||'','O.D':e.od||'','Month':lab(ST.ym),'Start':x.r?x.r.s:'','End':x.r?x.r.e:'','Diff (h)':x.d==null?'no reading':x.d,'Limit (h)':x.lim,'Type':x.g?'Generator':'Equipment','Repair status':x.ur?(x.ur.label+' - '+x.ur.detail):''}; });
+    var data=LAST.map(function(x,i){ var e=x.e; return {'#':i+1,'Code':e.code||'','Equipment':e.equipment||'','Category':catOf(e),'Brand / Model':e.brand||'','Capacity':capOf(e),'Fleet':FL[e.fleet||'egypt']||e.fleet||'','Project':e.project||'','O.D':e.od||'','Month':lab(x.ym||ST.ym),'Start':x.r?x.r.s:'','End':x.r?x.r.e:'','Diff (h)':x.d==null?'no reading':x.d,'Limit (h)':x.lim,'Type':x.g?'Generator':'Equipment','Repair status':x.ur?(x.ur.label+' - '+x.ur.detail):''}; });
     var wb=XLSX.utils.book_new(), ws=XLSX.utils.json_to_sheet(data); ws['!cols']=[{wch:5},{wch:12},{wch:20},{wch:22},{wch:24},{wch:12},{wch:14},{wch:26},{wch:22},{wch:10},{wch:9},{wch:9},{wch:10},{wch:9},{wch:11}];
     XLSX.utils.book_append_sheet(wb,ws,'Low H-M usage'); XLSX.writeFile(wb,'Low_HM_Usage_'+ST.ym+'.xlsx');
   };
