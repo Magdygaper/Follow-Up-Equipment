@@ -3924,7 +3924,7 @@ function fuBuildWorkbook(EJ, rows, opt){
       ws.getCell(r,5).value=d.sap||''; ws.getCell(r,6).value=d.project||'';
       if(d.sub) ws.getCell(r,7).value=d.sub; ws.getCell(r,8).value=d.prov||'';
       if(d.from) ws.getCell(r,9).value=d.from; if(d.to) ws.getCell(r,10).value=d.to;
-      ws.getCell(r,11).value=(d.from&&d.to)?FM('J'+r+'-I'+r):d.days;
+      ws.getCell(r,11).value=(d.from&&d.to&&d.dok!==false)?FM('J'+r+'-I'+r):d.days;
       if(d.cost) ws.getCell(r,12).value=d.cost; if(d.fc) ws.getCell(r,13).value=d.fc;
       ws.getCell(r,17).value=d.notes||'';
     }
@@ -4345,16 +4345,32 @@ function fuDashXlsx(scoped){
   var EJ=window.ExcelJS;
   if(!EJ){ if(typeof toast==='function') toast('Excel library did not load \u2014 check the internet connection','error'); return; }
   if(!scoped||!scoped.length){ if(typeof toast==='function') toast('Nothing to export','error'); return; }
-  function toDate(v){ var s=''; try{ s=formatExcelDate(v); }catch(x){ s=String(v||''); } var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(s||''); return m?new Date(Date.UTC(+m[1],+m[2]-1,+m[3])):null; }
+  function toDate(v){ var s=''; try{ s=formatExcelDate(v); }catch(x){ s=String(v||''); } var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(s||''); if(m) return new Date(Date.UTC(+m[1],+m[2]-1,+m[3]));
+    m=/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/.exec(String(s||'').trim()); return m?new Date(Date.UTC(+m[3],+m[2]-1,+m[1])):null; }
+  /* From/To sometimes arrive with day and month swapped (05-09 read as 09-May). Swap back ONLY when that makes To − From equal the Days stored in the app. */
+  var DAYMS=864e5, swappedRows=0;
+  function swapDM(d){ if(!d) return null; var dd=d.getUTCDate(), mm=d.getUTCMonth()+1; if(dd>12||dd===mm) return null; return new Date(Date.UTC(d.getUTCFullYear(),dd-1,mm)); }
+  function fixPair(f,t,days){
+    if(!f||!t) return {f:f,t:t,ok:true};
+    var cur=Math.round((t-f)/DAYMS);
+    if(cur===days||(!days&&cur>=0)) return {f:f,t:t,ok:true};
+    var fs=[f,swapDM(f)].filter(Boolean), ts=[t,swapDM(t)].filter(Boolean), best=null;
+    fs.forEach(function(a){ ts.forEach(function(b){ if(!best&&Math.round((b-a)/DAYMS)===days&&!(a===f&&b===t)) best={f:a,t:b}; }); });
+    if(best){ swappedRows++; return {f:best.f,t:best.t,ok:true}; }
+    if(days>0&&cur===-days){ swappedRows++; return {f:t,t:f,ok:true}; }   /* From and To entered the wrong way round */
+    return {f:f,t:t,ok:false};
+  }
   var rows=scoped.map(function(r,i){
     var sav=0; try{ sav=Math.round(Number(fuSavingOf(r))||0); }catch(x){}
+    var fp=fixPair(toDate(r.date_from),toDate(r.date_to),Number(r.days)||0);
     return {sn:i+1, eq:String(r.equipment||'').trim(), cap:String(r.capacity||'').trim(), qty:Number(r.qty)||1, sap:String(r.sap||'').trim(),
       project:String(r.project||'').trim(), sub:toDate(r.submission_date), prov:String(r.provision||'').trim(),
-      from:toDate(r.date_from), to:toDate(r.date_to), days:Number(r.days)||0, cost:Number(r.rental_cost_excl_fuel)||0, fc:Number(r.fuel_consumption_per_hour)||0, stot:Number(r.saving_total)||0, sav:sav, notes:String(r.notes||'').trim()};
+      from:fp.f, to:fp.t, dok:fp.ok, days:Number(r.days)||0, cost:Number(r.rental_cost_excl_fuel)||0, fc:Number(r.fuel_consumption_per_hour)||0, stot:Number(r.saving_total)||0, sav:sav, notes:String(r.notes||'').trim()};
   });
   var wb;
   try{ wb=window.fuBuildWorkbook(EJ,rows,{stamp:new Date().toISOString().slice(0,10)}); }
   catch(err){ console.error(err); if(typeof toast==='function') toast('Excel export failed: '+(err&&err.message||err),'error'); return; }
+  if(swappedRows&&typeof toast==='function') toast(swappedRows+' rows had From/To swapped or day/month mixed up \u2014 corrected to match Days','info');
   var d=new Date(); function two(n){ return n<10?'0'+n:''+n; }
   var name='Follow_Up_Report_'+d.getFullYear()+'-'+two(d.getMonth()+1)+'-'+two(d.getDate())+'.xlsx';
   function save(buf){
