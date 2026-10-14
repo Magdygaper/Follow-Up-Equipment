@@ -3941,10 +3941,12 @@ function fuBuildWorkbook(EJ, rows, opt){
         x.font={name:'Arial',size:12,bold:(c===1||c===4)}; x.alignment={horizontal:'center',vertical:'middle',wrapText:c===17};
         x.border=BD; if(c===1) x.fill={type:'pattern',pattern:'solid',fgColor:{argb:A('D9D9D9')}};
         if(c===7||c===9||c===10) x.numFmt='[$-409]dd\\-mmm\\-yy'; if(c===12||c===15||c===16) x.numFmt='[$EGP]\\ #,##0'; if(c===13||c===14) x.numFmt='0'; }
+      if(d2){   /* data rows only — rows under the table stay EMPTY in A:Q so Table1 can grow without shifting anything (new rows get these from the table's calculated columns) */
       ws.getCell(r2,14).value=FM('IF($B'+r2+'="","",$M'+r2+'*12*18.5)');
       ws.getCell(r2,15).value=FM('IF($B'+r2+'="","",$L'+r2+'+$N'+r2+')');
-      var calc=d2?((d2.cost||0)+(d2.fc||0)*12*18.5)*(d2.days||0):0, useF=!d2||((d2.cost||d2.fc)&&!(d2.stot>0&&Math.abs(d2.stot-calc)>1));
+      var calc=((d2.cost||0)+(d2.fc||0)*12*18.5)*(d2.days||0), useF=((d2.cost||d2.fc)&&!(d2.stot>0&&Math.abs(d2.stot-calc)>1));
       ws.getCell(r2,16).value=useF?FM('IF($B'+r2+'="","",$O'+r2+'*$K'+r2+')'):(d2.sav||0);
+      }
       var rr=function(c){ return '$'+c+r2; };
       ws.getCell(r2,colNum(cMK)).value=FM('IF(ISNUMBER($G'+r2+'),YEAR($G'+r2+')*100+MONTH($G'+r2+'),"")');
       ws.getCell(r2,colNum(cDED)).value=FM('IF($B'+r2+'="","",IF(ISNUMBER(SEARCH("خصم",$Q'+r2+')),1,0))');
@@ -4348,6 +4350,23 @@ root.fuBuildWorkbook=fuBuildWorkbook; root.fuInjectCharts=fuInjectCharts;
 })(typeof window!=='undefined'?window:globalThis);
 
 
+/* Adds Excel "calculated column" formulas to Table1 (S/N, Days, Fuel Cost, Rate, Total) so every new row typed under the table fills itself in, like the original workbook. */
+function fuPatchTable(JSZ,buf){
+  return JSZ.loadAsync(buf).then(function(zip){
+    var names=Object.keys(zip.files).filter(function(n){ return /^xl\/tables\/table\d+\.xml$/.test(n); });
+    if(!names.length) return buf;
+    var CF={'S/N':'ROW()-6','Days':'J7-I7','Fuel Cost ':'IF($B7="","",$M7*12*18.5)','Average Rental Rate Include Fuel':'IF($B7="","",$L7+$N7)','Total':'IF($B7="","",$O7*$K7)'};
+    return Promise.all(names.map(function(n){ return zip.file(n).async('string').then(function(x){
+      if(x.indexOf('name="Table1"')<0) return;
+      x=x.replace(/<tableColumn\b([^>]*?)\/>/g,function(m,attrs){
+        var nm=/\bname="([^"]*)"/.exec(attrs); if(!nm||!Object.prototype.hasOwnProperty.call(CF,nm[1])) return m;
+        return '<tableColumn'+attrs+'><calculatedColumnFormula>'+CF[nm[1]].replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</calculatedColumnFormula></tableColumn>';
+      }).replace('totalsRowShown="1"','totalsRowShown="0"');
+      zip.file(n,x);
+    }); })).then(function(){ return zip.generateAsync({type:'uint8array',compression:'DEFLATE'}); });
+  });
+}
+
 function fuDashXlsx(scoped){
   var EJ=window.ExcelJS;
   if(!EJ){ if(typeof toast==='function') toast('Excel library did not load \u2014 check the internet connection','error'); return; }
@@ -4384,7 +4403,9 @@ function fuDashXlsx(scoped){
     var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
     a.download=name; document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1500);
   }
-  wb.xlsx.writeBuffer().then(function(buf){
+  wb.xlsx.writeBuffer().then(function(buf0){
+    return (window.JSZip?fuPatchTable(window.JSZip,buf0).catch(function(e){ console.error(e); return buf0; }):Promise.resolve(buf0));
+  }).then(function(buf){
     if(window.JSZip && window.fuInjectCharts){
       return window.fuInjectCharts(window.JSZip,buf,'Charts').then(function(u8){ save(u8); if(typeof toast==='function') toast('Excel exported \u2014 Dashboard + Charts included','success'); })
         .catch(function(e){ console.error(e); save(buf); if(typeof toast==='function') toast('Excel exported (charts could not be added: '+(e&&e.message||e)+')','error'); });
