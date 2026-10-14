@@ -3832,7 +3832,8 @@ function fuBuildWorkbook(EJ, rows, opt){
   var N=rows.length, SPARE=300, F=7, L=F+N+SPARE-1;
   var MS=24, PS=150, ES=100, NM=12;
   function A(h){ return 'FF'+h; }
-  var cMK='AB',cDED='AC',cVIS='AD',cMN='AE',cPN='AF',cEN='AG',cSEL='AH',cSAV='AI',cKEY='AJ';
+  var cMK='R',cDED='S',cVIS='T',cMN='U',cPN='V',cEN='W',cSEL='X',cSAV='Y',cKEY='Z';   /* helper columns are real columns of Table1 (R:Z) so they always grow / shift together with the data */
+  var calcCols={};
   function DR(c){ return "'2026'!$"+c+"$"+F+":$"+c+"$"+L; }
   function FM(f){ return {formula:f}; }
   var thin={style:'thin',color:{argb:A(LINE)}};
@@ -3888,6 +3889,7 @@ function fuBuildWorkbook(EJ, rows, opt){
   var wsL=wb.addWorksheet('Lists',{views:[{showGridLines:true}],properties:{tabColor:{argb:A('ADB5BD')}}});
   var wsK=wb.addWorksheet('Calc',{views:[{showGridLines:true}],properties:{tabColor:{argb:A('ADB5BD')}}});
 
+  wb._fuCalcCols=calcCols;   /* filled while the 2026 sheet is written */
   /* control cells (Calc!M2:M7) — every formula in the file reads the selection from here */
   var C_MK='Calc!$M$3', C_PV='Calc!$M$4', C_PJ='Calc!$M$5', C_EQ='Calc!$M$6', C_VIS='Calc!$M$7';
 
@@ -3915,14 +3917,15 @@ function fuBuildWorkbook(EJ, rows, opt){
     ws.getRow(6).height=54; ws.getRow(5).height=18;
     /* real Excel Table, same as the uploaded workbook: Table1 over the header row + the data rows (new rows are typed straight under it) */
     (function(){
-      var tcols=H.map(function(t){ return {name:t.replace(/\n/g,'_x000a_'), filterButton:true}; }), trows=[], q;
-      for(q=0;q<N;q++){ trows.push(new Array(17).fill(null)); }
+      var HELP=['Month key','Deduction','Visible','Month #','Project #','Equip #','In selection','Savings','Prov key'];
+      var tcols=H.concat(HELP).map(function(t){ return {name:t.replace(/\n/g,'_x000a_'), filterButton:true}; }), trows=[], q;
+      for(q=0;q<N;q++){ trows.push(new Array(26).fill(null)); }
       ws.addTable({name:'Table1',displayName:'Table1',ref:'A6',headerRow:true,totalsRow:false,style:{theme:'TableStyleMedium6',showRowStripes:true},columns:tcols,rows:trows});
       H.forEach(function(t,k){ ws.getCell(6,k+1).value=t; });   /* header cells keep their real line breaks */
     })();
     [[cMK,'Month key'],[cDED,'Deduction'],[cVIS,'Visible'],[cMN,'Month #'],[cPN,'Project #'],[cEN,'Equip #'],[cSEL,'In selection'],[cSAV,'Savings'],[cKEY,'Prov key']].forEach(function(h){ hdrCell(ws,6,colNum(h[0]),h[1]); });
     S(ws,5,colNum(cMK),'helpers — leave them',{c2:colNum(cKEY),fill:'6C757D',color:WHITE,sz:8,i:1,h:'center'});
-    [12.4,27.4,33.1,12.6,21,44.1,27.1,41,14.6,12,14,31.6,24.3,20,31.1,17,49.6,14.4,10,7.3,5.4,15.4,7.3,5.6,34,7.3,5,10,9,9,9,9,9,9,10,11,14].forEach(function(w,k){ ws.getColumn(k+1).width=w; });
+    [12.4,27.4,33.1,12.6,21,44.1,27.1,41,14.6,12,14,31.6,24.3,20,31.1,17,49.6,11,11,11,11,11,11,11,11,11,3,14,8,3,30,8,3,40,8].forEach(function(w,k){ ws.getColumn(k+1).width=w; });
 
     for(i=0;i<N;i++){
       var d=rows[i], r=F+i;
@@ -3948,17 +3951,21 @@ function fuBuildWorkbook(EJ, rows, opt){
       ws.getCell(r2,16).value=useF?FM('IF($B'+r2+'="","",$O'+r2+'*$K'+r2+')'):(d2.sav||0);
       }
       var rr=function(c){ return '$'+c+r2; };
-      ws.getCell(r2,colNum(cMK)).value=FM('IF(ISNUMBER($G'+r2+'),YEAR($G'+r2+')*100+MONTH($G'+r2+'),"")');
-      ws.getCell(r2,colNum(cDED)).value=FM('IF($B'+r2+'="","",IF(ISNUMBER(SEARCH("خصم",$Q'+r2+')),1,0))');
-      ws.getCell(r2,colNum(cVIS)).value=FM('IF($B'+r2+'="","",SUBTOTAL(103,OFFSET($B'+r2+',0,0)))');
-      ws.getCell(r2,colNum(cMN)).value=FM('IF('+rr(cMK)+'="","",IF(COUNTIF($'+cMK+'$'+F+':'+rr(cMK)+','+rr(cMK)+')=1,MAX($'+cMN+'$'+(F-1)+':$'+cMN+(r2-1)+')+1,""))');
-      ws.getCell(r2,colNum(cPN)).value=FM('IF($F'+r2+'="","",IF(COUNTIF($F$'+F+':$F'+r2+',$F'+r2+')=1,MAX($'+cPN+'$'+(F-1)+':$'+cPN+(r2-1)+')+1,""))');
-      ws.getCell(r2,colNum(cEN)).value=FM('IF($B'+r2+'="","",IF(COUNTIF($B$'+F+':$B'+r2+',$B'+r2+')=1,MAX($'+cEN+'$'+(F-1)+':$'+cEN+(r2-1)+')+1,""))');
-      ws.getCell(r2,colNum(cSEL)).value=FM('IF($B'+r2+'="",0,IF(AND(OR('+C_MK+'=0,'+rr(cMK)+'='+C_MK+'),OR('+C_PV+'="All",$H'+r2+'='+C_PV+'),OR('+C_PJ+'="All",$F'+r2+'='+C_PJ+'),OR('+C_EQ+'="All",$B'+r2+'='+C_EQ+'),OR('+C_VIS+'="No",'+rr(cVIS)+'=1)),1,0))');
-      ws.getCell(r2,colNum(cSAV)).value=FM('IF($B'+r2+'="",0,IF(OR($H'+r2+'="Hold",$H'+r2+'="Cancel"),N($P'+r2+'),0))');
-      ws.getCell(r2,colNum(cKEY)).value=FM('IF($B'+r2+'="","",$H'+r2+'&"|"&COUNTIF($H$'+F+':$H'+r2+',$H'+r2+'))');
+      if(!d2) continue;   /* rows under the table stay completely empty — the table's calculated columns fill every new row */
+      var HN={}; HN[cMK]='Month key'; HN[cDED]='Deduction'; HN[cVIS]='Visible'; HN[cMN]='Month #'; HN[cPN]='Project #'; HN[cEN]='Equip #'; HN[cSEL]='In selection'; HN[cSAV]='Savings'; HN[cKEY]='Prov key';
+      var hput=function(cc,f){ ws.getCell(r2,colNum(cc)).value=FM(f); if(r2===F) calcCols[HN[cc]]=f; };
+      hput(cMK,'IF(ISNUMBER($G'+r2+'),YEAR($G'+r2+')*100+MONTH($G'+r2+'),"")');
+      hput(cDED,'IF($B'+r2+'="","",IF(ISNUMBER(SEARCH("خصم",$Q'+r2+')),1,0))');
+      hput(cVIS,'IF($B'+r2+'="","",SUBTOTAL(103,OFFSET($B'+r2+',0,0)))');
+      hput(cMN,'IF('+rr(cMK)+'="","",IF(COUNTIF($'+cMK+'$'+F+':'+rr(cMK)+','+rr(cMK)+')=1,MAX($'+cMN+'$'+(F-1)+':$'+cMN+(r2-1)+')+1,""))');
+      hput(cPN,'IF($F'+r2+'="","",IF(COUNTIF($F$'+F+':$F'+r2+',$F'+r2+')=1,MAX($'+cPN+'$'+(F-1)+':$'+cPN+(r2-1)+')+1,""))');
+      hput(cEN,'IF($B'+r2+'="","",IF(COUNTIF($B$'+F+':$B'+r2+',$B'+r2+')=1,MAX($'+cEN+'$'+(F-1)+':$'+cEN+(r2-1)+')+1,""))');
+      hput(cSEL,'IF($B'+r2+'="",0,IF(AND(OR('+C_MK+'=0,'+rr(cMK)+'='+C_MK+'),OR('+C_PV+'="All",$H'+r2+'='+C_PV+'),OR('+C_PJ+'="All",$F'+r2+'='+C_PJ+'),OR('+C_EQ+'="All",$B'+r2+'='+C_EQ+'),OR('+C_VIS+'="No",'+rr(cVIS)+'=1)),1,0))');
+      hput(cSAV,'IF($B'+r2+'="",0,IF(OR($H'+r2+'="Hold",$H'+r2+'="Cancel"),N($P'+r2+'),0))');
+      hput(cKEY,'IF($B'+r2+'="","",$H'+r2+'&"|"&COUNTIF($H$'+F+':$H'+r2+',$H'+r2+'))');
     }
     for(var c3=colNum(cMK);c3<=colNum(cKEY);c3++){ ws.getColumn(c3).font={name:'Calibri',size:9,color:{argb:A('868E96')}}; }
+    calcCols['S/N']='ROW()-6'; calcCols['Days']='J7-I7'; calcCols['Fuel Cost ']='IF($B7="","",$M7*12*18.5)'; calcCols['Average Rental Rate Include Fuel']='IF($B7="","",$L7+$N7)'; calcCols['Total']='IF($B7="","",$O7*$K7)';
     var ref='A'+F+':Q'+L;
     ws.addConditionalFormatting({ref:ref,rules:PROVS.filter(function(p){ return ROWFILL[p]; }).map(function(p){ return {type:'expression',formulae:['$H'+F+'="'+p+'"'],
       style:{fill:{type:'pattern',pattern:'solid',fgColor:{argb:A(ROWFILL[p])},bgColor:{argb:A(ROWFILL[p])}}}}; })});
@@ -3972,9 +3979,9 @@ function fuBuildWorkbook(EJ, rows, opt){
         var cc=ws.getCell(r3,c0+1); cc.value=FM('IF('+cl(c0)+r3+'="","",'+cntExpr(cl(c0)+r3)+')'); cc.font={name:'Calibri',size:10,bold:true}; cc.alignment={horizontal:'center',vertical:'middle'}; }
       ws.addConditionalFormatting({ref:cl(c0+1)+'7:'+cl(c0+1)+(6+nm),rules:[{type:'dataBar',cfvo:[{type:'min'},{type:'max'}],color:{argb:A(AMBER)},priority:1}]});
     }
-    side(19,'Month',NM,function(a){ return 'COUNTIFS('+DR(cVIS)+',1,'+DR(cMK)+',INDEX(Calc!$A$5:$A$16,MATCH('+a+',Calc!$B$5:$B$16,0)))'; },function(k){ return 'IF(Calc!$B$'+(4+k)+'="","",Calc!$B$'+(4+k)+')'; });
-    side(22,'Equipment',10,function(a){ return 'COUNTIFS('+DR(cVIS)+',1,'+DR('B')+','+a+')'; },function(k){ return 'IFERROR(INDEX(Lists!$P$5:$P$'+(4+ES)+',MATCH(LARGE(Lists!$T$5:$T$'+(4+ES)+','+k+'),Lists!$T$5:$T$'+(4+ES)+',0)),"")'; });
-    side(25,'Project',10,function(a){ return 'COUNTIFS('+DR(cVIS)+',1,'+DR('F')+','+a+')'; },function(k){ return 'IFERROR(INDEX(Lists!$I$5:$I$'+(4+PS)+',MATCH(LARGE(Lists!$N$5:$N$'+(4+PS)+','+k+'),Lists!$N$5:$N$'+(4+PS)+',0)),"")'; });
+    side(28,'Month',NM,function(a){ return 'COUNTIFS('+DR(cVIS)+',1,'+DR(cMK)+',INDEX(Calc!$A$5:$A$16,MATCH('+a+',Calc!$B$5:$B$16,0)))'; },function(k){ return 'IF(Calc!$B$'+(4+k)+'="","",Calc!$B$'+(4+k)+')'; });
+    side(31,'Equipment',10,function(a){ return 'COUNTIFS('+DR(cVIS)+',1,'+DR('B')+','+a+')'; },function(k){ return 'IFERROR(INDEX(Lists!$P$5:$P$'+(4+ES)+',MATCH(LARGE(Lists!$T$5:$T$'+(4+ES)+','+k+'),Lists!$T$5:$T$'+(4+ES)+',0)),"")'; });
+    side(34,'Project',10,function(a){ return 'COUNTIFS('+DR(cVIS)+',1,'+DR('F')+','+a+')'; },function(k){ return 'IFERROR(INDEX(Lists!$I$5:$I$'+(4+PS)+',MATCH(LARGE(Lists!$N$5:$N$'+(4+PS)+','+k+'),Lists!$N$5:$N$'+(4+PS)+',0)),"")'; });
     ws.pageSetup={paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0};
   })();
 
@@ -4351,11 +4358,11 @@ root.fuBuildWorkbook=fuBuildWorkbook; root.fuInjectCharts=fuInjectCharts;
 
 
 /* Adds Excel "calculated column" formulas to Table1 (S/N, Days, Fuel Cost, Rate, Total) so every new row typed under the table fills itself in, like the original workbook. */
-function fuPatchTable(JSZ,buf){
+function fuPatchTable(JSZ,buf,CF){
   return JSZ.loadAsync(buf).then(function(zip){
     var names=Object.keys(zip.files).filter(function(n){ return /^xl\/tables\/table\d+\.xml$/.test(n); });
     if(!names.length) return buf;
-    var CF={'S/N':'ROW()-6','Days':'J7-I7','Fuel Cost ':'IF($B7="","",$M7*12*18.5)','Average Rental Rate Include Fuel':'IF($B7="","",$L7+$N7)','Total':'IF($B7="","",$O7*$K7)'};
+    CF=CF||{};
     return Promise.all(names.map(function(n){ return zip.file(n).async('string').then(function(x){
       if(x.indexOf('name="Table1"')<0) return;
       x=x.replace(/<tableColumn\b([^>]*?)\/>/g,function(m,attrs){
@@ -4404,7 +4411,7 @@ function fuDashXlsx(scoped){
     a.download=name; document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1500);
   }
   wb.xlsx.writeBuffer().then(function(buf0){
-    return (window.JSZip?fuPatchTable(window.JSZip,buf0).catch(function(e){ console.error(e); return buf0; }):Promise.resolve(buf0));
+    return (window.JSZip?fuPatchTable(window.JSZip,buf0,wb._fuCalcCols).catch(function(e){ console.error(e); return buf0; }):Promise.resolve(buf0));
   }).then(function(buf){
     if(window.JSZip && window.fuInjectCharts){
       return window.fuInjectCharts(window.JSZip,buf,'Charts').then(function(u8){ save(u8); if(typeof toast==='function') toast('Excel exported \u2014 Dashboard + Charts included','success'); })
