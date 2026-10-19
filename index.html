@@ -3878,7 +3878,7 @@ function fuBuildWorkbook(EJ, rows, opt){
   }
   var SUBT=N.toLocaleString('en-US')+' requests  ·  '+(opt.stamp||'')+'  ·  every number is a live formula off the "2026" sheet';
 
-  var wb=new EJ.Workbook(); wb.creator='HAC PMV'; wb.created=new Date(); wb.calcProperties={fullCalcOnLoad:true};
+  var wb=new EJ.Workbook(); wb.creator='HAC PMV'; wb.created=new Date(); wb.calcProperties={fullCalcOnLoad:true}; try{ if(window.fuAddMeta) window.fuAddMeta(wb); }catch(_e){}
   var PCOL={Rental:'3FB950',Transfer:'58A6FF',Hold:'F0A500',Pending:'8B949E',Cancel:'F85149'};
   var wsA=wb.addWorksheet('2026',{views:[{showGridLines:true,state:'frozen',ySplit:6,xSplit:2,zoomScale:70}],properties:{tabColor:{argb:A('495057')}}});
   var wsP={}; PROVS.forEach(function(p){ wsP[p]=wb.addWorksheet(p,{views:[{showGridLines:true,state:'frozen',ySplit:4,zoomScale:90}],properties:{tabColor:{argb:A(PCOL[p])}}}); });
@@ -15488,5 +15488,181 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
 })();
 </script>
 
+<script>
+/* ===== HAC · Follow-Up hardening module (Dry Run · Sync · Backup · Stages · Attention · Audit · Search Owned · Pricing) ===== */
+(function(){
+var STAGES=['Receive & Register','Search Owned','Rental/Transfer Decision','Approval','Provision','Delivery','Request Closure'];
+var SLA_DAYS=3, PEND_DAYS=5, PROVS=['Rental','Transfer','Hold','Cancel','Pending'];
+var KEYS=['equipment','capacity','qty','sap','project','engineer','contact','submission_date','provision','date_from','date_to','days','notes'];
+function $(i){return document.getElementById(i)}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function today(){return new Date().toISOString().slice(0,10)}
+function norm(s){return String(s||'').toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]/g,'')}
+function num(s){var n=parseFloat(String(s||'').replace(/[^0-9.]/g,''));return isFinite(n)?n:0}
+function fp(r){return [r.equipment,r.capacity,r.project].map(function(s){return String(s||'').toLowerCase().replace(/\s+/g,' ').trim()}).join('|')}
+function ownerOf(r){var t=((r.equipment||'')+' '+(r.capacity||'')).toLowerCase();
+  if(/generator|light ?tower|genset|compressor/.test(t))return 'Generators';
+  if(/crane|boom|manlift|forklift|telehandler|lift/.test(t))return 'Lifting';
+  if(/excavator|loader|dozer|grader|roller|backhoe|dump|truck|compactor|paver/.test(t))return 'Earthworks';
+  return 'General'}
+function modal(html){var m=$('fx-modal');if(!m){m=document.createElement('div');m.id='fx-modal';m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';m.onclick=function(e){if(e.target===m)m.remove()};document.body.appendChild(m)}
+  m.innerHTML='<div dir="auto" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:12px;max-width:860px;width:100%;max-height:86vh;overflow:auto;padding:18px;font-size:13px">'+html+'</div>'}
+window.fxClose=function(){var m=$('fx-modal');if(m)m.remove()};
+function chunk(arr,fn){var p=Promise.resolve();for(var i=0;i<arr.length;i+=400)(function(c){p=p.then(function(){var b=db.batch();c.forEach(function(x){fn(b,x)});return b.commit()})})(arr.slice(i,i+400));return p}
+function isLocal(id){return !id||String(id).indexOf('local_')===0}
+var BTN='style="padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);cursor:pointer"';
+
+/* ---- 6. Audit log ---- */
+var AUD=[];try{AUD=JSON.parse(localStorage.getItem('fuAudit')||'[]')}catch(e){}
+function audit(a,r,f,from,to){r=r||{};var x={ts:new Date().toISOString(),user:(typeof currentUser!=='undefined'&&currentUser&&currentUser.email)||'',action:a,sn:r.sn||'',equipment:r.equipment||'',project:r.project||'',field:f||'',from:from==null?'':String(from),to:to==null?'':String(to)};
+  AUD.unshift(x);AUD=AUD.slice(0,500);try{localStorage.setItem('fuAudit',JSON.stringify(AUD))}catch(e){}
+  try{db.collection('followup_audit').add(x).catch(function(){})}catch(e){}}
+window.fxAudit=function(days){days=days||0;var cut=days?Date.now()-days*864e5:0;
+  function go(list){list=list.filter(function(x){return Date.parse(x.ts)>=cut});window._fxAudList=list;
+    modal('<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px"><b style="font-size:15px">🧾 Audit Log ('+list.length+')</b><span style="display:flex;gap:6px"><button '+BTN+' onclick="fxAudit(7)">آخر 7 أيام</button><button '+BTN+' onclick="fxAudit(0)">الكل</button><button '+BTN+' onclick="fxAuditXlsx()">📊 Excel</button><button '+BTN+' onclick="fxClose()">✕</button></span></div>'
+    +'<table style="width:100%;font-size:12px"><tr style="color:var(--text-muted)"><th>When</th><th>Who</th><th>Action</th><th>Request</th><th>Field</th><th>From → To</th></tr>'
+    +list.slice(0,200).map(function(x){return '<tr><td>'+esc(x.ts.replace('T',' ').slice(0,16))+'</td><td>'+esc(x.user.split('@')[0])+'</td><td>'+esc(x.action)+'</td><td>'+esc(x.sn+' · '+x.equipment+(x.project?' — '+x.project:''))+'</td><td>'+esc(x.field)+'</td><td>'+esc(x.from)+' → '+esc(x.to)+'</td></tr>'}).join('')+'</table>')}
+  db.collection('followup_audit').orderBy('ts','desc').limit(300).get().then(function(q){go(q.docs.map(function(d){return d.data()}))}).catch(function(){go(AUD)})};
+window.fxAuditXlsx=function(){if(typeof XLSX==='undefined'||!XLSX.writeFile){toast('Excel library not ready','error');return}
+  var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(window._fxAudList||AUD),'Audit');XLSX.writeFile(wb,'FollowUp_Audit_'+today()+'.xlsx')};
+var _cs=window.changeFuStatus;
+window.changeFuStatus=function(id,s){var r=FU_DATA.find(function(x){return x.id===id});var o=r&&r.provision;_cs.apply(this,arguments);if(r&&o!==s)audit('status',r,'provision',o,s)};
+var _sv=window.saveFuEquipment;
+window.saveFuEquipment=function(){var n=FU_DATA.length;_sv.apply(this,arguments);setTimeout(function(){if(FU_DATA.length>n)audit('add',FU_DATA[FU_DATA.length-1])},1500)};
+
+/* ---- 3. Backup + Undo ---- */
+function snap(label){var s={ts:Date.now(),label:label,data:JSON.parse(JSON.stringify(FU_DATA,function(k,v){return k==='createdAt'?undefined:v}))};
+  try{localStorage.setItem('fuBackup',JSON.stringify(s))}catch(e){toast('Backup too large for local storage — file download only','error')}
+  try{var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(s)],{type:'application/json'}));a.download='FollowUp_backup_'+today()+'.json';a.click()}catch(e){}}
+window.fxUndo=function(){if(!isAdmin){toast('Admin only','error');return}var s;try{s=JSON.parse(localStorage.getItem('fuBackup'))}catch(e){}
+  if(!s){toast('No backup found on this device','error');return}
+  if(!confirm('رجّع آخر استيراد؟\n'+s.data.length+' صف · '+new Date(s.ts).toLocaleString()+' · '+s.label+'\nالداتا الحالية هتتبدل.'))return;
+  toast('⏳ Restoring…');var col=db.collection('followup');
+  col.get().then(function(q){return chunk(q.docs,function(b,d){b.delete(d.ref)})}).then(function(){return chunk(s.data,function(b,r){var y=Object.assign({},r);delete y.id;b.set(isLocal(r.id)?col.doc():col.doc(r.id),y)})})
+  .then(function(){FU_DATA=s.data;setupFollowUpUI();audit('undo-import',{},'rows','',s.data.length);toast('✅ Restored '+s.data.length+' rows')}).catch(function(e){toast('Restore failed: '+e.message,'error')})};
+
+/* ---- 1+2. Dry Run + Sync by stable ID ---- */
+window.fuAddMeta=function(wb){var ws=wb.addWorksheet('_meta',{state:'veryHidden'});ws.addRow(['ID','S/N','Fingerprint']);FU_DATA.forEach(function(r){ws.addRow([r.id,r.sn,fp(r)])})};
+function parse(wb){var sh=fuPickSheet(wb),rows=XLSX.utils.sheet_to_json(wb.Sheets[sh],{defval:'',header:1}),hi=-1,i;
+  for(i=0;i<Math.min(rows.length,10);i++){var t=rows[i].map(function(c){return String(c).trim().toLowerCase()});if(t.some(function(c){return c.indexOf('equipment')>-1})&&t.some(function(c){return c.indexOf('project')>-1})){hi=i;break}}
+  if(hi<0)return {error:'Header row not found في شيت "'+sh+'"'};
+  var H=rows[hi].map(function(c){return String(c).trim().toLowerCase()});
+  function f(){var a=[].slice.call(arguments);return H.findIndex(function(h){return a.some(function(t){return h.replace(/[^a-z0-9]/g,'').indexOf(t)>-1})})}
+  var c={equipment:f('equipment'),capacity:f('capacity'),qty:f('qty','quantity'),sap:f('sap'),project:f('project','desc'),engineer:f('eng'),contact:f('contact'),submission_date:f('submission'),provision:f('provision','method'),date_from:f('from'),
+    date_to:H.findIndex(function(h){var x=h.replace(/[^a-z0-9]/g,'');return x==='to'||x==='dateto'}),days:f('days'),notes:f('notes')};
+  if(c.submission_date<0)c.submission_date=f('date');
+  var has={};KEYS.forEach(function(k){if(c[k]>=0)has[k]=1});
+  var out=[];for(i=hi+1;i<rows.length;i++){var r=rows[i],eq=String(r[c.equipment]||'').trim();if(!eq)continue;
+    function g(k){return c[k]>=0?String(r[c[k]]==null?'':r[c[k]]).trim():''}
+    var pv=g('provision'),sb=r[c.submission_date];
+    out.push({_row:i+1,sn:Number(r[0])||(i-hi),equipment:eq,capacity:g('capacity'),qty:Number(r[c.qty])||1,sap:g('sap'),project:g('project'),engineer:g('engineer'),contact:g('contact'),
+      submission_date:(Number(sb)>30000&&Number(sb)<70000)?formatExcelDate(sb):String(sb||'').trim(),provision:pv.charAt(0).toUpperCase()+pv.slice(1).toLowerCase(),
+      date_from:formatExcelDate(r[c.date_from]),date_to:formatExcelDate(r[c.date_to]),days:Number(r[c.days])||0,notes:g('notes')})}
+  var meta=null,ms=wb.Sheets['_meta'];
+  if(ms){meta={byFp:{},bySn:{}};XLSX.utils.sheet_to_json(ms,{header:1,defval:''}).slice(1).forEach(function(r){if(!r[0])return;var q={id:String(r[0]),sn:Number(r[1])||0};(meta.byFp[r[2]]=meta.byFp[r[2]]||[]).push(q);if(!meta.bySn[q.sn])meta.bySn[q.sn]=q})}
+  return {sheet:sh,rows:out,has:has,meta:meta}}
+function diff(o,n,has){return KEYS.filter(function(k){return has[k]&&String(o[k]==null?'':o[k]).trim()!==String(n[k]==null?'':n[k]).trim()})}
+function plan(P,mode){var used={},res={add:[],chg:[],del:[],same:0},byId={},dbFp={},maxSn=0;
+  FU_DATA.forEach(function(r){byId[r.id]=r;(dbFp[fp(r)]=dbFp[fp(r)]||[]).push(r);if((Number(r.sn)||0)>maxSn)maxSn=Number(r.sn)||0});
+  P.rows.forEach(function(x){var m=null,q,list;
+    if(P.meta){list=(P.meta.byFp[fp(x)]||[]).filter(function(q){return byId[q.id]&&!used[q.id]});q=list.find(function(q){return q.sn===x.sn})||list[0];
+      if(!q){var s=P.meta.bySn[x.sn];if(s&&byId[s.id]&&!used[s.id])q=s}if(q)m=byId[q.id]}
+    if(!m){list=(dbFp[fp(x)]||[]).filter(function(r){return !used[r.id]});m=list.find(function(r){return r.sn===x.sn})||list[0]||null}
+    if(m){used[m.id]=1;var d=diff(m,x,P.has);if(d.length)res.chg.push({old:m,nw:x,d:d});else res.same++}else res.add.push(x)});
+  FU_DATA.forEach(function(r){if(!used[r.id])res.del.push(r)});
+  if(mode==='add'){res.add=res.add.filter(function(x){return x.sn>maxSn});res.chg=[];res.del=[]}
+  return res}
+function warns(rows){var W=[],seen={};rows.forEach(function(x){var p=[];
+  if(PROVS.indexOf(x.provision)<0)p.push('Provision غير معروف: "'+x.provision+'"');
+  if((x.provision==='Rental'||x.provision==='Transfer')&&(!x.date_from||!x.date_to))p.push('تاريخ فاضي'+(!x.date_from?' (From)':'')+(!x.date_to?' (To)':''));
+  var a=Date.parse(x.date_from),b=Date.parse(x.date_to);
+  if((x.date_from&&isNaN(a))||(x.date_to&&isNaN(b)))p.push('تاريخ غير مفهوم');
+  else if(!isNaN(a)&&!isNaN(b)){if(a>b)p.push('From أكبر من To');else{var d=Math.round((b-a)/864e5);if(x.days&&Math.abs(x.days-d)>1&&!(d===31&&x.days===30))p.push('Days ('+x.days+') مش مطابق للتواريخ ('+d+')')}}
+  var s=[x.equipment,x.capacity,x.project,x.date_from,x.date_to].join('|').toLowerCase();if(seen[s])p.push('صف مكرر (زي صف '+seen[s]+')');else seen[s]=x._row;
+  if(p.length)W.push({row:x._row,msg:p.join(' · ')})});return W}
+function show(res,mode,P,warn){window._fxRes={res:res,mode:mode,sheet:P.sheet};
+  var tile=function(l,v,c){return '<div style="flex:1;min-width:110px;background:var(--surface2);border-radius:8px;padding:10px;text-align:center"><div style="font-size:22px;font-weight:700;color:'+c+'">'+v+'</div><div style="font-size:11px;color:var(--text-muted)">'+l+'</div></div>'};
+  modal('<div style="font-size:15px;font-weight:700;margin-bottom:4px">🔍 Dry Run — '+(mode==='sync'?'Sync':'Add New')+'</div>'
+  +'<div style="color:var(--text-muted);margin-bottom:10px">الشيت المقروء: <b style="color:var(--text)">'+esc(P.sheet)+'</b> · '+P.rows.length+' صف · '+(P.meta?'متربط بـ ID (_meta)':'مفيش _meta — المطابقة بالاسم/المشروع/S/N')+' · <b>لسه ما اتكتب أي حاجة</b></div>'
+  +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'+tile('جديد',res.add.length,'var(--green)')+tile('اتغيّر',res.chg.length,'var(--accent)')+(mode==='sync'?tile('هيتمسح',res.del.length,'var(--red)'):'')+tile('زي ما هو',res.same,'var(--text-muted)')+tile('تحذيرات',warn.length,warn.length?'var(--red)':'var(--green)')+'</div>'
+  +(warn.length?'<div style="margin-bottom:10px"><b>⚠️ مشاكل في الشيت</b><div style="max-height:160px;overflow:auto;font-size:12px;margin-top:4px">'+warn.slice(0,60).map(function(w){return '<div>صف '+w.row+': '+esc(w.msg)+'</div>'}).join('')+(warn.length>60?'<div>… +'+(warn.length-60)+'</div>':'')+'</div></div>':'')
+  +(res.chg.length?'<div style="margin-bottom:10px"><b>✏️ تعديلات (أول 12)</b><div style="font-size:12px;margin-top:4px">'+res.chg.slice(0,12).map(function(c){return '<div>'+esc(c.old.sn+' · '+c.old.equipment)+': '+c.d.map(function(k){return esc(k)+' <span style="color:var(--text-muted)">'+esc(c.old[k]==null?'':c.old[k])+'</span>→<b>'+esc(c.nw[k])+'</b>'}).join(' ; ')+'</div>'}).join('')+'</div></div>':'')
+  +(mode==='sync'&&res.del.length?'<label style="display:block;margin-bottom:10px;color:var(--red)"><input type="checkbox" id="fx-del"> أوافق على مسح '+res.del.length+' صف مش موجودين في الشيت ('+esc(res.del.slice(0,3).map(function(r){return r.sn+' '+r.equipment}).join('، '))+'…)</label>':'')
+  +'<div style="display:flex;gap:8px;justify-content:flex-end"><button '+BTN+' onclick="fxClose()">إلغاء</button><button '+BTN+' style="padding:6px 14px;border-radius:8px;border:0;background:var(--accent);color:#000;font-weight:700;cursor:pointer" onclick="fxApply()">✅ نفّذ (مع Backup)</button></div>')}
+window.fxApply=function(){var S=window._fxRes,res=S.res,delOk=!!($('fx-del')&&$('fx-del').checked);fxClose();
+  if(!res.add.length&&!res.chg.length&&!(delOk&&res.del.length)){toast('مفيش حاجة تتنفذ');return}
+  snap(S.mode+' · '+S.sheet);toast('⏳ Applying…');var col=db.collection('followup');
+  var ops=[];res.add.forEach(function(x){x.id=col.doc().id;ops.push(['s',x])});res.chg.forEach(function(c){ops.push(['u',c])});if(delOk)res.del.forEach(function(r){ops.push(['d',r])});
+  function done(local){var n=res.add.length+res.chg.length+(delOk?res.del.length:0),few=n<=100;
+    res.add.forEach(function(x){var y=Object.assign({},x);delete y._row;FU_DATA.push(y);if(few)audit('import-add',y)});
+    res.chg.forEach(function(c){c.d.forEach(function(k){if(few)audit('import-change',c.old,k,c.old[k],c.nw[k]);c.old[k]=c.nw[k]})});
+    if(delOk){var ids={};res.del.forEach(function(r){ids[r.id]=1;if(few)audit('import-delete',r)});FU_DATA=FU_DATA.filter(function(r){return !ids[r.id]})}
+    if(!few)audit('import-summary',{},'rows','',n+' (+'+res.add.length+' ~'+res.chg.length+' -'+(delOk?res.del.length:0)+')');
+    setupFollowUpUI();toast((local?'⚠️ محلي فقط (Quota) — ':'✅ ')+'+'+res.add.length+' / ~'+res.chg.length+' / -'+(delOk?res.del.length:0)+(local?'':' · فيه زرار ↩ Undo'))}
+  chunk(ops,function(b,o){if(o[0]==='s'){var y=Object.assign({},o[1]);delete y._row;delete y.id;y.createdAt=firebase.firestore.FieldValue.serverTimestamp();b.set(col.doc(o[1].id),y)}
+    else if(o[0]==='u'){if(isLocal(o[1].old.id))return;var u={};o[1].d.forEach(function(k){u[k]=o[1].nw[k]});b.update(col.doc(o[1].old.id),u)}
+    else{if(!isLocal(o[1].id))b.delete(col.doc(o[1].id))}}).then(function(){done(false)},function(e){if(e.code==='resource-exhausted')done(true);else toast('Error: '+e.message,'error')})};
+function start(input,mode){var file=input.files[0];if(!file)return;if(!isAdmin){input.value='';return}toast('⏳ Reading Excel…');var rd=new FileReader();
+  rd.onload=function(e){try{var wb=XLSX.read(e.target.result,{type:'binary'}),P=parse(wb);input.value='';if(P.error){toast(P.error,'error');return}show(plan(P,mode),mode,P,warns(P.rows))}catch(er){input.value='';toast('Error: '+er.message,'error')}};rd.readAsBinaryString(file)}
+window.updateFuFromExcel=function(i){start(i,'sync')};window.addNewFuFromExcel=function(i){start(i,'add')};
+
+/* ---- 4. Stages ---- */
+window.fxStage=function(id,s){var r=FU_DATA.find(function(x){return x.id===id});if(!r)return;var o=r.stage||STAGES[0];r.stage=s;r.stage_since=today();r.owner=r.owner||ownerOf(r);audit('stage',r,'stage',o,s);renderFollowUpTable();
+  if(!isLocal(id))db.collection('followup').doc(id).update({stage:s,stage_since:r.stage_since,owner:r.owner}).catch(function(e){toast('Saved locally only: '+e.message,'error')})};
+function decorate(){var tr0=document.querySelector('#page-followup thead tr');if(tr0&&!$('fx-th')){var th=document.createElement('th');th.id='fx-th';th.textContent='Stage · Owner';tr0.insertBefore(th,tr0.children[12]||null)}
+  var data=getFilteredFuData(),trs=$('fu-table-body').querySelectorAll('tr');if(trs.length!==data.length||!data.length)return;
+  trs.forEach(function(tr,i){var r=data[i],st=r.stage||STAGES[0],since=r.stage_since||r.submission_date||'',d=since&&!isNaN(Date.parse(since))?Math.max(0,Math.floor((Date.now()-Date.parse(since))/864e5)):0;
+    var closed=r.provision==='Cancel'||st===STAGES[6],late=!closed&&d>SLA_DAYS,id=esc(r.id);
+    var td=document.createElement('td');td.style.whiteSpace='nowrap';
+    td.innerHTML=(isAdmin?'<select onchange="fxStage(\''+id+'\',this.value)" style="max-width:150px">'+STAGES.map(function(s){return '<option'+(s===st?' selected':'')+'>'+s+'</option>'}).join('')+'</select>':esc(st))
+      +'<div style="font-size:10.5px;color:var(--text-muted);margin-top:2px">'+esc(r.owner||ownerOf(r))+' · '+d+'d '+(late?'<span style="background:rgba(248,81,73,.2);color:var(--red);border-radius:8px;padding:1px 6px;font-weight:700">متأخر</span>':'')
+      +' <a href="#" onclick="fxOwned(\''+id+'\');return false" title="Search Owned + Price">🔎</a></div>';
+    tr.insertBefore(td,tr.children[12]||null)})}
+
+/* ---- 5. Needs-attention panel ---- */
+function panel(){var pg=$('page-followup');if(!pg)return;var el=$('fx-panel');if(!el){el=document.createElement('div');el.id='fx-panel';el.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin-bottom:16px';pg.insertBefore(el,pg.children[1]||null)}
+  var tm=Date.now(),L=FU_DATA.filter(function(r){return r.provision!=='Cancel'&&(r.stage||'')!==STAGES[6]});
+  var A=L.filter(function(r){return r.provision==='Pending'&&Date.parse(r.submission_date)<tm-PEND_DAYS*864e5});
+  var B=L.filter(function(r){return r.provision==='Pending'&&Date.parse(r.date_from)<=tm});
+  var C=L.filter(function(r){var d=(Date.parse(r.date_to)-tm)/864e5;return r.provision==='Rental'&&d>=-1&&d<=7});
+  var D=L.filter(function(r){var a=Date.parse(r.date_from),b=Date.parse(r.date_to);if(isNaN(a)||isNaN(b))return false;var d=Math.round((b-a)/864e5);return r.days&&Math.abs(r.days-d)>1&&!(d===31&&r.days===30)});
+  function box(t,list,c){var items=list.slice(0,8).map(function(r){return '<div>'+esc(r.sn+' · '+r.equipment+' — '+(r.project||''))+'</div>'}).join('')+(list.length>8?'<div>… +'+(list.length-8)+'</div>':'');
+    return '<details style="flex:1;min-width:200px;background:var(--surface2);border-radius:8px;padding:8px 10px"><summary style="cursor:pointer"><b style="color:'+(list.length?c:'var(--green)')+';font-size:18px">'+list.length+'</b> <span style="font-size:12px">'+t+'</span></summary><div style="font-size:11.5px;margin-top:6px;color:var(--text-muted)">'+items+'</div></details>'}
+  el.innerHTML='<div style="font-weight:700;margin-bottom:8px">🚨 محتاج تدخّل</div><div style="display:flex;gap:8px;flex-wrap:wrap">'
+    +box('Pending أكتر من '+PEND_DAYS+' أيام',A,'var(--red)')+box('وصل From وما اتأكدش',B,'var(--red)')+box('إيجار هينتهي خلال 7 أيام (تمديد/إرجاع)',C,'var(--accent)')+box('Days مش مظبوط',D,'var(--accent)')+'</div>'}
+
+/* ---- 7+8. Search Owned + reference price ---- */
+var PCACHE={};
+function refCost(res){var l=res&&res.last;if(!l)return null;var u=String(l.rateL||l.rate||'').toLowerCase();return {cost:Number(l.cost)||0,monthly:/month|شهر/.test(u)?Number(l.cost)||0:(Number(l.cost)||0)*30,unit:l.rateL||l.rate||'',ccy:res.ccy||'',vendor:l.vendor||'',fuel:l.fuel||''}}
+window.fxOwned=function(id){var r=FU_DATA.find(function(x){return x.id===id});if(!r)return;var nm=norm(r.equipment),cap=num(r.capacity);
+  var c=(typeof allEquipment!=='undefined'?allEquipment:[]).filter(function(e){return norm(e.equipment)===nm||norm(e.category)===nm}).map(function(e){var ec=num(eqCapacity(e).v);var s=cap&&ec?(Math.abs(ec-cap)/cap<=.001?0:Math.abs(ec-cap)/cap<=.15?1:2):1;var idle=/standby|idle/i.test(e.status||'')||!e.project;return {e:e,s:s,idle:idle,cap:eqCapacity(e).v}}).filter(function(x){return x.s<2}).sort(function(a,b){return a.s-b.s||(b.idle-a.idle)}).slice(0,15);
+  modal('<div style="display:flex;justify-content:space-between"><b style="font-size:15px">🔎 '+esc(r.equipment)+' '+esc(r.capacity)+' — '+esc(r.project||'')+'</b><button '+BTN+' onclick="fxClose()">✕</button></div>'
+  +'<div style="margin:10px 0 4px"><b>معدات مملوكة مطابقة</b> <span style="color:var(--text-muted)">(نفس النوع، السعة ±15%)</span></div>'
+  +(c.length?'<table style="width:100%;font-size:12px"><tr style="color:var(--text-muted)"><th>Code</th><th>Capacity</th><th>Project</th><th>O.D</th><th></th></tr>'+c.map(function(x){return '<tr><td>'+esc(x.e.code)+'</td><td>'+esc(x.cap)+(x.s===0?' ✓':'')+'</td><td>'+esc(x.e.project||'—')+'</td><td>'+esc(x.e.od||'')+'</td><td>'+(x.idle?'<span style="color:var(--green)">فاضية/Standby</span>':'')+'</td></tr>'}).join('')+'</table>'
+    +'<div style="margin-top:8px"><button '+BTN+' onclick="changeFuStatus(\''+esc(id)+'\',\'Transfer\');fxClose()">↪ حوّل لـ Transfer (يدخل في الـ Savings)</button></div>':'<div style="color:var(--text-muted)">مفيش مطابق في المملوك → إيجار خارجي.</div>')
+  +'<div style="margin:14px 0 4px"><b>💰 السعر المرجعي (Rental Database)</b></div><div id="fx-price">⏳…</div>');
+  window.rdLastPrice(r.equipment,r.project,function(res){var p=refCost(res),b=$('fx-price');if(!b)return;
+    if(!p){b.innerHTML='<span style="color:var(--text-muted)">مفيش سعر سابق.</span>';return}
+    b.innerHTML='<div><b style="font-size:18px;color:var(--accent)">'+p.cost.toLocaleString()+'</b> '+esc(p.ccy)+' / '+esc(p.unit)+(p.fuel?' · Fuel: '+esc(p.fuel):'')+' · '+esc(p.vendor)+'</div>'
+      +'<div style="margin-top:6px">السعر المطلوب: <input id="fx-req" type="number" value="'+esc(r.req_price||'')+'" style="width:110px" oninput="fxPriceChk('+p.cost+')"> <button '+BTN+' onclick="fxSavePrice(\''+esc(id)+'\','+p.cost+')">حفظ</button> <span id="fx-warn"></span></div>'
+      +'<div style="margin-top:4px;color:var(--text-muted)">توقّع شهري للطلب: <b>'+Math.round(p.monthly*(Number(r.qty)||1)).toLocaleString()+'</b> '+esc(p.ccy)+'</div>';fxPriceChk(p.cost)},r.capacity)};
+window.fxPriceChk=function(ref){var v=Number($('fx-req').value),w=$('fx-warn');w.innerHTML=v&&ref&&v>ref?'<b style="color:var(--red)">⚠️ أعلى من المرجع بـ '+Math.round((v/ref-1)*100)+'%</b>':''};
+window.fxSavePrice=function(id,ref){var r=FU_DATA.find(function(x){return x.id===id}),v=Number($('fx-req').value)||0;if(!r)return;audit('price',r,'req_price',r.req_price||'',v);r.req_price=v;r.ref_price=ref;
+  if(!isLocal(id))db.collection('followup').doc(id).update({req_price:v,ref_price:ref}).catch(function(){});toast('✓ Saved')};
+window.fxForecast=function(){var L=FU_DATA.filter(function(r){return (r.provision==='Rental'||r.provision==='Pending')&&r.equipment}).slice(0,80),agg={},i=0;toast('⏳ Forecast: '+L.length+' requests…');
+  (function next(){if(i>=L.length){var rows=Object.keys(agg).sort(function(a,b){return agg[b].t-agg[a].t});
+    modal('<div style="display:flex;justify-content:space-between"><b style="font-size:15px">📈 توقّع التكلفة الشهرية لكل مشروع</b><button '+BTN+' onclick="fxClose()">✕</button></div><table style="width:100%;margin-top:8px"><tr style="color:var(--text-muted)"><th>Project</th><th>Requests</th><th>No ref</th><th>Monthly</th></tr>'+rows.map(function(k){return '<tr><td>'+esc(k)+'</td><td>'+agg[k].n+'</td><td>'+agg[k].m+'</td><td><b>'+Math.round(agg[k].t).toLocaleString()+'</b> '+esc(agg[k].c)+'</td></tr>'}).join('')+'</table><div style="margin-top:8px;font-size:11px;color:var(--text-muted)">السعر اليومي بيتضرب ×30. أسعار بدون مرجع مش متحسوبة.</div>');return}
+    var r=L[i++],k=norm(r.equipment)+'|'+norm(r.project)+'|'+norm(r.capacity),a=agg[r.project||'—']=agg[r.project||'—']||{n:0,m:0,t:0,c:''};
+    function add(p){a.n++;if(p){a.t+=p.monthly*(Number(r.qty)||1);a.c=p.ccy}else a.m++;next()}
+    if(k in PCACHE)return add(PCACHE[k]);window.rdLastPrice(r.equipment,r.project,function(res){PCACHE[k]=refCost(res);add(PCACHE[k])},r.capacity)})()};
+
+/* ---- wiring ---- */
+var _rf=window.renderFollowUpTable;
+window.renderFollowUpTable=function(){_rf.apply(this,arguments);try{decorate();panel()}catch(e){console.warn('fx',e)}};
+var hdr=document.querySelector('#page-followup > div > div:last-child');
+if(hdr)[['🧾 Audit','fxAudit()'],['↩ Undo import','fxUndo()'],['📈 Forecast','fxForecast()']].forEach(function(b){var x=document.createElement('button');x.className='btn-sm';x.textContent=b[0];x.setAttribute('onclick',b[1]);hdr.appendChild(x)});
+})();
+
+</script>
 </body>
 </html>
