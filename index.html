@@ -947,14 +947,19 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
           <button class="btn-sm" onclick="exportFuPDF('xlsx')">📊 Excel</button>
             <button id="fu-btn-undo" class="btn-sm" style="display:none;background:rgba(240,165,0,.15);border-color:rgba(240,165,0,.4);color:var(--accent);" onclick="undoLastFuStatus()" title="Undo last status change">↩ Undo</button>
             <button id="fu-btn-add" class="btn-sm" style="display:none;background:rgba(63,185,80,.15);border-color:rgba(63,185,80,.4);color:var(--green);" onclick="openAddFuModal()">+ Add Equipment</button>
+            <label id="fu-btn-sync" class="btn-sm" style="display:none;background:rgba(240,165,0,.15);border-color:rgba(240,165,0,.45);color:var(--accent);cursor:pointer;" title="Compare the Excel file with the database and apply only what changed (new / edited rows) — by Rec ID, with a preview first">
+              🔄 Smart Sync
+              <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="syncFuFromExcel(this)"/>
+            </label>
             <label id="fu-btn-upload" class="btn-sm" style="display:none;background:rgba(88,166,255,.15);border-color:rgba(88,166,255,.4);color:var(--blue);cursor:pointer;">
-              📂 Update Excel
+              📂 Update Excel (Replace)
               <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="updateFuFromExcel(this)"/>
             </label>
             <label id="fu-btn-addnew" class="btn-sm" style="display:none;background:rgba(63,185,80,.15);border-color:rgba(63,185,80,.4);color:var(--green);cursor:pointer;" title="Add only the new rows (SN greater than the last registered SN) — nothing existing is changed or deleted">
               ➕ Add New Only
               <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="addNewFuFromExcel(this)"/>
             </label>
+            <button id="fu-btn-backups" class="btn-sm" style="display:none;" onclick="fuOpenBackups()" title="Automatic backups taken before every import — undo / restore">🛟 Backups</button>
             <button id="fu-btn-clear" class="btn-sm" style="display:none;background:rgba(248,81,73,.1);border-color:rgba(248,81,73,.3);color:var(--red);" onclick="clearFollowUpData()">🗑 Clear Data</button>
           </div>
         </div>
@@ -2056,6 +2061,8 @@ auth.onAuthStateChanged(function(user) {
     document.getElementById('fu-actions-col').style.display = isAdmin ? '' : 'none';
     document.getElementById('fu-btn-upload').style.display = isAdmin ? 'inline-flex' : 'none';
     document.getElementById('fu-btn-addnew').style.display = isAdmin ? 'inline-flex' : 'none';
+    document.getElementById('fu-btn-sync').style.display = isAdmin ? 'inline-flex' : 'none';
+    document.getElementById('fu-btn-backups').style.display = isAdmin ? 'inline-flex' : 'none';
     document.getElementById('fu-btn-clear').style.display  = isAdmin ? 'inline-flex' : 'none';
     document.getElementById('fu-btn-add').style.display    = isAdmin ? 'inline-flex' : 'none';
     document.getElementById('btn-viewers-log').style.display = isAdmin ? 'inline-flex' : 'none';
@@ -3878,7 +3885,7 @@ function fuBuildWorkbook(EJ, rows, opt){
   }
   var SUBT=N.toLocaleString('en-US')+' requests  ·  '+(opt.stamp||'')+'  ·  every number is a live formula off the "2026" sheet';
 
-  var wb=new EJ.Workbook(); wb.creator='HAC PMV'; wb.created=new Date(); wb.calcProperties={fullCalcOnLoad:true}; try{ if(window.fuAddMeta) window.fuAddMeta(wb); }catch(_e){}
+  var wb=new EJ.Workbook(); wb.creator='HAC PMV'; wb.created=new Date(); wb.calcProperties={fullCalcOnLoad:true};
   var PCOL={Rental:'3FB950',Transfer:'58A6FF',Hold:'F0A500',Pending:'8B949E',Cancel:'F85149'};
   var wsA=wb.addWorksheet('2026',{views:[{showGridLines:true,state:'frozen',ySplit:6,xSplit:2,zoomScale:70}],properties:{tabColor:{argb:A('495057')}}});
   var wsP={}; PROVS.forEach(function(p){ wsP[p]=wb.addWorksheet(p,{views:[{showGridLines:true,state:'frozen',ySplit:4,zoomScale:90}],properties:{tabColor:{argb:A(PCOL[p])}}}); });
@@ -3917,19 +3924,21 @@ function fuBuildWorkbook(EJ, rows, opt){
     ws.getRow(6).height=54; ws.getRow(5).height=18;
     /* real Excel Table, same as the uploaded workbook: Table1 over the header row + the data rows (new rows are typed straight under it) */
     (function(){
-      var HELP=['Month key','Deduction','Visible','Month #','Project #','Equip #','In selection','Savings','Prov key'];
+      var HELP=['Month key','Deduction','Visible','Month #','Project #','Equip #','In selection','Savings','Prov key','Rec ID'];
       var tcols=H.concat(HELP).map(function(t){ return {name:t.replace(/\n/g,'_x000a_'), filterButton:true}; }), trows=[], q;
-      for(q=0;q<N;q++){ trows.push(new Array(26).fill(null)); }
+      for(q=0;q<N;q++){ trows.push(new Array(27).fill(null)); }
       ws.addTable({name:'Table1',displayName:'Table1',ref:'A6',headerRow:true,totalsRow:false,style:{theme:'TableStyleMedium6',showRowStripes:true},columns:tcols,rows:trows});
       H.forEach(function(t,k){ ws.getCell(6,k+1).value=t; });   /* header cells keep their real line breaks */
     })();
-    [[cMK,'Month key'],[cDED,'Deduction'],[cVIS,'Visible'],[cMN,'Month #'],[cPN,'Project #'],[cEN,'Equip #'],[cSEL,'In selection'],[cSAV,'Savings'],[cKEY,'Prov key']].forEach(function(h){ hdrCell(ws,6,colNum(h[0]),h[1]); });
-    S(ws,5,colNum(cMK),'helpers — leave them',{c2:colNum(cKEY),fill:'6C757D',color:WHITE,sz:8,i:1,h:'center'});
-    [12.4,27.4,33.1,12.6,21,44.1,27.1,41,14.6,12,14,31.6,24.3,20,31.1,17,49.6,11,11,11,11,11,11,11,11,11,3,14,8,3,30,8,3,40,8].forEach(function(w,k){ ws.getColumn(k+1).width=w; });
+    [[cMK,'Month key'],[cDED,'Deduction'],[cVIS,'Visible'],[cMN,'Month #'],[cPN,'Project #'],[cEN,'Equip #'],[cSEL,'In selection'],[cSAV,'Savings'],[cKEY,'Prov key'],['AA','Rec ID']].forEach(function(h){ hdrCell(ws,6,colNum(h[0]),h[1]); });
+    ws.getColumn(27).hidden=true;   /* Rec ID = the database id of each row; it travels with the row so Smart Sync can match rows after sorting / inserting */
+    S(ws,5,colNum(cMK),'helpers — leave them',{c2:27,fill:'6C757D',color:WHITE,sz:8,i:1,h:'center'});
+    [12.4,27.4,33.1,12.6,21,44.1,27.1,41,14.6,12,14,31.6,24.3,20,31.1,17,49.6,11,11,11,11,11,11,11,11,11,12,3,14,8,3,30,8,3,40,8].forEach(function(w,k){ ws.getColumn(k+1).width=w; });
 
     for(i=0;i<N;i++){
       var d=rows[i], r=F+i;
       ws.getCell(r,1).value=d.sn!=null&&d.sn!==''?d.sn:i+1;
+      if(d.id) ws.getCell(r,27).value=d.id;
       ws.getCell(r,2).value=d.eq||''; ws.getCell(r,3).value=d.cap||''; ws.getCell(r,4).value=d.qty;
       ws.getCell(r,5).value=d.sap||''; ws.getCell(r,6).value=d.project||'';
       if(d.sub) ws.getCell(r,7).value=d.sub; ws.getCell(r,8).value=d.prov||'';
@@ -3979,9 +3988,9 @@ function fuBuildWorkbook(EJ, rows, opt){
         var cc=ws.getCell(r3,c0+1); cc.value=FM('IF('+cl(c0)+r3+'="","",'+cntExpr(cl(c0)+r3)+')'); cc.font={name:'Calibri',size:10,bold:true}; cc.alignment={horizontal:'center',vertical:'middle'}; }
       ws.addConditionalFormatting({ref:cl(c0+1)+'7:'+cl(c0+1)+(6+nm),rules:[{type:'dataBar',cfvo:[{type:'min'},{type:'max'}],color:{argb:A(AMBER)},priority:1}]});
     }
-    side(28,'Month',NM,function(a){ return 'COUNTIFS('+DR(cVIS)+',1,'+DR(cMK)+',INDEX(Calc!$A$5:$A$16,MATCH('+a+',Calc!$B$5:$B$16,0)))'; },function(k){ return 'IF(Calc!$B$'+(4+k)+'="","",Calc!$B$'+(4+k)+')'; });
-    side(31,'Equipment',10,function(a){ return 'COUNTIFS('+DR(cVIS)+',1,'+DR('B')+','+a+')'; },function(k){ return 'IFERROR(INDEX(Lists!$P$5:$P$'+(4+ES)+',MATCH(LARGE(Lists!$T$5:$T$'+(4+ES)+','+k+'),Lists!$T$5:$T$'+(4+ES)+',0)),"")'; });
-    side(34,'Project',10,function(a){ return 'COUNTIFS('+DR(cVIS)+',1,'+DR('F')+','+a+')'; },function(k){ return 'IFERROR(INDEX(Lists!$I$5:$I$'+(4+PS)+',MATCH(LARGE(Lists!$N$5:$N$'+(4+PS)+','+k+'),Lists!$N$5:$N$'+(4+PS)+',0)),"")'; });
+    side(29,'Month',NM,function(a){ return 'COUNTIFS('+DR(cVIS)+',1,'+DR(cMK)+',INDEX(Calc!$A$5:$A$16,MATCH('+a+',Calc!$B$5:$B$16,0)))'; },function(k){ return 'IF(Calc!$B$'+(4+k)+'="","",Calc!$B$'+(4+k)+')'; });
+    side(32,'Equipment',10,function(a){ return 'COUNTIFS('+DR(cVIS)+',1,'+DR('B')+','+a+')'; },function(k){ return 'IFERROR(INDEX(Lists!$P$5:$P$'+(4+ES)+',MATCH(LARGE(Lists!$T$5:$T$'+(4+ES)+','+k+'),Lists!$T$5:$T$'+(4+ES)+',0)),"")'; });
+    side(35,'Project',10,function(a){ return 'COUNTIFS('+DR(cVIS)+',1,'+DR('F')+','+a+')'; },function(k){ return 'IFERROR(INDEX(Lists!$I$5:$I$'+(4+PS)+',MATCH(LARGE(Lists!$N$5:$N$'+(4+PS)+','+k+'),Lists!$N$5:$N$'+(4+PS)+',0)),"")'; });
     ws.pageSetup={paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0};
   })();
 
@@ -4396,7 +4405,7 @@ function fuDashXlsx(scoped){
   var rows=scoped.map(function(r,i){
     var sav=0; try{ sav=Math.round(Number(fuSavingOf(r))||0); }catch(x){}
     var fp=fixPair(toDate(r.date_from),toDate(r.date_to),Number(r.days)||0);
-    return {sn:i+1, eq:String(r.equipment||'').trim(), cap:String(r.capacity||'').trim(), qty:Number(r.qty)||1, sap:String(r.sap||'').trim(),
+    return {id:(r.id&&String(r.id).indexOf('local_')!==0)?String(r.id):'', sn:i+1, eq:String(r.equipment||'').trim(), cap:String(r.capacity||'').trim(), qty:Number(r.qty)||1, sap:String(r.sap||'').trim(),
       project:String(r.project||'').trim(), sub:toDate(r.submission_date), prov:String(r.provision||'').trim(),
       from:fp.f, to:fp.t, dok:fp.ok, days:Number(r.days)||0, cost:Number(r.rental_cost_excl_fuel)||0, fc:Number(r.fuel_consumption_per_hour)||0, stot:Number(r.saving_total)||0, sav:sav, notes:String(r.notes||'').trim()};
   });
@@ -4856,6 +4865,22 @@ function exportFuXlsxWithDeduction(o, scoped) {
 }
 
 
+/* ═══════ Follow-Up import: preview (dry run) · Smart Sync by Rec ID · automatic backup & restore ═══════ */
+/*FU-CORE-START*/
+var FU_PROVS = ['Rental','Transfer','Hold','Cancel','Pending'];
+var FU_SYNC_FIELDS = ['equipment','capacity','qty','sap','project','submission_date','provision','date_from','date_to','days','notes'];
+var FU_FIELD_LABEL = {equipment:'Equipment',capacity:'Capacity',qty:'Qty',sap:'SAP',project:'Project',submission_date:'Submission',provision:'Provision',date_from:'From',date_to:'To',days:'Days',notes:'Notes',engineer:'Engineer',contact:'Contact'};
+var FU_MODE_LABEL = {sync:'Smart Sync', replace:'Upload & Replace', addnew:'Add New Only'};
+
+function fuEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function fuIsoDay(s){ return /^\d{4}-\d{2}-\d{2}$/.test(s||''); }
+function fuIsLocalId(id){ return String(id||'').indexOf('local_')===0; }
+function fuNorm(f, v){
+  if(f==='qty' || f==='days') return Number(v)||0;
+  if(f==='date_from' || f==='date_to' || f==='submission_date'){ v = (v==null) ? '' : String(v).trim(); return (v===''||v==='—') ? '—' : v; }
+  return String(v==null?'':v).trim();
+}
+
 /* Picks the sheet that really holds the follow-up table (header row: "Equipment" + "Capacity" + "Project…").
    The exported workbook starts with Dashboard / Charts, so SheetNames[0] is NOT the data sheet any more. */
 function fuPickSheet(wb){
@@ -4875,238 +4900,470 @@ function fuPickSheet(wb){
   return names[0];
 }
 
-/* ➕ Add New Only — يقرا من الشيت الصفوف الجديدة بس (SN أكبر من آخر SN متسجل) ومايلمسش الموجود */
-function addNewFuFromExcel(input) {
-  const file = input.files[0];
-  if(!file) return;
-  if(!isAdmin){ input.value=''; return; }
+/* Reads the data sheet into records + a list of data-quality issues (nothing is written anywhere). */
+function fuParseImport(wb){
+  var sheet = fuPickSheet(wb);
+  var rows = XLSX.utils.sheet_to_json(wb.Sheets[sheet], {defval:'', header:1});
+  var hi = -1, i;
+  for(i=0; i<Math.min(rows.length,10); i++){
+    var row = rows[i].map(function(c){ return String(c).trim().toLowerCase(); });
+    if(row.some(function(c){ return c.indexOf('equipment')!==-1; }) && row.some(function(c){ return c.indexOf('project')!==-1; })){ hi = i; break; }
+  }
+  if(hi < 0) return {error:'Header row not found in sheet "'+sheet+'"', sheet:sheet};
+  var headers = rows[hi].map(function(c){ return String(c).trim().toLowerCase(); });
+  var clean = function(h){ return h.replace(/[^a-z0-9]/g,''); };
+  var find = function(){
+    var t = Array.prototype.slice.call(arguments);
+    return headers.findIndex(function(h){ return t.some(function(x){ return clean(h).indexOf(clean(x))!==-1; }); });
+  };
+  var col = {
+    equip:find('equipment'), cap:find('capacity'), qty:find('qty','quantity'), sap:find('sap'), proj:find('project','desc'),
+    eng:find('eng','engineer'), contact:find('contact'), sub:find('submission'), prov:find('provision','method'), from:find('from'),
+    to:headers.findIndex(function(h){ var c = clean(h); return c==='to' || c==='dateto'; }),
+    days:find('days'), notes:find('notes'),
+    id:headers.findIndex(function(h){ return clean(h)==='recid'; })
+  };
+  if(col.sub < 0) col.sub = find('date');
 
-  toast('⏳ Reading Excel...');
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    try {
-      const wb = XLSX.read(e.target.result, {type:'binary'});
-      const rows = XLSX.utils.sheet_to_json(wb.Sheets[fuPickSheet(wb)], {defval:'', header:1});
+  var errors = [], issues = [];
+  [['prov','Provision Method'],['from','From'],['to','To']].forEach(function(p){ if(col[p[0]] < 0) errors.push('Column "'+p[1]+'" not found in sheet "'+sheet+'"'); });
+  if(col.to >= 0 && col.to === col.sub) errors.push('"To" column resolved to the Submission column — check the sheet headers');
 
-      let headerIdx = -1;
-      for(let i=0; i<Math.min(rows.length,10); i++){
-        const row = rows[i].map(function(c){ return String(c).trim().toLowerCase(); });
-        if(row.some(function(c){ return c.indexOf('equipment')!==-1; }) && row.some(function(c){ return c.indexOf('project')!==-1; })){ headerIdx = i; break; }
-      }
-      if(headerIdx < 0){ toast('Header row not found','error'); input.value=''; return; }
-
-      const headers = rows[headerIdx].map(function(c){ return String(c).trim().toLowerCase(); });
-      const find = function() {
-        const terms = Array.prototype.slice.call(arguments);
-        return headers.findIndex(function(h){
-          return terms.some(function(t){ return h.replace(/[^a-z0-9]/g,'').indexOf(t.replace(/[^a-z0-9]/g,''))!==-1; });
-        });
-      };
-      const iSn=0, iEquip=find('equipment'), iCap=find('capacity'), iQty=find('qty','quantity');
-      const iSap=find('sap'), iProj=find('project','desc'), iEng=find('eng','engineer');
-      const iContact=find('contact');
-      let iSub=find('submission'); if(iSub<0) iSub=find('date');
-      const iProv=find('provision','method'), iFrom=find('from'), iTo=headers.findIndex(function(h){ var c=h.replace(/[^a-z0-9]/g,''); return c==='to'||c==='dateto'; }), iDays=find('days'), iNotes=find('notes');
-
-      // آخر SN متسجل عندي
-      const existingSn = {};
-      let maxSn = 0;
-      FU_DATA.forEach(function(r){ const n = Number(r.sn)||0; if(n>0){ existingSn[n]=1; if(n>maxSn) maxSn=n; } });
-
-      const fresh = [];
-      let sheetMax = 0;
-      for(let i=headerIdx+1; i<rows.length; i++){
-        const r = rows[i];
-        const equip = String(r[iEquip]||'').trim();
-        if(!equip) continue;
-        const sn = Number(r[iSn]) || (i - headerIdx);
-        if(sn > sheetMax) sheetMax = sn;
-        if(sn <= maxSn || existingSn[sn]) continue;   // موجود قبل كده → تجاهل
-
-        const prov = String(r[iProv]||'').trim();
-        const provNorm = prov.charAt(0).toUpperCase() + prov.slice(1).toLowerCase();
-        const provFinal = ({'Rental':'Rental','Transfer':'Transfer','Hold':'Hold','Cancel':'Cancel','Pending':'Pending'}[provNorm]) || provNorm || 'Pending';
-        const subRaw = r[iSub];
-        fresh.push({
-          sn: sn,
-          equipment: equip,
-          capacity: String(r[iCap]||'').trim(),
-          qty: Number(r[iQty]) || 1,
-          sap: String(r[iSap]||'').trim(),
-          project: String(r[iProj]||'').trim(),
-          engineer: String(r[iEng]||'').trim(),
-          contact: String(r[iContact]||'').trim(),
-          submission_date: (Number(subRaw) > 30000 && Number(subRaw) < 70000) ? formatExcelDate(subRaw) : String(subRaw||'').trim(),
-          provision: provFinal,
-          date_from: formatExcelDate(r[iFrom]),
-          date_to: formatExcelDate(r[iTo]),
-          days: Number(r[iDays]) || 0,
-          notes: String(r[iNotes]||'').trim()
-        });
-      }
-
-      input.value = '';
-      if(!fresh.length){
-        toast('مفيش معدات جديدة — آخر SN عندك '+maxSn+' وآخر SN في الشيت '+sheetMax);
-        return;
-      }
-      fresh.sort(function(a,b){ return a.sn-b.sn; });
-
-      const preview = fresh.slice(0,12).map(function(x){ return x.sn+' · '+x.equipment+(x.project?' — '+x.project:''); }).join('\n')
-                    + (fresh.length>12 ? '\n… +'+(fresh.length-12)+' more' : '');
-      if(!confirm('آخر SN متسجل: '+maxSn+'\nالشيت لحد SN: '+sheetMax+'\n\nهيتضاف '+fresh.length+' معدة جديدة بس (من غير تعديل أو حذف أي حاجة موجودة):\n\n'+preview+'\n\nنكمل؟')) return;
-
-      toast('⏳ Adding '+fresh.length+' new record(s)...');
-      let p = Promise.resolve();
-      for(let i=0; i<fresh.length; i+=400){
-        (function(chunk){
-          p = p.then(function(){
-            const batch = db.batch();
-            chunk.forEach(function(item){
-              const ref = db.collection('followup').doc();
-              item.id = ref.id;
-              batch.set(ref, Object.assign({}, item, {createdAt: firebase.firestore.FieldValue.serverTimestamp()}));
-            });
-            return batch.commit();
-          });
-        })(fresh.slice(i,i+400));
-      }
-      p.then(function(){
-        fresh.forEach(function(x){ FU_DATA.push(x); });
-        setupFollowUpUI();
-        toast('✅ اتضاف '+fresh.length+' معدة جديدة (SN '+fresh[0].sn+(fresh.length>1?' → '+fresh[fresh.length-1].sn:'')+')');
-      }).catch(function(err){
-        if(err.code === 'resource-exhausted'){
-          fresh.forEach(function(x,idx){ x.id = 'local_'+Date.now()+'_'+idx; FU_DATA.push(x); });
-          setupFollowUpUI();
-          toast('⚠️ Cloud quota full: added locally only (resets 10 AM Cairo)', 'error');
-        } else {
-          toast('Error: '+err.message, 'error');
-        }
-      });
-    } catch(err){
-      input.value = '';
-      toast('Error: '+err.message, 'error');
+  var recs = [];
+  for(i = hi+1; i < rows.length; i++){
+    var r = rows[i];
+    var equip = String(r[col.equip]||'').trim();
+    if(!equip) continue;
+    var rowNo = i + 1;
+    var prov = String(r[col.prov]||'').trim();
+    var provNorm = prov.charAt(0).toUpperCase() + prov.slice(1).toLowerCase();
+    var subRaw = r[col.sub];
+    var rec = {
+      _row:rowNo,
+      _id:(col.id >= 0) ? String(r[col.id]||'').trim() : '',
+      sn:Number(r[0]) || (i - hi),
+      equipment:equip,
+      capacity:String(r[col.cap]||'').trim(),
+      qty:Number(r[col.qty]) || 1,
+      sap:String(r[col.sap]||'').trim(),
+      project:String(r[col.proj]||'').trim(),
+      engineer:(col.eng >= 0) ? String(r[col.eng]||'').trim() : '',
+      contact:(col.contact >= 0) ? String(r[col.contact]||'').trim() : '',
+      submission_date:(Number(subRaw) > 30000 && Number(subRaw) < 70000) ? formatExcelDate(subRaw) : String(subRaw||'').trim(),
+      provision:({'Rental':'Rental','Transfer':'Transfer','Hold':'Hold','Cancel':'Cancel','Pending':'Pending'}[provNorm]) || provNorm,
+      date_from:formatExcelDate(r[col.from]),
+      date_to:formatExcelDate(r[col.to]),
+      days:Number(r[col.days]) || 0,
+      notes:String(r[col.notes]||'').trim()
+    };
+    /* "Days" is a formula in the exported file: a file that was never opened/saved in Excel has no cached value → derive it from the dates */
+    if((r[col.days] === '' || r[col.days] == null) && fuIsoDay(rec.date_from) && fuIsoDay(rec.date_to)){
+      rec.days = Math.max(0, Math.round((Date.parse(rec.date_to) - Date.parse(rec.date_from)) / 864e5));
     }
+    recs.push(rec);
+
+    /* ── data-quality checks (warnings only — they never block) ── */
+    var add = function(code, msg){ issues.push({row:rowNo, code:code, msg:msg, equipment:equip}); };
+    var from = rec.date_from, to = rec.date_to;
+    if(from === '—') add('nofrom','From date is empty');
+    else if(!fuIsoDay(from)) add('baddate','From date is unreadable: "'+from+'"');
+    if(to === '—') add('noto','To date is empty');
+    else if(!fuIsoDay(to)) add('baddate','To date is unreadable: "'+to+'"');
+    if(fuIsoDay(from) && fuIsoDay(to)){
+      var diff = Math.round((Date.parse(to) - Date.parse(from)) / 864e5);
+      if(diff < 0) add('range','From ('+from+') is after To ('+to+')');
+      else if(rec.days !== diff) add('days','Days ('+rec.days+') ≠ To − From ('+diff+')');
+    }
+    if(rec.provision === '') add('noprov','Provision is empty');
+    else if(FU_PROVS.indexOf(rec.provision) < 0) add('prov','Unknown provision "'+rec.provision+'"');
+    if(rec.project === '') add('noproj','Project is empty');
+    if(rec.submission_date === '' || rec.submission_date === '—') add('nosub','Submission date is empty');
+    var q = Number(r[col.qty]); if(String(r[col.qty]).trim() !== '' && !(q > 0)) add('qty','Qty is not a positive number: "'+r[col.qty]+'"');
+  }
+  return {sheet:sheet, headerRow:hi+1, col:col, hasId:col.id >= 0, hasEng:col.eng >= 0, hasContact:col.contact >= 0, records:recs, issues:issues, errors:errors};
+}
+
+/* Record in the exact shape that is stored in Firestore */
+function fuRecForDb(rec, parsed, mode){
+  var out = {
+    sn:rec.sn, equipment:rec.equipment, capacity:rec.capacity, qty:rec.qty, sap:rec.sap, project:rec.project,
+    engineer:rec.engineer, contact:rec.contact, submission_date:rec.submission_date,
+    provision:(mode === 'addnew' && rec.provision === '') ? 'Pending' : rec.provision,
+    date_from:rec.date_from, date_to:rec.date_to, days:rec.days, notes:rec.notes
+  };
+  return out;
+}
+
+/* Compares sheet rows with what is in the database. Used by Smart Sync (and as the "net effect" line for Replace). */
+function fuMatchRecords(parsed, existing){
+  var ex = (existing || []).filter(Boolean);
+  var maxSn = 0, bySn = {}, byId = {};
+  ex.forEach(function(r){
+    var n = Number(r.sn) || 0; if(n > maxSn) maxSn = n;
+    if(n > 0 && !bySn[n]) bySn[n] = r;
+    if(r.id && !fuIsLocalId(r.id)) byId[r.id] = r;
+  });
+  var fields = FU_SYNC_FIELDS.slice();
+  if(parsed.hasEng) fields.push('engineer');
+  if(parsed.hasContact) fields.push('contact');
+  var used = {}, seenId = {}, res = {adds:[], updates:[], same:0, removes:[], issues:[]};
+  parsed.records.forEach(function(rec){
+    var match = null;
+    if(parsed.hasId){
+      if(rec._id){
+        if(seenId[rec._id]){ res.issues.push({row:rec._row, code:'dupid', msg:'Duplicate Rec ID in the sheet — treated as a new row', equipment:rec.equipment}); }
+        else {
+          seenId[rec._id] = 1;
+          if(byId[rec._id]) match = byId[rec._id];
+          else res.issues.push({row:rec._row, code:'unkid', msg:'Rec ID is not in the database — treated as a new row', equipment:rec.equipment});
+        }
+      }
+    } else {
+      var c = bySn[rec.sn]; if(c && !used[c.id]) match = c;      /* legacy file without Rec ID → match by S/N */
+    }
+    if(match && used[match.id]) match = null;
+    if(match){
+      used[match.id] = 1;
+      var changes = {}, diff = [];
+      fields.forEach(function(f){
+        var a = fuNorm(f, match[f]), b = fuNorm(f, rec[f]);
+        if(a !== b){ changes[f] = rec[f]; diff.push({f:f, from:a, to:b}); }
+      });
+      if(diff.length) res.updates.push({row:rec._row, id:match.id, equipment:rec.equipment, project:rec.project, changes:changes, diff:diff});
+      else res.same++;
+    } else {
+      var d = fuRecForDb(rec, parsed, 'sync'); d.sn = ++maxSn;
+      res.adds.push({row:rec._row, data:d});
+    }
+  });
+  res.removes = ex.filter(function(r){ return !used[r.id]; });
+  return res;
+}
+
+function fuBuildPlan(mode, parsed, existing){
+  var ex = (existing || []).filter(Boolean);
+  var plan = {mode:mode, sheet:parsed.sheet, headerRow:parsed.headerRow, total:parsed.records.length, hasId:parsed.hasId,
+              adds:[], updates:[], same:0, removes:[], skipped:0, issues:parsed.issues.slice(), errors:parsed.errors.slice(), net:null, maxSn:0};
+  ex.forEach(function(r){ var n = Number(r.sn)||0; if(n > plan.maxSn) plan.maxSn = n; });
+  if(mode === 'sync'){
+    var m = fuMatchRecords(parsed, ex);
+    plan.adds = m.adds; plan.updates = m.updates; plan.same = m.same; plan.removes = m.removes;
+    plan.issues = plan.issues.concat(m.issues);
+  } else if(mode === 'addnew'){
+    var exSn = {}; ex.forEach(function(r){ var n = Number(r.sn)||0; if(n > 0) exSn[n] = 1; });
+    parsed.records.forEach(function(rec){
+      if(rec.sn <= plan.maxSn || exSn[rec.sn]){ plan.skipped++; return; }
+      plan.adds.push({row:rec._row, data:fuRecForDb(rec, parsed, 'addnew')});
+    });
+    plan.adds.sort(function(a,b){ return a.data.sn - b.data.sn; });
+  } else {   /* replace */
+    parsed.records.forEach(function(rec){ plan.adds.push({row:rec._row, data:fuRecForDb(rec, parsed, 'replace')}); });
+    plan.removes = ex.slice();
+    var n = fuMatchRecords(parsed, ex);
+    plan.net = {adds:n.adds.length, updates:n.updates.length, same:n.same, removes:n.removes.length};
+  }
+  return plan;
+}
+/*FU-CORE-END*/
+
+/*FU-UI-START*/
+/* ───────── entry points used by the three toolbar buttons ───────── */
+function fuImportEntry(input, mode){
+  var file = input.files && input.files[0]; if(!file) return;
+  if(typeof isAdmin !== 'undefined' && !isAdmin){ input.value = ''; return; }
+  toast('⏳ Reading Excel...');
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      var wb = XLSX.read(e.target.result, {type:'binary'});
+      var parsed = fuParseImport(wb);
+      input.value = '';
+      if(parsed.error){ toast('❌ ' + parsed.error, 'error'); return; }
+      var plan = fuBuildPlan(mode, parsed, FU_DATA);
+      plan.fileName = file.name;
+      fuShowPreview(plan);
+    }catch(err){ input.value = ''; toast('❌ Error reading file: ' + err.message, 'error'); }
   };
   reader.readAsBinaryString(file);
 }
+function syncFuFromExcel(input){ fuImportEntry(input, 'sync'); }
+function addNewFuFromExcel(input){ fuImportEntry(input, 'addnew'); }
+function updateFuFromExcel(input){ fuImportEntry(input, 'replace'); }
 
-function updateFuFromExcel(input) {
-  const file = input.files[0];
-  if(!file) return;
-  if(!confirm('Upload & Replace Follow-Up database with this sheet?')) { input.value=''; return; }
+/* ───────── preview (dry run) ───────── */
+var FU_ISSUE_LABEL = {nofrom:'From date empty', noto:'To date empty', baddate:'Unreadable date', range:'From is after To', days:'Days ≠ To − From',
+  noprov:'Provision empty', prov:'Unknown provision', noproj:'Project empty', nosub:'Submission date empty', qty:'Bad Qty', dupid:'Duplicate Rec ID', unkid:'Rec ID not in database'};
 
-  toast('⏳ Reading Excel...');
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    try {
-      const wb = XLSX.read(e.target.result, {type:'binary'});
-      const ws = wb.Sheets[fuPickSheet(wb)];
-      const rows = XLSX.utils.sheet_to_json(ws, {defval:'', header:1});
+function fuShowPreview(plan){
+  window.__fuPlan = plan;
+  var m = document.getElementById('fu-import-modal');
+  if(!m){ m = document.createElement('div'); m.className = 'modal-overlay'; m.id = 'fu-import-modal'; document.body.appendChild(m); }
+  var chip = function(label, n, color){
+    return '<div style="flex:1;min-width:110px;background:var(--bg);border:1px solid var(--border);border-top:3px solid '+color+';border-radius:8px;padding:10px 12px;">'
+      + '<div style="font-size:22px;font-weight:700;color:'+color+';font-family:\'JetBrains Mono\',monospace;">'+n+'</div>'
+      + '<div style="font-size:11px;color:var(--text-muted);">'+label+'</div></div>';
+  };
+  var td = 'style="padding:4px 8px;border-bottom:1px solid var(--border);font-size:12px;"';
+  var th = 'style="padding:4px 8px;text-align:left;font-size:11px;color:var(--text-muted);"';
+  var sect = function(title, count, body, open){
+    if(!count) return '';
+    return '<details '+(open?'open':'')+' style="margin-top:12px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;"><summary style="cursor:pointer;font-weight:600;font-size:13px;">'+title+' <span style="color:var(--text-muted);font-weight:400;">('+count+')</span></summary><div style="margin-top:8px;max-height:230px;overflow:auto;">'+body+'</div></details>';
+  };
+  var rowT = function(a){
+    var d = a.data;
+    return '<tr><td '+td+'>'+a.row+'</td><td '+td+'>'+fuEsc(d.equipment)+(d.capacity?' <span style="color:var(--text-muted)">'+fuEsc(d.capacity)+'</span>':'')+'</td><td '+td+'>'+fuEsc(d.project)+'</td><td '+td+'>'+fuEsc(d.provision)+'</td><td '+td+'>'+fuEsc(d.date_from)+' → '+fuEsc(d.date_to)+'</td></tr>';
+  };
+  var LIM = 60, html = '';
+  var modeLabel = FU_MODE_LABEL[plan.mode];
+  html += '<div class="modal" style="width:900px;">';
+  html += '<div class="modal-title">📋 Import preview — '+modeLabel+'</div>';
+  html += '<div style="font-size:12px;color:var(--text-muted);margin:-8px 0 14px;">File: <b style="color:var(--text)">'+fuEsc(plan.fileName||'')+'</b> · Sheet: <b style="color:var(--text)">'+fuEsc(plan.sheet)+'</b> · header row '+plan.headerRow+' · '+plan.total+' rows read · '
+        + (plan.hasId ? 'matched by <b style="color:var(--green)">Rec ID</b>' : (plan.mode==='sync' ? 'no Rec ID column — matched by <b style="color:var(--accent)">S/N</b> (older file)' : '')) + '</div>';
+  if(plan.errors.length){
+    html += '<div style="background:rgba(248,81,73,.12);border:1px solid rgba(248,81,73,.4);color:var(--red);border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:12px;">'
+          + plan.errors.map(function(e){ return '❌ '+fuEsc(e); }).join('<br>') + '</div>';
+  }
+  var willDelete = plan.mode === 'replace';
+  html += '<div style="display:flex;gap:10px;flex-wrap:wrap;">';
+  html += chip(plan.mode==='replace' ? 'Rows to write' : 'New rows', plan.adds.length, 'var(--green)');
+  if(plan.mode === 'sync') html += chip('Changed', plan.updates.length, 'var(--blue)') + chip('Unchanged', plan.same, 'var(--text-muted)') + chip('Not in sheet', plan.removes.length, 'var(--red)');
+  if(plan.mode === 'addnew') html += chip('Skipped (already exist)', plan.skipped, 'var(--text-muted)');
+  if(plan.mode === 'replace') html += chip('Existing to delete', plan.removes.length, 'var(--red)');
+  html += chip('Warnings', plan.issues.length, plan.issues.length ? 'var(--accent)' : 'var(--text-muted)');
+  html += '</div>';
 
-      let headerIdx = -1;
-      for(let i=0; i<Math.min(rows.length,10); i++){
-        const row = rows[i].map(function(c){ return String(c).trim().toLowerCase(); });
-        if(row.some(function(c){ return c.indexOf('equipment')!==-1; }) && row.some(function(c){ return c.indexOf('project')!==-1; })){
-          headerIdx = i; break;
-        }
-      }
-      if(headerIdx < 0){ alert('Header row not found'); return; }
+  if(plan.mode === 'replace'){
+    html += '<div style="margin-top:12px;background:rgba(240,165,0,.10);border:1px solid rgba(240,165,0,.4);border-radius:8px;padding:10px 14px;font-size:12px;">⚠ <b>Replace</b> deletes all '+plan.removes.length+' existing records and re-creates them with <b>new IDs</b>. '
+          + 'Net effect vs. what is stored now: <b>'+plan.net.adds+'</b> new · <b>'+plan.net.updates+'</b> changed · <b>'+plan.net.same+'</b> identical · <b>'+plan.net.removes+'</b> missing from the sheet. '
+          + 'Prefer <b>🔄 Smart Sync</b> — it keeps IDs and only touches what changed.</div>';
+  }
+  if(plan.mode === 'addnew' && !plan.adds.length){
+    html += '<div style="margin-top:12px;font-size:13px;color:var(--text-muted);">No new rows: every S/N in the sheet is ≤ the last registered S/N ('+plan.maxSn+').</div>';
+  }
 
-      const headers = rows[headerIdx].map(function(c){ return String(c).trim().toLowerCase(); });
-      const find = function() {
-        const terms = Array.prototype.slice.call(arguments);
-        return headers.findIndex(function(h){
-          return terms.some(function(t){ return h.replace(/[^a-z0-9]/g,'').indexOf(t.replace(/[^a-z0-9]/g,''))!==-1; });
-        });
-      };
-
-      const iSn=0, iEquip=find('equipment'), iCap=find('capacity'), iQty=find('qty','quantity');
-      const iSap=find('sap'), iProj=find('project','desc'), iEng=find('eng','engineer');
-      const iContact=find('contact'), iSub=find('submission','date'), iProv=find('provision','method');
-      const iFrom=find('from'), iTo=headers.findIndex(function(h){ var c=h.replace(/[^a-z0-9]/g,''); return c==='to'||c==='dateto'; }), iDays=find('days'), iNotes=find('notes');
-
-      const newData = [];
-      for(let i=headerIdx+1; i<rows.length; i++){
-        const r = rows[i];
-        const equip = String(r[iEquip]||'').trim();
-        if(!equip) continue;
-
-        const prov = String(r[iProv]||'').trim();
-        const provNorm = prov.charAt(0).toUpperCase() + prov.slice(1).toLowerCase();
-        const provFinal = {'Rental':'Rental','Transfer':'Transfer','Hold':'Hold','Cancel':'Cancel','Pending':'Pending'}[provNorm] || provNorm;
-
-        newData.push({
-          sn: Number(r[iSn]) || (i - headerIdx),
-          equipment: equip,
-          capacity: String(r[iCap]||'').trim(),
-          qty: Number(r[iQty]) || 1,
-          sap: String(r[iSap]||'').trim(),
-          project: String(r[iProj]||'').trim(),
-          engineer: String(r[iEng]||'').trim(),
-          contact: String(r[iContact]||'').trim(),
-          submission_date: (Number(r[iSub]) > 30000 && Number(r[iSub]) < 70000) ? formatExcelDate(r[iSub]) : String(r[iSub]||'').trim(),
-          provision: provFinal,
-          date_from: formatExcelDate(r[iFrom]),
-          date_to: formatExcelDate(r[iTo]),
-          days: Number(r[iDays]) || 0,
-          notes: String(r[iNotes]||'').trim(),
-        });
-      }
-
-      toast('⏳ Syncing to Cloud...');
-      db.collection('followup').get().then(function(snap){
-        /* delete in chunks of 400 — one batch of >500 deletes is rejected by Firestore, which is what happens with 1000+ records */
-        let pd = Promise.resolve();
-        for(let i=0; i<snap.docs.length; i+=400){
-          (function(chunk){
-            pd = pd.then(function(){
-              const batch = db.batch();
-              chunk.forEach(function(d){ batch.delete(d.ref); });
-              return batch.commit();
-            });
-          })(snap.docs.slice(i, i+400));
-        }
-        return pd;
-      }).then(function(){
-        const batchSize = 400;
-        let p = Promise.resolve();
-        for(let i=0; i<newData.length; i+=batchSize){
-          (function(startIdx){
-            p = p.then(function(){
-              const batch = db.batch();
-              newData.slice(startIdx, startIdx+batchSize).forEach(function(item){
-                const docRef = db.collection('followup').doc();
-                item.id = docRef.id;
-                batch.set(docRef, item);
-              });
-              return batch.commit();
-            });
-          })(i);
-        }
-        return p;
-      }).then(function(){
-        FU_DATA = newData;
-        setupFollowUpUI();
-        toast('✅ Follow-Up synced (' + newData.length + ' records)!');
-      }).catch(function(err){
-        if(err.code === 'resource-exhausted') {
-          newData.forEach(function(item, idx){ item.id = 'local_' + idx; });
-          FU_DATA = newData;
-          setupFollowUpUI();
-          toast('⚠\ufe0f Cloud quota exceeded: Loaded locally (resets 10 AM Cairo)', 'error');
-        } else {
-          alert('Error: ' + err.message);
-        }
-      });
-    } catch(err){
-      alert('Error: ' + err.message);
+  /* new rows */
+  html += sect('➕ '+(plan.mode==='replace'?'Rows that will be written':'New rows'), plan.adds.length,
+    '<table style="width:100%;border-collapse:collapse;"><tr><th '+th+'>Row</th><th '+th+'>Equipment</th><th '+th+'>Project</th><th '+th+'>Provision</th><th '+th+'>Dates</th></tr>'
+    + plan.adds.slice(0,LIM).map(rowT).join('') + '</table>' + (plan.adds.length>LIM ? '<div style="font-size:11px;color:var(--text-muted);padding:6px 8px;">… and '+(plan.adds.length-LIM)+' more</div>' : ''),
+    plan.mode !== 'replace' && plan.adds.length <= 15);
+  /* changed rows */
+  if(plan.mode === 'sync'){
+    html += sect('✏️ Changed rows', plan.updates.length,
+      '<table style="width:100%;border-collapse:collapse;"><tr><th '+th+'>Row</th><th '+th+'>Equipment</th><th '+th+'>What changes</th></tr>'
+      + plan.updates.slice(0,LIM).map(function(u){
+          return '<tr><td '+td+'>'+u.row+'</td><td '+td+'>'+fuEsc(u.equipment)+'<div style="color:var(--text-muted);font-size:11px;">'+fuEsc(u.project)+'</div></td><td '+td+'>'
+            + u.diff.map(function(d){ return '<div><b>'+FU_FIELD_LABEL[d.f]+'</b>: <span style="color:var(--red)">'+fuEsc(d.from)+'</span> → <span style="color:var(--green)">'+fuEsc(d.to)+'</span></div>'; }).join('') + '</td></tr>';
+        }).join('') + '</table>' + (plan.updates.length>LIM ? '<div style="font-size:11px;color:var(--text-muted);padding:6px 8px;">… and '+(plan.updates.length-LIM)+' more</div>' : ''),
+      plan.updates.length <= 10);
+    if(plan.removes.length){
+      html += '<div style="margin-top:12px;border:1px solid rgba(248,81,73,.35);border-radius:8px;padding:10px 14px;">'
+        + '<label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;font-size:13px;"><input type="checkbox" id="fu-imp-del" style="margin-top:3px;"> '
+        + '<span><b style="color:var(--red)">Also delete the '+plan.removes.length+' records that are not in the sheet</b><br><span style="color:var(--text-muted);font-size:12px;">Leave unchecked if the file was exported with filters or is only part of the data. Default: nothing is deleted.</span></span></label>'
+        + '<div style="margin-top:8px;max-height:130px;overflow:auto;font-size:11px;color:var(--text-muted);">'
+        + plan.removes.slice(0,30).map(function(r){ return '#'+fuEsc(r.sn)+' · '+fuEsc(r.equipment)+' · '+fuEsc(r.project); }).join('<br>') + (plan.removes.length>30 ? '<br>… and '+(plan.removes.length-30)+' more' : '') + '</div></div>';
     }
+  }
+  /* warnings grouped by type */
+  if(plan.issues.length){
+    var groups = {}; plan.issues.forEach(function(i){ (groups[i.code] = groups[i.code] || []).push(i); });
+    html += sect('⚠ Data-quality warnings', plan.issues.length,
+      Object.keys(groups).map(function(k){
+        var g = groups[k];
+        return '<div style="padding:5px 8px;border-bottom:1px solid var(--border);font-size:12px;"><b>'+(FU_ISSUE_LABEL[k]||k)+'</b> <span style="color:var(--text-muted)">×'+g.length+'</span><div style="color:var(--text-muted);font-size:11px;">'
+          + g.slice(0,6).map(function(i){ return 'row '+i.row+' ('+fuEsc(i.equipment)+')'; }).join(' · ') + (g.length>6 ? ' · …' : '') + '</div></div>';
+      }).join(''), plan.issues.length <= 8);
+    html += '<div style="font-size:11px;color:var(--text-muted);margin-top:6px;">Warnings never block the import — they only tell you what to double-check in the sheet.</div>';
+  }
+  var nothing = !plan.adds.length && !plan.updates.length && !(plan.mode==='replace');
+  html += '<div style="font-size:11px;color:var(--text-muted);margin-top:14px;">🛟 A backup file of the current data is downloaded automatically before anything is written, and you can undo from <b>🛟 Backups</b>.</div>';
+  html += '<div class="modal-actions"><button class="btn-cancel" onclick="closeModal(\'fu-import-modal\')">Cancel</button>'
+        + '<button class="btn-save" id="fu-imp-apply" onclick="fuApplyFromModal()" '+((plan.errors.length||nothing)?'disabled style="opacity:.45;cursor:not-allowed;"':'')+'>'
+        + (plan.mode==='replace' ? 'Replace all data' : plan.mode==='addnew' ? 'Add '+plan.adds.length+' new rows' : 'Apply changes') + '</button></div></div>';
+  m.innerHTML = html;
+  m.classList.add('open');
+}
+
+function fuApplyFromModal(){
+  var plan = window.__fuPlan; if(!plan || plan.errors.length) return;
+  var del = !!(document.getElementById('fu-imp-del') || {}).checked;
+  closeModal('fu-import-modal');
+  fuApplyPlan(plan, {deleteMissing:del});
+}
+
+/* ───────── apply ───────── */
+function fuRunOps(ops){
+  var p = Promise.resolve();
+  for(var i = 0; i < ops.length; i += 400){
+    (function(chunk){
+      p = p.then(function(){
+        var b = db.batch();
+        chunk.forEach(function(o){ if(o.t === 'set') b.set(o.ref, o.data); else if(o.t === 'upd') b.update(o.ref, o.data); else b.delete(o.ref); });
+        return b.commit();
+      });
+    })(ops.slice(i, i + 400));
+  }
+  return p;
+}
+
+function fuApplyPlan(plan, opts){
+  opts = opts || {};
+  var mode = plan.mode, col = db.collection('followup');
+  var ts = function(){ return firebase.firestore.FieldValue.serverTimestamp(); };
+  var delExisting = (mode === 'replace') || (mode === 'sync' && opts.deleteMissing);
+  var backupP = fuMakeBackup(mode);            /* downloads the file synchronously, cloud copy runs in the background */
+  toast('⏳ Applying changes...');
+
+  var newDocs = plan.adds.map(function(a, i){ var ref = col.doc(); var d = Object.assign({}, a.data, {id:ref.id}); return {ref:ref, data:d}; });
+  var addOps = newDocs.map(function(n){ return {t:'set', ref:n.ref, data:Object.assign({}, n.data, {createdAt:ts()})}; });
+  var updOps = (mode === 'sync') ? plan.updates.map(function(u){ return {t:'upd', ref:col.doc(u.id), data:Object.assign({}, u.changes, {updatedAt:ts()})}; }) : [];
+  var delP;
+  if(mode === 'replace') delP = col.get().then(function(snap){ return fuRunOps(snap.docs.map(function(d){ return {t:'del', ref:d.ref}; })); });
+  else if(delExisting) delP = fuRunOps(plan.removes.filter(function(r){ return !fuIsLocalId(r.id); }).map(function(r){ return {t:'del', ref:col.doc(r.id)}; }));
+  else delP = Promise.resolve();
+
+  var applyLocal = function(){
+    var adds = newDocs.map(function(n){ return n.data; });
+    if(mode === 'replace'){ FU_DATA = adds; }
+    else {
+      var removeIds = {}; if(delExisting) plan.removes.forEach(function(r){ removeIds[r.id] = 1; });
+      var updById = {}; plan.updates.forEach(function(u){ updById[u.id] = u.changes; });
+      FU_DATA = FU_DATA.filter(function(r){ return !removeIds[r.id]; }).map(function(r){ return (mode === 'sync' && updById[r.id]) ? Object.assign({}, r, updById[r.id]) : r; }).concat(adds);
+    }
+    setupFollowUpUI();
+  };
+  var summary = function(){
+    var parts = [];
+    if(mode === 'replace') parts.push(plan.adds.length + ' rows written');
+    else { if(plan.adds.length) parts.push('+' + plan.adds.length + ' new'); if(mode==='sync' && plan.updates.length) parts.push(plan.updates.length + ' updated'); if(delExisting && plan.removes.length) parts.push(plan.removes.length + ' deleted'); }
+    return parts.join(' · ') || 'nothing to change';
+  };
+
+  delP.then(function(){ return fuRunOps(updOps.concat(addOps)); })
+    .then(function(){ applyLocal(); return backupP; })
+    .then(function(cloudOk){ toast('✅ ' + FU_MODE_LABEL[mode] + ': ' + summary() + (cloudOk ? '' : ' · backup saved as file (cloud copy unavailable)')); })
+    .catch(function(err){
+      if(err && (err.code === 'resource-exhausted' || String(err.message||'').indexOf('quota') !== -1)){
+        newDocs.forEach(function(n, i){ n.data.id = 'local_' + Date.now() + '_' + i; });
+        applyLocal();
+        toast('⚠ Firestore quota is full — applied on screen only (' + summary() + '). Resets at 10 AM Egypt time.', 'error');
+      } else {
+        toast('❌ Import failed midway: ' + (err && err.message || err) + ' — open 🛟 Backups → Undo last import', 'error');
+      }
+    });
+}
+
+/* ───────── backup & restore ───────── */
+function fuSnapshotRecords(){
+  var skip = function(k, v){
+    if(k.charAt(0) === '_') return undefined;
+    if(v && typeof v === 'object' && (typeof v.toDate === 'function' || ('seconds' in v && 'nanoseconds' in v))) return undefined;
+    return v;
+  };
+  return (FU_DATA || []).filter(function(r){ return r && r.id && !fuIsLocalId(r.id); }).map(function(r){
+    var c = JSON.parse(JSON.stringify(r, skip)); delete c.createdAt; delete c.updatedAt; return c;
+  });
+}
+function fuStamp(d){ function p(n){ return (n<10?'0':'')+n; } return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'_'+p(d.getHours())+p(d.getMinutes()); }
+
+function fuMakeBackup(label){
+  var recs = fuSnapshotRecords(), now = new Date();
+  var meta = {at:now.getTime(), label:label, count:recs.length};
+  window.__fuLastBackup = {meta:meta, records:recs};
+  try{
+    var blob = new Blob([JSON.stringify({type:'hac-followup-backup', version:1, meta:meta, records:recs})], {type:'application/json'});
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'followup_backup_' + fuStamp(now) + '_' + label + '.json';
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  }catch(e){ console.warn('backup download failed', e); }
+  return fuCloudBackup(meta, recs).then(function(){ return true; }, function(e){ console.warn('cloud backup failed', e); return false; });
+}
+function fuCloudBackup(meta, recs){
+  var col = db.collection('followup_backups'), id = 'bk_' + meta.at, chunks = [];
+  for(var i = 0; i < recs.length; i += 250) chunks.push(recs.slice(i, i + 250));
+  var cu = (typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser) || {};
+  return col.doc(id).set({at:meta.at, label:meta.label, count:meta.count, chunks:chunks.length, by:cu.email || ''}).then(function(){
+    var p = Promise.resolve();
+    chunks.forEach(function(c, i){ p = p.then(function(){ return col.doc(id).collection('chunks').doc(String(i)).set({i:i, json:JSON.stringify(c)}); }); });
+    return p;
+  }).then(function(){ return fuPruneBackups(10); });
+}
+function fuPruneBackups(keep){
+  var col = db.collection('followup_backups');
+  return col.orderBy('at', 'desc').get().then(function(snap){
+    var p = Promise.resolve();
+    snap.docs.slice(keep).forEach(function(d){
+      p = p.then(function(){ return d.ref.collection('chunks').get().then(function(cs){ return Promise.all(cs.docs.map(function(c){ return c.ref.delete(); })); }); }).then(function(){ return d.ref.delete(); });
+    });
+    return p;
+  }).catch(function(){});
+}
+
+function fuRestoreRecords(recs, label){
+  if(!recs || !recs.length){ toast('❌ Backup is empty', 'error'); return; }
+  if(!confirm('Restore ' + recs.length + ' records from "' + label + '"?\n\nThe current ' + FU_DATA.length + ' records will be replaced.\nA backup of the current data is downloaded first, so this can be undone.')) return;
+  var bm = document.getElementById('fu-backup-modal'); if(bm) bm.classList.remove('open');
+  var col = db.collection('followup');
+  var backupP = fuMakeBackup('before-restore');
+  toast('⏳ Restoring...');
+  col.get().then(function(snap){ return fuRunOps(snap.docs.map(function(d){ return {t:'del', ref:d.ref}; })); })
+    .then(function(){ return fuRunOps(recs.map(function(r){ return {t:'set', ref:col.doc(r.id), data:r}; })); })
+    .then(function(){ FU_DATA = recs.map(function(r){ return Object.assign({}, r); }); setupFollowUpUI(); return backupP; })
+    .then(function(){ toast('✅ Restored ' + recs.length + ' records'); })
+    .catch(function(err){ toast('❌ Restore failed: ' + (err && err.message || err), 'error'); });
+}
+
+function fuOpenBackups(){
+  var m = document.getElementById('fu-backup-modal');
+  if(!m){ m = document.createElement('div'); m.className = 'modal-overlay'; m.id = 'fu-backup-modal'; document.body.appendChild(m); }
+  var last = window.__fuLastBackup;
+  var fmt = function(t){ return new Date(t).toLocaleString('en-GB'); };
+  var html = '<div class="modal" style="width:720px;"><div class="modal-title">🛟 Follow-Up backups</div>';
+  html += '<div style="font-size:12px;color:var(--text-muted);margin:-8px 0 14px;">A backup is taken automatically before every import / restore.</div>';
+  html += '<div style="border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:12px;"><b style="font-size:13px;">↩ Undo last import (this session)</b><div style="font-size:12px;color:var(--text-muted);margin:4px 0 8px;">'
+        + (last ? fuEsc(last.meta.label) + ' · ' + last.meta.count + ' records · ' + fmt(last.meta.at) : 'Nothing to undo in this session — use a cloud backup or a file below.') + '</div>'
+        + '<button class="btn-sm" ' + (last ? '' : 'disabled style="opacity:.4"') + ' onclick="fuRestoreRecords(window.__fuLastBackup.records, \'last import\')">Restore this state</button></div>';
+  html += '<div style="border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:12px;"><b style="font-size:13px;">📂 Restore from a backup file (.json)</b><div style="margin-top:8px;"><input type="file" accept=".json" onchange="fuRestoreFromFile(this)"></div></div>';
+  html += '<div style="border:1px solid var(--border);border-radius:8px;padding:12px 14px;"><b style="font-size:13px;">☁ Cloud backups (last 10)</b><div id="fu-cloud-backups" style="margin-top:8px;font-size:12px;color:var(--text-muted);">Loading…</div></div>';
+  html += '<div class="modal-actions"><button class="btn-cancel" onclick="closeModal(\'fu-backup-modal\')">Close</button></div></div>';
+  m.innerHTML = html; m.classList.add('open');
+  db.collection('followup_backups').orderBy('at', 'desc').limit(10).get().then(function(snap){
+    var box = document.getElementById('fu-cloud-backups'); if(!box) return;
+    if(snap.empty){ box.textContent = 'No cloud backups yet.'; return; }
+    box.innerHTML = snap.docs.map(function(d){
+      var x = d.data();
+      return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);"><span>' + fmt(x.at) + ' · ' + fuEsc(x.label) + ' · ' + x.count + ' records' + (x.by ? ' · ' + fuEsc(x.by) : '') + '</span>'
+        + '<button class="btn-sm" onclick="fuRestoreCloud(\'' + d.id + '\')">Restore</button></div>';
+    }).join('');
+  }).catch(function(){
+    var box = document.getElementById('fu-cloud-backups');
+    if(box) box.textContent = 'Cloud backups are not available (check the Firestore rules for followup_backups) — file backups still work.';
+  });
+}
+function fuRestoreFromFile(input){
+  var f = input.files && input.files[0]; if(!f) return;
+  var rd = new FileReader();
+  rd.onload = function(e){
+    try{
+      var j = JSON.parse(e.target.result);
+      if(!j || j.type !== 'hac-followup-backup' || !Array.isArray(j.records)) throw new Error('not a Follow-Up backup file');
+      fuRestoreRecords(j.records, f.name);
+    }catch(err){ toast('❌ ' + err.message, 'error'); }
     input.value = '';
   };
-  reader.readAsBinaryString(file);
+  rd.readAsText(f);
 }
+function fuRestoreCloud(id){
+  var ref = db.collection('followup_backups').doc(id);
+  toast('⏳ Loading backup...');
+  ref.get().then(function(doc){
+    return ref.collection('chunks').get().then(function(cs){
+      var parts = cs.docs.map(function(c){ return c.data(); }).sort(function(a, b){ return a.i - b.i; });
+      var recs = []; parts.forEach(function(p){ recs = recs.concat(JSON.parse(p.json)); });
+      fuRestoreRecords(recs, 'cloud ' + new Date(doc.data().at).toLocaleString('en-GB'));
+    });
+  }).catch(function(err){ toast('❌ ' + (err && err.message || err), 'error'); });
+}
+/*FU-UI-END*/
 
 // ─── صف القرارات: Red Flags + Workshop + Fleet Age ───
 function _mgmtDays(it){
@@ -15488,181 +15745,5 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
 })();
 </script>
 
-<script>
-/* ===== HAC · Follow-Up hardening module (Dry Run · Sync · Backup · Stages · Attention · Audit · Search Owned · Pricing) ===== */
-(function(){
-var STAGES=['Receive & Register','Search Owned','Rental/Transfer Decision','Approval','Provision','Delivery','Request Closure'];
-var SLA_DAYS=3, PEND_DAYS=5, PROVS=['Rental','Transfer','Hold','Cancel','Pending'];
-var KEYS=['equipment','capacity','qty','sap','project','engineer','contact','submission_date','provision','date_from','date_to','days','notes'];
-function $(i){return document.getElementById(i)}
-function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
-function today(){return new Date().toISOString().slice(0,10)}
-function norm(s){return String(s||'').toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]/g,'')}
-function num(s){var n=parseFloat(String(s||'').replace(/[^0-9.]/g,''));return isFinite(n)?n:0}
-function fp(r){return [r.equipment,r.capacity,r.project].map(function(s){return String(s||'').toLowerCase().replace(/\s+/g,' ').trim()}).join('|')}
-function ownerOf(r){var t=((r.equipment||'')+' '+(r.capacity||'')).toLowerCase();
-  if(/generator|light ?tower|genset|compressor/.test(t))return 'Generators';
-  if(/crane|boom|manlift|forklift|telehandler|lift/.test(t))return 'Lifting';
-  if(/excavator|loader|dozer|grader|roller|backhoe|dump|truck|compactor|paver/.test(t))return 'Earthworks';
-  return 'General'}
-function modal(html){var m=$('fx-modal');if(!m){m=document.createElement('div');m.id='fx-modal';m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';m.onclick=function(e){if(e.target===m)m.remove()};document.body.appendChild(m)}
-  m.innerHTML='<div dir="auto" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:12px;max-width:860px;width:100%;max-height:86vh;overflow:auto;padding:18px;font-size:13px">'+html+'</div>'}
-window.fxClose=function(){var m=$('fx-modal');if(m)m.remove()};
-function chunk(arr,fn){var p=Promise.resolve();for(var i=0;i<arr.length;i+=400)(function(c){p=p.then(function(){var b=db.batch();c.forEach(function(x){fn(b,x)});return b.commit()})})(arr.slice(i,i+400));return p}
-function isLocal(id){return !id||String(id).indexOf('local_')===0}
-var BTN='style="padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);cursor:pointer"';
-
-/* ---- 6. Audit log ---- */
-var AUD=[];try{AUD=JSON.parse(localStorage.getItem('fuAudit')||'[]')}catch(e){}
-function audit(a,r,f,from,to){r=r||{};var x={ts:new Date().toISOString(),user:(typeof currentUser!=='undefined'&&currentUser&&currentUser.email)||'',action:a,sn:r.sn||'',equipment:r.equipment||'',project:r.project||'',field:f||'',from:from==null?'':String(from),to:to==null?'':String(to)};
-  AUD.unshift(x);AUD=AUD.slice(0,500);try{localStorage.setItem('fuAudit',JSON.stringify(AUD))}catch(e){}
-  try{db.collection('followup_audit').add(x).catch(function(){})}catch(e){}}
-window.fxAudit=function(days){days=days||0;var cut=days?Date.now()-days*864e5:0;
-  function go(list){list=list.filter(function(x){return Date.parse(x.ts)>=cut});window._fxAudList=list;
-    modal('<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px"><b style="font-size:15px">🧾 Audit Log ('+list.length+')</b><span style="display:flex;gap:6px"><button '+BTN+' onclick="fxAudit(7)">آخر 7 أيام</button><button '+BTN+' onclick="fxAudit(0)">الكل</button><button '+BTN+' onclick="fxAuditXlsx()">📊 Excel</button><button '+BTN+' onclick="fxClose()">✕</button></span></div>'
-    +'<table style="width:100%;font-size:12px"><tr style="color:var(--text-muted)"><th>When</th><th>Who</th><th>Action</th><th>Request</th><th>Field</th><th>From → To</th></tr>'
-    +list.slice(0,200).map(function(x){return '<tr><td>'+esc(x.ts.replace('T',' ').slice(0,16))+'</td><td>'+esc(x.user.split('@')[0])+'</td><td>'+esc(x.action)+'</td><td>'+esc(x.sn+' · '+x.equipment+(x.project?' — '+x.project:''))+'</td><td>'+esc(x.field)+'</td><td>'+esc(x.from)+' → '+esc(x.to)+'</td></tr>'}).join('')+'</table>')}
-  db.collection('followup_audit').orderBy('ts','desc').limit(300).get().then(function(q){go(q.docs.map(function(d){return d.data()}))}).catch(function(){go(AUD)})};
-window.fxAuditXlsx=function(){if(typeof XLSX==='undefined'||!XLSX.writeFile){toast('Excel library not ready','error');return}
-  var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(window._fxAudList||AUD),'Audit');XLSX.writeFile(wb,'FollowUp_Audit_'+today()+'.xlsx')};
-var _cs=window.changeFuStatus;
-window.changeFuStatus=function(id,s){var r=FU_DATA.find(function(x){return x.id===id});var o=r&&r.provision;_cs.apply(this,arguments);if(r&&o!==s)audit('status',r,'provision',o,s)};
-var _sv=window.saveFuEquipment;
-window.saveFuEquipment=function(){var n=FU_DATA.length;_sv.apply(this,arguments);setTimeout(function(){if(FU_DATA.length>n)audit('add',FU_DATA[FU_DATA.length-1])},1500)};
-
-/* ---- 3. Backup + Undo ---- */
-function snap(label){var s={ts:Date.now(),label:label,data:JSON.parse(JSON.stringify(FU_DATA,function(k,v){return k==='createdAt'?undefined:v}))};
-  try{localStorage.setItem('fuBackup',JSON.stringify(s))}catch(e){toast('Backup too large for local storage — file download only','error')}
-  try{var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(s)],{type:'application/json'}));a.download='FollowUp_backup_'+today()+'.json';a.click()}catch(e){}}
-window.fxUndo=function(){if(!isAdmin){toast('Admin only','error');return}var s;try{s=JSON.parse(localStorage.getItem('fuBackup'))}catch(e){}
-  if(!s){toast('No backup found on this device','error');return}
-  if(!confirm('رجّع آخر استيراد؟\n'+s.data.length+' صف · '+new Date(s.ts).toLocaleString()+' · '+s.label+'\nالداتا الحالية هتتبدل.'))return;
-  toast('⏳ Restoring…');var col=db.collection('followup');
-  col.get().then(function(q){return chunk(q.docs,function(b,d){b.delete(d.ref)})}).then(function(){return chunk(s.data,function(b,r){var y=Object.assign({},r);delete y.id;b.set(isLocal(r.id)?col.doc():col.doc(r.id),y)})})
-  .then(function(){FU_DATA=s.data;setupFollowUpUI();audit('undo-import',{},'rows','',s.data.length);toast('✅ Restored '+s.data.length+' rows')}).catch(function(e){toast('Restore failed: '+e.message,'error')})};
-
-/* ---- 1+2. Dry Run + Sync by stable ID ---- */
-window.fuAddMeta=function(wb){var ws=wb.addWorksheet('_meta',{state:'veryHidden'});ws.addRow(['ID','S/N','Fingerprint']);FU_DATA.forEach(function(r){ws.addRow([r.id,r.sn,fp(r)])})};
-function parse(wb){var sh=fuPickSheet(wb),rows=XLSX.utils.sheet_to_json(wb.Sheets[sh],{defval:'',header:1}),hi=-1,i;
-  for(i=0;i<Math.min(rows.length,10);i++){var t=rows[i].map(function(c){return String(c).trim().toLowerCase()});if(t.some(function(c){return c.indexOf('equipment')>-1})&&t.some(function(c){return c.indexOf('project')>-1})){hi=i;break}}
-  if(hi<0)return {error:'Header row not found في شيت "'+sh+'"'};
-  var H=rows[hi].map(function(c){return String(c).trim().toLowerCase()});
-  function f(){var a=[].slice.call(arguments);return H.findIndex(function(h){return a.some(function(t){return h.replace(/[^a-z0-9]/g,'').indexOf(t)>-1})})}
-  var c={equipment:f('equipment'),capacity:f('capacity'),qty:f('qty','quantity'),sap:f('sap'),project:f('project','desc'),engineer:f('eng'),contact:f('contact'),submission_date:f('submission'),provision:f('provision','method'),date_from:f('from'),
-    date_to:H.findIndex(function(h){var x=h.replace(/[^a-z0-9]/g,'');return x==='to'||x==='dateto'}),days:f('days'),notes:f('notes')};
-  if(c.submission_date<0)c.submission_date=f('date');
-  var has={};KEYS.forEach(function(k){if(c[k]>=0)has[k]=1});
-  var out=[];for(i=hi+1;i<rows.length;i++){var r=rows[i],eq=String(r[c.equipment]||'').trim();if(!eq)continue;
-    function g(k){return c[k]>=0?String(r[c[k]]==null?'':r[c[k]]).trim():''}
-    var pv=g('provision'),sb=r[c.submission_date];
-    out.push({_row:i+1,sn:Number(r[0])||(i-hi),equipment:eq,capacity:g('capacity'),qty:Number(r[c.qty])||1,sap:g('sap'),project:g('project'),engineer:g('engineer'),contact:g('contact'),
-      submission_date:(Number(sb)>30000&&Number(sb)<70000)?formatExcelDate(sb):String(sb||'').trim(),provision:pv.charAt(0).toUpperCase()+pv.slice(1).toLowerCase(),
-      date_from:formatExcelDate(r[c.date_from]),date_to:formatExcelDate(r[c.date_to]),days:Number(r[c.days])||0,notes:g('notes')})}
-  var meta=null,ms=wb.Sheets['_meta'];
-  if(ms){meta={byFp:{},bySn:{}};XLSX.utils.sheet_to_json(ms,{header:1,defval:''}).slice(1).forEach(function(r){if(!r[0])return;var q={id:String(r[0]),sn:Number(r[1])||0};(meta.byFp[r[2]]=meta.byFp[r[2]]||[]).push(q);if(!meta.bySn[q.sn])meta.bySn[q.sn]=q})}
-  return {sheet:sh,rows:out,has:has,meta:meta}}
-function diff(o,n,has){return KEYS.filter(function(k){return has[k]&&String(o[k]==null?'':o[k]).trim()!==String(n[k]==null?'':n[k]).trim()})}
-function plan(P,mode){var used={},res={add:[],chg:[],del:[],same:0},byId={},dbFp={},maxSn=0;
-  FU_DATA.forEach(function(r){byId[r.id]=r;(dbFp[fp(r)]=dbFp[fp(r)]||[]).push(r);if((Number(r.sn)||0)>maxSn)maxSn=Number(r.sn)||0});
-  P.rows.forEach(function(x){var m=null,q,list;
-    if(P.meta){list=(P.meta.byFp[fp(x)]||[]).filter(function(q){return byId[q.id]&&!used[q.id]});q=list.find(function(q){return q.sn===x.sn})||list[0];
-      if(!q){var s=P.meta.bySn[x.sn];if(s&&byId[s.id]&&!used[s.id])q=s}if(q)m=byId[q.id]}
-    if(!m){list=(dbFp[fp(x)]||[]).filter(function(r){return !used[r.id]});m=list.find(function(r){return r.sn===x.sn})||list[0]||null}
-    if(m){used[m.id]=1;var d=diff(m,x,P.has);if(d.length)res.chg.push({old:m,nw:x,d:d});else res.same++}else res.add.push(x)});
-  FU_DATA.forEach(function(r){if(!used[r.id])res.del.push(r)});
-  if(mode==='add'){res.add=res.add.filter(function(x){return x.sn>maxSn});res.chg=[];res.del=[]}
-  return res}
-function warns(rows){var W=[],seen={};rows.forEach(function(x){var p=[];
-  if(PROVS.indexOf(x.provision)<0)p.push('Provision غير معروف: "'+x.provision+'"');
-  if((x.provision==='Rental'||x.provision==='Transfer')&&(!x.date_from||!x.date_to))p.push('تاريخ فاضي'+(!x.date_from?' (From)':'')+(!x.date_to?' (To)':''));
-  var a=Date.parse(x.date_from),b=Date.parse(x.date_to);
-  if((x.date_from&&isNaN(a))||(x.date_to&&isNaN(b)))p.push('تاريخ غير مفهوم');
-  else if(!isNaN(a)&&!isNaN(b)){if(a>b)p.push('From أكبر من To');else{var d=Math.round((b-a)/864e5);if(x.days&&Math.abs(x.days-d)>1&&!(d===31&&x.days===30))p.push('Days ('+x.days+') مش مطابق للتواريخ ('+d+')')}}
-  var s=[x.equipment,x.capacity,x.project,x.date_from,x.date_to].join('|').toLowerCase();if(seen[s])p.push('صف مكرر (زي صف '+seen[s]+')');else seen[s]=x._row;
-  if(p.length)W.push({row:x._row,msg:p.join(' · ')})});return W}
-function show(res,mode,P,warn){window._fxRes={res:res,mode:mode,sheet:P.sheet};
-  var tile=function(l,v,c){return '<div style="flex:1;min-width:110px;background:var(--surface2);border-radius:8px;padding:10px;text-align:center"><div style="font-size:22px;font-weight:700;color:'+c+'">'+v+'</div><div style="font-size:11px;color:var(--text-muted)">'+l+'</div></div>'};
-  modal('<div style="font-size:15px;font-weight:700;margin-bottom:4px">🔍 Dry Run — '+(mode==='sync'?'Sync':'Add New')+'</div>'
-  +'<div style="color:var(--text-muted);margin-bottom:10px">الشيت المقروء: <b style="color:var(--text)">'+esc(P.sheet)+'</b> · '+P.rows.length+' صف · '+(P.meta?'متربط بـ ID (_meta)':'مفيش _meta — المطابقة بالاسم/المشروع/S/N')+' · <b>لسه ما اتكتب أي حاجة</b></div>'
-  +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'+tile('جديد',res.add.length,'var(--green)')+tile('اتغيّر',res.chg.length,'var(--accent)')+(mode==='sync'?tile('هيتمسح',res.del.length,'var(--red)'):'')+tile('زي ما هو',res.same,'var(--text-muted)')+tile('تحذيرات',warn.length,warn.length?'var(--red)':'var(--green)')+'</div>'
-  +(warn.length?'<div style="margin-bottom:10px"><b>⚠️ مشاكل في الشيت</b><div style="max-height:160px;overflow:auto;font-size:12px;margin-top:4px">'+warn.slice(0,60).map(function(w){return '<div>صف '+w.row+': '+esc(w.msg)+'</div>'}).join('')+(warn.length>60?'<div>… +'+(warn.length-60)+'</div>':'')+'</div></div>':'')
-  +(res.chg.length?'<div style="margin-bottom:10px"><b>✏️ تعديلات (أول 12)</b><div style="font-size:12px;margin-top:4px">'+res.chg.slice(0,12).map(function(c){return '<div>'+esc(c.old.sn+' · '+c.old.equipment)+': '+c.d.map(function(k){return esc(k)+' <span style="color:var(--text-muted)">'+esc(c.old[k]==null?'':c.old[k])+'</span>→<b>'+esc(c.nw[k])+'</b>'}).join(' ; ')+'</div>'}).join('')+'</div></div>':'')
-  +(mode==='sync'&&res.del.length?'<label style="display:block;margin-bottom:10px;color:var(--red)"><input type="checkbox" id="fx-del"> أوافق على مسح '+res.del.length+' صف مش موجودين في الشيت ('+esc(res.del.slice(0,3).map(function(r){return r.sn+' '+r.equipment}).join('، '))+'…)</label>':'')
-  +'<div style="display:flex;gap:8px;justify-content:flex-end"><button '+BTN+' onclick="fxClose()">إلغاء</button><button '+BTN+' style="padding:6px 14px;border-radius:8px;border:0;background:var(--accent);color:#000;font-weight:700;cursor:pointer" onclick="fxApply()">✅ نفّذ (مع Backup)</button></div>')}
-window.fxApply=function(){var S=window._fxRes,res=S.res,delOk=!!($('fx-del')&&$('fx-del').checked);fxClose();
-  if(!res.add.length&&!res.chg.length&&!(delOk&&res.del.length)){toast('مفيش حاجة تتنفذ');return}
-  snap(S.mode+' · '+S.sheet);toast('⏳ Applying…');var col=db.collection('followup');
-  var ops=[];res.add.forEach(function(x){x.id=col.doc().id;ops.push(['s',x])});res.chg.forEach(function(c){ops.push(['u',c])});if(delOk)res.del.forEach(function(r){ops.push(['d',r])});
-  function done(local){var n=res.add.length+res.chg.length+(delOk?res.del.length:0),few=n<=100;
-    res.add.forEach(function(x){var y=Object.assign({},x);delete y._row;FU_DATA.push(y);if(few)audit('import-add',y)});
-    res.chg.forEach(function(c){c.d.forEach(function(k){if(few)audit('import-change',c.old,k,c.old[k],c.nw[k]);c.old[k]=c.nw[k]})});
-    if(delOk){var ids={};res.del.forEach(function(r){ids[r.id]=1;if(few)audit('import-delete',r)});FU_DATA=FU_DATA.filter(function(r){return !ids[r.id]})}
-    if(!few)audit('import-summary',{},'rows','',n+' (+'+res.add.length+' ~'+res.chg.length+' -'+(delOk?res.del.length:0)+')');
-    setupFollowUpUI();toast((local?'⚠️ محلي فقط (Quota) — ':'✅ ')+'+'+res.add.length+' / ~'+res.chg.length+' / -'+(delOk?res.del.length:0)+(local?'':' · فيه زرار ↩ Undo'))}
-  chunk(ops,function(b,o){if(o[0]==='s'){var y=Object.assign({},o[1]);delete y._row;delete y.id;y.createdAt=firebase.firestore.FieldValue.serverTimestamp();b.set(col.doc(o[1].id),y)}
-    else if(o[0]==='u'){if(isLocal(o[1].old.id))return;var u={};o[1].d.forEach(function(k){u[k]=o[1].nw[k]});b.update(col.doc(o[1].old.id),u)}
-    else{if(!isLocal(o[1].id))b.delete(col.doc(o[1].id))}}).then(function(){done(false)},function(e){if(e.code==='resource-exhausted')done(true);else toast('Error: '+e.message,'error')})};
-function start(input,mode){var file=input.files[0];if(!file)return;if(!isAdmin){input.value='';return}toast('⏳ Reading Excel…');var rd=new FileReader();
-  rd.onload=function(e){try{var wb=XLSX.read(e.target.result,{type:'binary'}),P=parse(wb);input.value='';if(P.error){toast(P.error,'error');return}show(plan(P,mode),mode,P,warns(P.rows))}catch(er){input.value='';toast('Error: '+er.message,'error')}};rd.readAsBinaryString(file)}
-window.updateFuFromExcel=function(i){start(i,'sync')};window.addNewFuFromExcel=function(i){start(i,'add')};
-
-/* ---- 4. Stages ---- */
-window.fxStage=function(id,s){var r=FU_DATA.find(function(x){return x.id===id});if(!r)return;var o=r.stage||STAGES[0];r.stage=s;r.stage_since=today();r.owner=r.owner||ownerOf(r);audit('stage',r,'stage',o,s);renderFollowUpTable();
-  if(!isLocal(id))db.collection('followup').doc(id).update({stage:s,stage_since:r.stage_since,owner:r.owner}).catch(function(e){toast('Saved locally only: '+e.message,'error')})};
-function decorate(){var tr0=document.querySelector('#page-followup thead tr');if(tr0&&!$('fx-th')){var th=document.createElement('th');th.id='fx-th';th.textContent='Stage · Owner';tr0.insertBefore(th,tr0.children[12]||null)}
-  var data=getFilteredFuData(),trs=$('fu-table-body').querySelectorAll('tr');if(trs.length!==data.length||!data.length)return;
-  trs.forEach(function(tr,i){var r=data[i],st=r.stage||STAGES[0],since=r.stage_since||r.submission_date||'',d=since&&!isNaN(Date.parse(since))?Math.max(0,Math.floor((Date.now()-Date.parse(since))/864e5)):0;
-    var closed=r.provision==='Cancel'||st===STAGES[6],late=!closed&&d>SLA_DAYS,id=esc(r.id);
-    var td=document.createElement('td');td.style.whiteSpace='nowrap';
-    td.innerHTML=(isAdmin?'<select onchange="fxStage(\''+id+'\',this.value)" style="max-width:150px">'+STAGES.map(function(s){return '<option'+(s===st?' selected':'')+'>'+s+'</option>'}).join('')+'</select>':esc(st))
-      +'<div style="font-size:10.5px;color:var(--text-muted);margin-top:2px">'+esc(r.owner||ownerOf(r))+' · '+d+'d '+(late?'<span style="background:rgba(248,81,73,.2);color:var(--red);border-radius:8px;padding:1px 6px;font-weight:700">متأخر</span>':'')
-      +' <a href="#" onclick="fxOwned(\''+id+'\');return false" title="Search Owned + Price">🔎</a></div>';
-    tr.insertBefore(td,tr.children[12]||null)})}
-
-/* ---- 5. Needs-attention panel ---- */
-function panel(){var pg=$('page-followup');if(!pg)return;var el=$('fx-panel');if(!el){el=document.createElement('div');el.id='fx-panel';el.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin-bottom:16px';pg.insertBefore(el,pg.children[1]||null)}
-  var tm=Date.now(),L=FU_DATA.filter(function(r){return r.provision!=='Cancel'&&(r.stage||'')!==STAGES[6]});
-  var A=L.filter(function(r){return r.provision==='Pending'&&Date.parse(r.submission_date)<tm-PEND_DAYS*864e5});
-  var B=L.filter(function(r){return r.provision==='Pending'&&Date.parse(r.date_from)<=tm});
-  var C=L.filter(function(r){var d=(Date.parse(r.date_to)-tm)/864e5;return r.provision==='Rental'&&d>=-1&&d<=7});
-  var D=L.filter(function(r){var a=Date.parse(r.date_from),b=Date.parse(r.date_to);if(isNaN(a)||isNaN(b))return false;var d=Math.round((b-a)/864e5);return r.days&&Math.abs(r.days-d)>1&&!(d===31&&r.days===30)});
-  function box(t,list,c){var items=list.slice(0,8).map(function(r){return '<div>'+esc(r.sn+' · '+r.equipment+' — '+(r.project||''))+'</div>'}).join('')+(list.length>8?'<div>… +'+(list.length-8)+'</div>':'');
-    return '<details style="flex:1;min-width:200px;background:var(--surface2);border-radius:8px;padding:8px 10px"><summary style="cursor:pointer"><b style="color:'+(list.length?c:'var(--green)')+';font-size:18px">'+list.length+'</b> <span style="font-size:12px">'+t+'</span></summary><div style="font-size:11.5px;margin-top:6px;color:var(--text-muted)">'+items+'</div></details>'}
-  el.innerHTML='<div style="font-weight:700;margin-bottom:8px">🚨 محتاج تدخّل</div><div style="display:flex;gap:8px;flex-wrap:wrap">'
-    +box('Pending أكتر من '+PEND_DAYS+' أيام',A,'var(--red)')+box('وصل From وما اتأكدش',B,'var(--red)')+box('إيجار هينتهي خلال 7 أيام (تمديد/إرجاع)',C,'var(--accent)')+box('Days مش مظبوط',D,'var(--accent)')+'</div>'}
-
-/* ---- 7+8. Search Owned + reference price ---- */
-var PCACHE={};
-function refCost(res){var l=res&&res.last;if(!l)return null;var u=String(l.rateL||l.rate||'').toLowerCase();return {cost:Number(l.cost)||0,monthly:/month|شهر/.test(u)?Number(l.cost)||0:(Number(l.cost)||0)*30,unit:l.rateL||l.rate||'',ccy:res.ccy||'',vendor:l.vendor||'',fuel:l.fuel||''}}
-window.fxOwned=function(id){var r=FU_DATA.find(function(x){return x.id===id});if(!r)return;var nm=norm(r.equipment),cap=num(r.capacity);
-  var c=(typeof allEquipment!=='undefined'?allEquipment:[]).filter(function(e){return norm(e.equipment)===nm||norm(e.category)===nm}).map(function(e){var ec=num(eqCapacity(e).v);var s=cap&&ec?(Math.abs(ec-cap)/cap<=.001?0:Math.abs(ec-cap)/cap<=.15?1:2):1;var idle=/standby|idle/i.test(e.status||'')||!e.project;return {e:e,s:s,idle:idle,cap:eqCapacity(e).v}}).filter(function(x){return x.s<2}).sort(function(a,b){return a.s-b.s||(b.idle-a.idle)}).slice(0,15);
-  modal('<div style="display:flex;justify-content:space-between"><b style="font-size:15px">🔎 '+esc(r.equipment)+' '+esc(r.capacity)+' — '+esc(r.project||'')+'</b><button '+BTN+' onclick="fxClose()">✕</button></div>'
-  +'<div style="margin:10px 0 4px"><b>معدات مملوكة مطابقة</b> <span style="color:var(--text-muted)">(نفس النوع، السعة ±15%)</span></div>'
-  +(c.length?'<table style="width:100%;font-size:12px"><tr style="color:var(--text-muted)"><th>Code</th><th>Capacity</th><th>Project</th><th>O.D</th><th></th></tr>'+c.map(function(x){return '<tr><td>'+esc(x.e.code)+'</td><td>'+esc(x.cap)+(x.s===0?' ✓':'')+'</td><td>'+esc(x.e.project||'—')+'</td><td>'+esc(x.e.od||'')+'</td><td>'+(x.idle?'<span style="color:var(--green)">فاضية/Standby</span>':'')+'</td></tr>'}).join('')+'</table>'
-    +'<div style="margin-top:8px"><button '+BTN+' onclick="changeFuStatus(\''+esc(id)+'\',\'Transfer\');fxClose()">↪ حوّل لـ Transfer (يدخل في الـ Savings)</button></div>':'<div style="color:var(--text-muted)">مفيش مطابق في المملوك → إيجار خارجي.</div>')
-  +'<div style="margin:14px 0 4px"><b>💰 السعر المرجعي (Rental Database)</b></div><div id="fx-price">⏳…</div>');
-  window.rdLastPrice(r.equipment,r.project,function(res){var p=refCost(res),b=$('fx-price');if(!b)return;
-    if(!p){b.innerHTML='<span style="color:var(--text-muted)">مفيش سعر سابق.</span>';return}
-    b.innerHTML='<div><b style="font-size:18px;color:var(--accent)">'+p.cost.toLocaleString()+'</b> '+esc(p.ccy)+' / '+esc(p.unit)+(p.fuel?' · Fuel: '+esc(p.fuel):'')+' · '+esc(p.vendor)+'</div>'
-      +'<div style="margin-top:6px">السعر المطلوب: <input id="fx-req" type="number" value="'+esc(r.req_price||'')+'" style="width:110px" oninput="fxPriceChk('+p.cost+')"> <button '+BTN+' onclick="fxSavePrice(\''+esc(id)+'\','+p.cost+')">حفظ</button> <span id="fx-warn"></span></div>'
-      +'<div style="margin-top:4px;color:var(--text-muted)">توقّع شهري للطلب: <b>'+Math.round(p.monthly*(Number(r.qty)||1)).toLocaleString()+'</b> '+esc(p.ccy)+'</div>';fxPriceChk(p.cost)},r.capacity)};
-window.fxPriceChk=function(ref){var v=Number($('fx-req').value),w=$('fx-warn');w.innerHTML=v&&ref&&v>ref?'<b style="color:var(--red)">⚠️ أعلى من المرجع بـ '+Math.round((v/ref-1)*100)+'%</b>':''};
-window.fxSavePrice=function(id,ref){var r=FU_DATA.find(function(x){return x.id===id}),v=Number($('fx-req').value)||0;if(!r)return;audit('price',r,'req_price',r.req_price||'',v);r.req_price=v;r.ref_price=ref;
-  if(!isLocal(id))db.collection('followup').doc(id).update({req_price:v,ref_price:ref}).catch(function(){});toast('✓ Saved')};
-window.fxForecast=function(){var L=FU_DATA.filter(function(r){return (r.provision==='Rental'||r.provision==='Pending')&&r.equipment}).slice(0,80),agg={},i=0;toast('⏳ Forecast: '+L.length+' requests…');
-  (function next(){if(i>=L.length){var rows=Object.keys(agg).sort(function(a,b){return agg[b].t-agg[a].t});
-    modal('<div style="display:flex;justify-content:space-between"><b style="font-size:15px">📈 توقّع التكلفة الشهرية لكل مشروع</b><button '+BTN+' onclick="fxClose()">✕</button></div><table style="width:100%;margin-top:8px"><tr style="color:var(--text-muted)"><th>Project</th><th>Requests</th><th>No ref</th><th>Monthly</th></tr>'+rows.map(function(k){return '<tr><td>'+esc(k)+'</td><td>'+agg[k].n+'</td><td>'+agg[k].m+'</td><td><b>'+Math.round(agg[k].t).toLocaleString()+'</b> '+esc(agg[k].c)+'</td></tr>'}).join('')+'</table><div style="margin-top:8px;font-size:11px;color:var(--text-muted)">السعر اليومي بيتضرب ×30. أسعار بدون مرجع مش متحسوبة.</div>');return}
-    var r=L[i++],k=norm(r.equipment)+'|'+norm(r.project)+'|'+norm(r.capacity),a=agg[r.project||'—']=agg[r.project||'—']||{n:0,m:0,t:0,c:''};
-    function add(p){a.n++;if(p){a.t+=p.monthly*(Number(r.qty)||1);a.c=p.ccy}else a.m++;next()}
-    if(k in PCACHE)return add(PCACHE[k]);window.rdLastPrice(r.equipment,r.project,function(res){PCACHE[k]=refCost(res);add(PCACHE[k])},r.capacity)})()};
-
-/* ---- wiring ---- */
-var _rf=window.renderFollowUpTable;
-window.renderFollowUpTable=function(){_rf.apply(this,arguments);try{decorate();panel()}catch(e){console.warn('fx',e)}};
-var hdr=document.querySelector('#page-followup > div > div:last-child');
-if(hdr)[['🧾 Audit','fxAudit()'],['↩ Undo import','fxUndo()'],['📈 Forecast','fxForecast()']].forEach(function(b){var x=document.createElement('button');x.className='btn-sm';x.textContent=b[0];x.setAttribute('onclick',b[1]);hdr.appendChild(x)});
-})();
-
-</script>
 </body>
 </html>
