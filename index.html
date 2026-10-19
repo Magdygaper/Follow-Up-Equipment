@@ -4856,6 +4856,25 @@ function exportFuXlsxWithDeduction(o, scoped) {
 }
 
 
+/* Picks the sheet that really holds the follow-up table (header row: "Equipment" + "Capacity" + "Project…").
+   The exported workbook starts with Dashboard / Charts, so SheetNames[0] is NOT the data sheet any more. */
+function fuPickSheet(wb){
+  var names = wb.SheetNames.slice();
+  var isDataSheet = function(name){
+    var ws = wb.Sheets[name]; if(!ws || !ws['!ref']) return false;
+    var rg = XLSX.utils.decode_range(ws['!ref']); rg.e.r = Math.min(rg.e.r, 9);
+    var rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', range:rg});
+    return rows.some(function(row){
+      var c = row.map(function(x){ return String(x).trim().toLowerCase(); });
+      return c.indexOf('equipment')!==-1 && c.some(function(x){ return x.indexOf('project')!==-1; }) && c.some(function(x){ return x.indexOf('capacity')!==-1; });
+    });
+  };
+  var byYear = names.filter(function(n){ return /^\s*20\d\d\s*$/.test(n); });
+  var ordered = byYear.concat(names.filter(function(n){ return byYear.indexOf(n)<0; }));
+  for(var i=0;i<ordered.length;i++){ if(isDataSheet(ordered[i])) return ordered[i]; }
+  return names[0];
+}
+
 /* ➕ Add New Only — يقرا من الشيت الصفوف الجديدة بس (SN أكبر من آخر SN متسجل) ومايلمسش الموجود */
 function addNewFuFromExcel(input) {
   const file = input.files[0];
@@ -4867,7 +4886,7 @@ function addNewFuFromExcel(input) {
   reader.onload = function(e) {
     try {
       const wb = XLSX.read(e.target.result, {type:'binary'});
-      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {defval:'', header:1});
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[fuPickSheet(wb)], {defval:'', header:1});
 
       let headerIdx = -1;
       for(let i=0; i<Math.min(rows.length,10); i++){
@@ -4983,7 +5002,7 @@ function updateFuFromExcel(input) {
   reader.onload = function(e) {
     try {
       const wb = XLSX.read(e.target.result, {type:'binary'});
-      const ws = wb.Sheets[wb.SheetNames[0]];
+      const ws = wb.Sheets[fuPickSheet(wb)];
       const rows = XLSX.utils.sheet_to_json(ws, {defval:'', header:1});
 
       let headerIdx = -1;
@@ -5038,9 +5057,18 @@ function updateFuFromExcel(input) {
 
       toast('⏳ Syncing to Cloud...');
       db.collection('followup').get().then(function(snap){
-        const batch = db.batch();
-        snap.docs.forEach(function(d){ batch.delete(d.ref); });
-        return batch.commit();
+        /* delete in chunks of 400 — one batch of >500 deletes is rejected by Firestore, which is what happens with 1000+ records */
+        let pd = Promise.resolve();
+        for(let i=0; i<snap.docs.length; i+=400){
+          (function(chunk){
+            pd = pd.then(function(){
+              const batch = db.batch();
+              chunk.forEach(function(d){ batch.delete(d.ref); });
+              return batch.commit();
+            });
+          })(snap.docs.slice(i, i+400));
+        }
+        return pd;
       }).then(function(){
         const batchSize = 400;
         let p = Promise.resolve();
