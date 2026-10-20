@@ -960,6 +960,9 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
               <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="addNewFuFromExcel(this)"/>
             </label>
             <button id="fu-btn-backups" class="btn-sm" style="display:none;" onclick="fuOpenBackups()" title="Automatic backups taken before every import — undo / restore">🛟 Backups</button>
+            <button id="fu-btn-history" class="btn-sm" onclick="fuOpenHistory()" title="Who changed what, and when (status, stage, imports)">🕘 History</button>
+            <button id="fu-btn-forecast" class="btn-sm" onclick="fuOpenForecast()" title="Reference prices from the Rental Database and cost forecast per project / month">💲 Forecast</button>
+            <button id="fu-btn-erms" class="btn-sm" style="display:none;" onclick="fuOpenErms()" title="Owners per equipment category and time limits per ERMS stage">⚙ ERMS</button>
             <button id="fu-btn-clear" class="btn-sm" style="display:none;background:rgba(248,81,73,.1);border-color:rgba(248,81,73,.3);color:var(--red);" onclick="clearFollowUpData()">🗑 Clear Data</button>
           </div>
         </div>
@@ -1033,6 +1036,8 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
           </div>
         </div>
 
+        <div id="fu-attn-panel" style="margin-bottom:12px;"></div>
+
         <div class="toolbar" style="margin-bottom:12px;">
           <select id="fu-equip-filter" onchange="renderFollowUpTable()" style="min-width:200px;">
             <option value="">All Equipment</option>
@@ -1043,6 +1048,8 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
           <select id="fu-month-filter" onchange="renderFollowUpTable()" style="min-width:160px;" title="Filter by Submission Month">
             <option value="">All Months</option>
           </select>
+          <select id="fu-stage-filter" onchange="renderFollowUpTable()" style="min-width:170px;" title="Filter by ERMS stage"><option value="">All Stages</option></select>
+          <select id="fu-owner-filter" onchange="renderFollowUpTable()" style="min-width:170px;" title="Filter by owner (from equipment category)"><option value="">All Owners</option></select>
           <button class="btn-sm" id="fu-clear-filters-btn" style="display:none;color:var(--accent);border-color:rgba(240,165,0,.4);" onclick="clearFuFilters()">Clear Filters ✕</button>
         </div>
 
@@ -1058,6 +1065,7 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
                 <th>Project</th>
                 <th>Submission Date</th>
                 <th>Provision (Editable)</th>
+                <th>Stage / Owner</th>
                 <th>From</th>
                 <th>To</th>
                 <th>Days</th>
@@ -2063,6 +2071,7 @@ auth.onAuthStateChanged(function(user) {
     document.getElementById('fu-btn-addnew').style.display = isAdmin ? 'inline-flex' : 'none';
     document.getElementById('fu-btn-sync').style.display = isAdmin ? 'inline-flex' : 'none';
     document.getElementById('fu-btn-backups').style.display = isAdmin ? 'inline-flex' : 'none';
+    document.getElementById('fu-btn-erms').style.display = isAdmin ? 'inline-flex' : 'none';
     document.getElementById('fu-btn-clear').style.display  = isAdmin ? 'inline-flex' : 'none';
     document.getElementById('fu-btn-add').style.display    = isAdmin ? 'inline-flex' : 'none';
     document.getElementById('btn-viewers-log').style.display = isAdmin ? 'inline-flex' : 'none';
@@ -3076,6 +3085,7 @@ function setupFollowUpUI() {
   monthSel.innerHTML = '<option value="">All Months</option>' + months.map(function(m){ return '<option value="'+m+'">'+fuMonthLabel(m)+'</option>'; }).join('');
   if(months.includes(currentMonth)) monthSel.value = currentMonth;
 
+  fuPopulateProFilters();
   renderFollowUpTable();
 }
 
@@ -3108,7 +3118,13 @@ function getScopedFuData() {
   const proj = document.getElementById('fu-proj-filter').value;
   const monthSel = document.getElementById('fu-month-filter');
   const month = monthSel ? monthSel.value : '';
+  const stageVal = (document.getElementById('fu-stage-filter')||{}).value || '';
+  const ownerVal = (document.getElementById('fu-owner-filter')||{}).value || '';
+  const todayNum = fuDayNum(fuTodayIso());
   return FU_DATA.filter(function(r){
+    if(stageVal && (stageVal === '__none' ? !!r.stage : r.stage !== stageVal)) return false;
+    if(ownerVal && fuOwnerOf(r) !== ownerVal) return false;
+    if(fuFilters.attn && !fuAttnTest(r, fuFilters.attn, todayNum)) return false;
     if(proj && (r.project||'').trim() !== proj) return false;
     if(eq && (r.equipment||'').trim() !== eq) return false;
     if(month && fuMonthKey(r.submission_date) !== month) return false;
@@ -3148,6 +3164,8 @@ function setFuCardProv(prov) {
 function clearFuFilters() {
   fuFilters.prov = [];
   fuFilters.deduction = false;
+  fuFilters.attn = '';
+  ['fu-stage-filter','fu-owner-filter'].forEach(function(i){ var e = document.getElementById(i); if(e) e.value = ''; });
   document.getElementById('fu-equip-filter').value = '';
   document.getElementById('fu-proj-filter').value = '';
   const monthSel = document.getElementById('fu-month-filter');
@@ -3170,12 +3188,14 @@ window.changeFuStatus = function(docId, newStatus) {
   updateUndoBtn();
 
   if(!docId || docId.startsWith('local_')) {
+    fuLogOne('status', item, 'Provision', oldStatus, newStatus, 'saved locally');
     toast('Saved locally ✓');
     return;
   }
 
   db.collection('followup').doc(docId).update({ provision: newStatus })
     .then(function(){
+      fuLogOne('status', item, 'Provision', oldStatus, newStatus);
       toast('✓ Status: ' + oldStatus + ' → ' + newStatus);
     })
     .catch(function(err){
@@ -3208,6 +3228,7 @@ function undoLastFuStatus() {
 
   db.collection('followup').doc(last.docId).update({ provision: last.oldStatus })
     .then(function(){
+      fuLogOne('status', item, 'Provision', last.newStatus, last.oldStatus, 'undo');
       toast('↩ Undo: ' + last.newStatus + ' → ' + last.oldStatus);
     })
     .catch(function(err){
@@ -3248,6 +3269,7 @@ function duplicateFuRow(docId) {
     copy.id = ref.id;
     FU_DATA.push(copy);
     setupFollowUpUI();
+    fuLogOne('add', copy, '', '', '', 'duplicate');
     toast('⧉ Row duplicated ✓');
   }).catch(function(err){
     if(err.code === 'resource-exhausted'){
@@ -3265,8 +3287,10 @@ function removeFuRow(docId) {
   if(!confirm('Remove this row?')) return;
   var idx = FU_DATA.findIndex(function(r){ return r.id === docId; });
   if(idx === -1) return;
+  var _rm = FU_DATA[idx];
   FU_DATA.splice(idx, 1);
   setupFollowUpUI();
+  fuLogOne('remove', _rm, '', '', '', _rm.provision || '');
   toast('Row removed ✓');
 
   if(!docId || docId.startsWith('local_')) return;
@@ -3385,6 +3409,7 @@ function renderFollowUpTable() {
   const tbody = document.getElementById('fu-table-body');
   renderFuDeductionChart(data);
   renderFuProvChart(data);
+  fuProLoad(); fuRenderAttention();
 
   const counts = {Rental:0, Transfer:0, Hold:0, Pending:0, Cancel:0};
   scopedData.forEach(function(r){ if(counts[r.provision] !== undefined) counts[r.provision]++; });
@@ -3427,12 +3452,12 @@ function renderFollowUpTable() {
   const eqVal = document.getElementById('fu-equip-filter').value;
   const projVal = document.getElementById('fu-proj-filter').value;
   const monthVal = document.getElementById('fu-month-filter') ? document.getElementById('fu-month-filter').value : '';
-  const hasFilter = fuFilters.prov.length || fuFilters.deduction || eqVal || projVal || monthVal;
+  const hasFilter = fuFilters.prov.length || fuFilters.deduction || eqVal || projVal || monthVal || fuFilters.attn || (document.getElementById('fu-stage-filter')||{}).value || (document.getElementById('fu-owner-filter')||{}).value;
   const clrBtn = document.getElementById('fu-clear-filters-btn');
   if(clrBtn) clrBtn.style.display = hasFilter ? 'inline-flex' : 'none';
 
   if(!data.length){
-    tbody.innerHTML = '<tr><td colspan="13" class="empty">No follow-up requests matching filter</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="14" class="empty">No follow-up requests matching filter</td></tr>';
     document.getElementById('fu-table-count').textContent = '0 requests';
     return;
   }
@@ -3466,6 +3491,7 @@ function renderFollowUpTable() {
       +'<td>'+_hacEsc(r.project||'—')+'</td>'
       +'<td style="font-size:11px;font-family:\'JetBrains Mono\'">'+formatExcelDate(r.submission_date)+'</td>'
       +'<td>'+statusSelect+'</td>'
+      +'<td style="min-width:190px;">'+fuStageCell(r)+'</td>'
       +'<td style="font-size:11px;font-family:\'JetBrains Mono\'">'+formatExcelDate(r.date_from)+'</td>'
       +'<td style="font-size:11px;font-family:\'JetBrains Mono\'">'+formatExcelDate(r.date_to)+'</td>'
       +'<td style="font-family:\'JetBrains Mono\'">'+_hacEsc(r.days||'—')+'</td>'
@@ -3682,6 +3708,7 @@ function saveFuEquipment() {
     FU_DATA.push(newRecord);
     setupFollowUpUI();
     closeModal('fu-add-modal');
+    fuLogOne('add', newRecord, '', '', '', 'new request');
     toast('✅ Follow-Up record added ✓');
   }).catch(function(err){
     if(err.code === 'resource-exhausted') {
@@ -5239,7 +5266,7 @@ function fuApplyPlan(plan, opts){
   };
 
   delP.then(function(){ return fuRunOps(updOps.concat(addOps)); })
-    .then(function(){ applyLocal(); return backupP; })
+    .then(function(){ applyLocal(); if(typeof fuLogImport === 'function') fuLogImport(plan, delExisting, newDocs); return backupP; })
     .then(function(cloudOk){ toast('✅ ' + FU_MODE_LABEL[mode] + ': ' + summary() + (cloudOk ? '' : ' · backup saved as file (cloud copy unavailable)')); })
     .catch(function(err){
       if(err && (err.code === 'resource-exhausted' || String(err.message||'').indexOf('quota') !== -1)){
@@ -5308,7 +5335,7 @@ function fuRestoreRecords(recs, label){
   col.get().then(function(snap){ return fuRunOps(snap.docs.map(function(d){ return {t:'del', ref:d.ref}; })); })
     .then(function(){ return fuRunOps(recs.map(function(r){ return {t:'set', ref:col.doc(r.id), data:r}; })); })
     .then(function(){ FU_DATA = recs.map(function(r){ return Object.assign({}, r); }); setupFollowUpUI(); return backupP; })
-    .then(function(){ toast('✅ Restored ' + recs.length + ' records'); })
+    .then(function(){ if(typeof fuLogMany === 'function') fuLogMany([{type:'restore', docId:'', equipment:'', project:'', field:'', from:'', to:'', note:'Restored ' + recs.length + ' records from ' + label}]); toast('✅ Restored ' + recs.length + ' records'); })
     .catch(function(err){ toast('❌ Restore failed: ' + (err && err.message || err), 'error'); });
 }
 
@@ -5364,6 +5391,471 @@ function fuRestoreCloud(id){
   }).catch(function(err){ toast('❌ ' + (err && err.message || err), 'error'); });
 }
 /*FU-UI-END*/
+
+/*FU-PRO-START*/
+/* ═══════ Follow-Up Pro: ERMS stages + owners · needs-attention panel · change history · owned-equipment search · reference prices & cost forecast ═══════ */
+var FU_STAGES = [
+  {key:'receive',      label:'1 · Receive & Register',        sla:1},
+  {key:'review',       label:'2 · Technical Review',          sla:2},
+  {key:'search',       label:'3 · Search Owned Equipment',    sla:3},
+  {key:'allocation',   label:'4 · Allocation Decision',       sla:2},
+  {key:'mobilization', label:'5 · Mobilization',              sla:7},
+  {key:'acceptance',   label:'6 · Project Acceptance',        sla:3},
+  {key:'closure',      label:'7 · Request Closure',           sla:2}
+];
+var FU_ERMS_DEFAULT = {
+  pendingSla:7,      /* days a Pending request without a stage may wait before it is flagged */
+  soonDays:7,        /* "starting soon / ending soon" window */
+  other:'',          /* owner for equipment that matches no category */
+  sla:{},            /* per-stage overrides: {stageKey: days} */
+  categories:[
+    {name:'Generators',              owner:'Eng. Emad Galal',   keywords:'generator, light tower, compressor, welding, jet pump'},
+    {name:'Lifting Equipment',       owner:'Eng. Bassem',       keywords:'crane, forklift, manlift, scissor, telescopic, boom truck, telehandler'},
+    {name:'Earthmoving / Operations',owner:'Mr. Arafa Ghoneim', keywords:'loader, excavator, bobcat, backhoe, bulldozer, grader, compactor, roller, tipper, truck, trailer, tractor, mixer, concrete pump, vacuum'}
+  ]
+};
+var FU_ERMS = JSON.parse(JSON.stringify(FU_ERMS_DEFAULT));
+
+/* ── small helpers ── */
+function fuPad(n){ return (n < 10 ? '0' : '') + n; }
+function fuTodayIso(){ var d = new Date(); return d.getFullYear() + '-' + fuPad(d.getMonth()+1) + '-' + fuPad(d.getDate()); }
+function fuDayNum(iso){ var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || ''); return m ? Math.floor(Date.UTC(+m[1], +m[2]-1, +m[3]) / 864e5) : null; }
+function fuIsoOf(v){ var s = ''; try{ s = formatExcelDate(v); }catch(e){ s = String(v||''); } return fuIsoDay(s) ? s : ''; }
+function fuStageObj(key){ for(var i = 0; i < FU_STAGES.length; i++) if(FU_STAGES[i].key === key) return FU_STAGES[i]; return null; }
+function fuStageLabel(key){ var s = fuStageObj(key); return s ? s.label : (key ? key : '—'); }
+function fuStageSla(key){ var s = fuStageObj(key); if(!s) return FU_ERMS.pendingSla; var o = FU_ERMS.sla && FU_ERMS.sla[key]; return (o != null && o !== '' && !isNaN(Number(o))) ? Number(o) : s.sla; }
+
+/* ── 4. category → owner, stage aging ── */
+function fuCategoryOf(name){
+  var n = String(name || '').toLowerCase();
+  for(var i = 0; i < FU_ERMS.categories.length; i++){
+    var kws = String(FU_ERMS.categories[i].keywords || '').toLowerCase().split(',').map(function(k){ return k.trim(); }).filter(Boolean);
+    if(kws.some(function(k){ return n.indexOf(k) !== -1; })) return FU_ERMS.categories[i];
+  }
+  return null;
+}
+function fuOwnerOf(r){ var c = fuCategoryOf(r && r.equipment); return c ? (c.owner || '') : (FU_ERMS.other || ''); }
+/* days the request has been waiting in its current stage (or, for a Pending request with no stage, since submission) */
+function fuStageInfo(r, todayNum){
+  var t = (todayNum != null) ? todayNum : fuDayNum(fuTodayIso()), since, sla, kind;
+  if(r.stage && fuStageObj(r.stage)){ since = fuDayNum(r.stageAt); sla = fuStageSla(r.stage); kind = 'stage'; }
+  else if(r.provision === 'Pending'){ since = fuDayNum(fuIsoOf(r.submission_date)); sla = Number(FU_ERMS.pendingSla) || 7; kind = 'pending'; }
+  else return null;
+  if(since == null) return null;
+  var days = Math.max(0, t - since);
+  return {days:days, sla:sla, overdue:days > sla, kind:kind};
+}
+function fuStageCell(r){
+  var info = fuStageInfo(r), owner = fuOwnerOf(r), id = fuEsc(r.id);
+  var sel;
+  if(typeof isAdmin !== 'undefined' && isAdmin){
+    sel = '<select onchange="fuSetStage(\'' + id + '\', this.value)" style="font-size:11px;max-width:170px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:2px 4px;">'
+        + '<option value="">— no stage —</option>'
+        + FU_STAGES.map(function(s){ return '<option value="' + s.key + '"' + (r.stage === s.key ? ' selected' : '') + '>' + fuEsc(s.label) + '</option>'; }).join('') + '</select>';
+  } else {
+    sel = '<span style="font-size:11px;">' + fuEsc(r.stage ? fuStageLabel(r.stage) : '—') + '</span>';
+  }
+  var chip = '';
+  if(info){
+    var col = info.overdue ? 'var(--red)' : (info.days >= info.sla * 0.7 ? 'var(--accent)' : 'var(--green)');
+    chip = '<span title="' + (info.kind === 'stage' ? 'Days in this stage' : 'Days since submission') + ' · limit ' + info.sla + ' d" style="font-size:10px;font-family:\'JetBrains Mono\',monospace;color:' + col + ';border:1px solid ' + col + ';border-radius:10px;padding:0 6px;margin-left:4px;">⏱ ' + info.days + 'd' + (info.overdue ? ' !' : '') + '</span>';
+  }
+  var tools = '<button class="btn-edit" title="Owned equipment that could cover this request" style="padding:1px 6px;font-size:10px;margin-left:4px;" onclick="event.stopPropagation();fuSearchOwned(\'' + id + '\')">🔍</button>'
+            + '<button class="btn-edit" title="Change history of this request" style="padding:1px 6px;font-size:10px;" onclick="event.stopPropagation();fuOpenHistory(\'' + id + '\')">🕘</button>';
+  return '<div style="display:flex;align-items:center;gap:2px;flex-wrap:wrap;">' + sel + chip + '</div>'
+       + '<div style="font-size:10.5px;color:var(--text-muted);margin-top:3px;">' + (owner ? '👤 ' + fuEsc(owner) : '') + tools + '</div>';
+}
+window.fuSetStage = function(id, key){
+  var r = FU_DATA.find(function(x){ return x.id === id; }); if(!r) return;
+  var old = r.stage || ''; if(old === key) return;
+  var oldAt = r.stageAt || '';
+  r.stage = key; r.stageAt = key ? fuTodayIso() : '';
+  renderFollowUpTable();
+  var done = function(){ fuLogOne('stage', r, 'stage', old ? fuStageLabel(old) : '—', key ? fuStageLabel(key) : '—'); toast('✓ Stage: ' + (key ? fuStageLabel(key) : 'cleared')); };
+  if(!id || String(id).indexOf('local_') === 0){ done(); return; }
+  db.collection('followup').doc(id).update({stage:key, stageAt:r.stageAt}).then(done).catch(function(err){
+    if(err && err.code === 'resource-exhausted'){ toast('⚠ Firebase quota reached. Saved in local memory.', 'error'); return; }
+    r.stage = old; r.stageAt = oldAt; renderFollowUpTable(); toast('Failed to update stage', 'error');
+  });
+};
+
+/* ── ERMS settings (owners per category, SLA days) — stored in settings/fuErms + this browser ── */
+function fuMergeCfg(c){
+  if(!c || typeof c !== 'object') return;
+  if(Array.isArray(c.categories) && c.categories.length) FU_ERMS.categories = c.categories.map(function(x){ return {name:String(x.name||''), owner:String(x.owner||''), keywords:String(x.keywords||'')}; });
+  if(c.pendingSla != null && !isNaN(Number(c.pendingSla))) FU_ERMS.pendingSla = Number(c.pendingSla);
+  if(c.soonDays != null && !isNaN(Number(c.soonDays))) FU_ERMS.soonDays = Number(c.soonDays);
+  if(typeof c.other === 'string') FU_ERMS.other = c.other;
+  if(c.sla && typeof c.sla === 'object') FU_ERMS.sla = Object.assign({}, c.sla);
+}
+function fuProLoad(){
+  if(window.__fuProLoaded) return; window.__fuProLoaded = true;
+  try{ var ls = localStorage.getItem('fuErmsCfg'); if(ls) fuMergeCfg(JSON.parse(ls)); }catch(e){}
+  try{
+    db.collection('settings').doc('fuErms').get().then(function(d){
+      if(d && d.exists){ fuMergeCfg(d.data()); try{ localStorage.setItem('fuErmsCfg', JSON.stringify(FU_ERMS)); }catch(e){} fuPopulateProFilters(); renderFollowUpTable(); }
+    }).catch(function(){});
+  }catch(e){}
+}
+function fuOpenErms(){
+  var m = document.getElementById('fu-erms-modal');
+  if(!m){ m = document.createElement('div'); m.className = 'modal-overlay'; m.id = 'fu-erms-modal'; document.body.appendChild(m); }
+  var inp = 'style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;"';
+  var h = '<div class="modal" style="width:860px;"><div class="modal-title">⚙ ERMS settings — owners & time limits</div>';
+  h += '<div style="font-size:12px;color:var(--text-muted);margin:-8px 0 12px;">The owner of a request is picked from its equipment name: the first category whose keywords appear in the name wins (top to bottom).</div>';
+  h += '<table style="width:100%;border-collapse:collapse;" id="fu-erms-cats"><tr><th style="text-align:left;font-size:11px;color:var(--text-muted);">Category</th><th style="text-align:left;font-size:11px;color:var(--text-muted);">Owner</th><th style="text-align:left;font-size:11px;color:var(--text-muted);">Keywords (comma separated)</th><th></th></tr>';
+  FU_ERMS.categories.forEach(function(c){ h += fuErmsCatRow(c, inp); });
+  h += '</table><button class="btn-sm" style="margin-top:8px;" onclick="fuErmsAddCat()">+ Add category</button>';
+  h += '<div style="margin-top:12px;display:flex;gap:10px;align-items:center;font-size:12px;"><span style="min-width:200px;">Owner for equipment that matches nothing</span><input id="fu-erms-other" ' + inp + ' value="' + fuEsc(FU_ERMS.other) + '"></div>';
+  h += '<div style="margin-top:16px;font-size:12px;font-weight:600;">Time limits (days) — flagged ⏱ red when exceeded</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px;">';
+  FU_STAGES.forEach(function(s){ h += '<label style="font-size:11px;color:var(--text-muted);">' + fuEsc(s.label) + '<input type="number" min="0" data-sla="' + s.key + '" ' + inp + ' value="' + fuStageSla(s.key) + '"></label>'; });
+  h += '<label style="font-size:11px;color:var(--text-muted);">Pending without a stage<input type="number" min="0" id="fu-erms-pend" ' + inp + ' value="' + FU_ERMS.pendingSla + '"></label>';
+  h += '<label style="font-size:11px;color:var(--text-muted);">"Soon" window (starts / ends)<input type="number" min="0" id="fu-erms-soon" ' + inp + ' value="' + FU_ERMS.soonDays + '"></label></div>';
+  h += '<div class="modal-actions"><button class="btn-cancel" onclick="closeModal(\'fu-erms-modal\')">Cancel</button><button class="btn-sm" onclick="fuErmsReset()">Reset to defaults</button><button class="btn-save" onclick="fuErmsSave()">Save</button></div></div>';
+  m.innerHTML = h; m.classList.add('open');
+}
+function fuErmsCatRow(c, inp){
+  inp = inp || 'style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;"';
+  return '<tr class="fu-erms-row"><td style="padding:3px 4px;width:190px;"><input class="e-name" ' + inp + ' value="' + fuEsc(c.name) + '"></td><td style="padding:3px 4px;width:190px;"><input class="e-owner" ' + inp + ' value="' + fuEsc(c.owner) + '"></td>'
+       + '<td style="padding:3px 4px;"><input class="e-kw" ' + inp + ' value="' + fuEsc(c.keywords) + '"></td><td style="width:30px;"><button class="btn-del" style="padding:2px 7px;" onclick="this.closest(\'tr\').remove()">✕</button></td></tr>';
+}
+function fuErmsAddCat(){ var t = document.getElementById('fu-erms-cats'); var d = document.createElement('tbody'); d.innerHTML = fuErmsCatRow({name:'', owner:'', keywords:''}); t.appendChild(d.firstChild); }
+function fuErmsReset(){ if(!confirm('Reset owners and time limits to the defaults?')) return; FU_ERMS = JSON.parse(JSON.stringify(FU_ERMS_DEFAULT)); fuOpenErms(); }
+function fuErmsSave(){
+  var cats = [].slice.call(document.querySelectorAll('#fu-erms-cats .fu-erms-row')).map(function(tr){
+    return {name:tr.querySelector('.e-name').value.trim(), owner:tr.querySelector('.e-owner').value.trim(), keywords:tr.querySelector('.e-kw').value.trim()};
+  }).filter(function(c){ return c.name || c.owner || c.keywords; });
+  var sla = {}; [].slice.call(document.querySelectorAll('#fu-erms-modal [data-sla]')).forEach(function(i){ if(i.value !== '') sla[i.getAttribute('data-sla')] = Number(i.value); });
+  var cfg = {categories:cats, other:document.getElementById('fu-erms-other').value.trim(), sla:sla, pendingSla:Number(document.getElementById('fu-erms-pend').value) || 7, soonDays:Number(document.getElementById('fu-erms-soon').value) || 7};
+  FU_ERMS = JSON.parse(JSON.stringify(FU_ERMS_DEFAULT)); fuMergeCfg(cfg);
+  try{ localStorage.setItem('fuErmsCfg', JSON.stringify(FU_ERMS)); }catch(e){}
+  closeModal('fu-erms-modal');
+  fuPopulateProFilters(); renderFollowUpTable();
+  db.collection('settings').doc('fuErms').set(FU_ERMS).then(function(){ toast('✅ ERMS settings saved'); }).catch(function(){ toast('⚠ Saved in this browser only (no permission to write settings/fuErms)', 'error'); });
+}
+
+/* ── filters (stage / owner) + needs-attention ── */
+function fuPopulateProFilters(){
+  var s = document.getElementById('fu-stage-filter'), o = document.getElementById('fu-owner-filter');
+  if(s){ var cur = s.value; s.innerHTML = '<option value="">All Stages</option><option value="__none">— no stage —</option>' + FU_STAGES.map(function(x){ return '<option value="' + x.key + '">' + fuEsc(x.label) + '</option>'; }).join(''); s.value = cur; }
+  if(o){
+    var cur2 = o.value, owners = {};
+    (FU_DATA || []).forEach(function(r){ var w = fuOwnerOf(r); if(w) owners[w] = 1; });
+    o.innerHTML = '<option value="">All Owners</option>' + Object.keys(owners).sort().map(function(w){ return '<option value="' + fuEsc(w) + '">' + fuEsc(w) + '</option>'; }).join('');
+    o.value = cur2;
+  }
+}
+var FU_ATTN = [
+  {key:'overdue',   icon:'⏱', title:'Overdue',                 hint:'Pending too long, or a stage past its time limit',
+    test:function(r, t){ var i = fuStageInfo(r, t); return !!(i && i.overdue); }},
+  {key:'startsoon', icon:'🚦', title:'Pending — start reached', hint:'Pending requests whose From date has passed or is close',
+    test:function(r, t){ if(r.provision !== 'Pending') return false; var f = fuDayNum(fuIsoOf(r.date_from)); return f != null && f <= t + (Number(FU_ERMS.soonDays) || 7); }},
+  {key:'endsoon',   icon:'📅', title:'Ending soon',             hint:'Rental / Transfer ending soon — extend or return',
+    test:function(r, t){ if(r.provision !== 'Rental' && r.provision !== 'Transfer') return false; var e = fuDayNum(fuIsoOf(r.date_to)); return e != null && e >= t && e <= t + (Number(FU_ERMS.soonDays) || 7); }},
+  {key:'dates',     icon:'🧩', title:'Date problems',           hint:'Missing From / To, or To before From',
+    test:function(r){ if(['Pending','Rental','Transfer'].indexOf(r.provision) < 0) return false; var f = fuDayNum(fuIsoOf(r.date_from)), e = fuDayNum(fuIsoOf(r.date_to)); return f == null || e == null || e < f; }}
+];
+function fuAttnTest(r, key, t){ for(var i = 0; i < FU_ATTN.length; i++) if(FU_ATTN[i].key === key) return FU_ATTN[i].test(r, t); return true; }
+function fuSetAttn(key){ fuFilters.attn = (fuFilters.attn === key) ? '' : key; renderFollowUpTable(); }
+function fuRenderAttention(){
+  var el = document.getElementById('fu-attn-panel'); if(!el) return;
+  var t = fuDayNum(fuTodayIso()), counts = {}, total = 0;
+  FU_ATTN.forEach(function(a){ counts[a.key] = 0; });
+  (FU_DATA || []).forEach(function(r){ FU_ATTN.forEach(function(a){ if(a.test(r, t)) counts[a.key]++; }); });
+  FU_ATTN.forEach(function(a){ total += counts[a.key]; });
+  var cards = FU_ATTN.map(function(a){
+    var n = counts[a.key], on = fuFilters.attn === a.key, col = n ? (a.key === 'dates' ? 'var(--accent)' : 'var(--red)') : 'var(--green)';
+    return '<div onclick="fuSetAttn(\'' + a.key + '\')" title="' + fuEsc(a.hint) + '" style="cursor:pointer;flex:1;min-width:150px;background:' + (on ? 'rgba(240,165,0,.12)' : 'var(--bg)') + ';border:1px solid ' + (on ? 'var(--accent)' : 'var(--border)') + ';border-left:4px solid ' + col + ';border-radius:8px;padding:8px 12px;">'
+      + '<div style="font-size:20px;font-weight:700;color:' + col + ';font-family:\'JetBrains Mono\',monospace;">' + n + '</div><div style="font-size:11.5px;">' + a.icon + ' ' + fuEsc(a.title) + '</div></div>';
+  }).join('');
+  el.innerHTML = '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;"><div style="font-size:12px;font-weight:600;margin-bottom:8px;">🚨 Needs attention'
+    + (fuFilters.attn ? ' <span style="color:var(--accent);font-weight:400;">— showing: ' + fuEsc((FU_ATTN.filter(function(a){ return a.key === fuFilters.attn; })[0] || {}).title || '') + ' <a href="javascript:void(0)" onclick="fuSetAttn(\'' + fuFilters.attn + '\')" style="color:var(--accent);">clear ✕</a></span>' : '<span style="font-weight:400;color:var(--text-muted);"> — click a card to filter the table</span>')
+    + '</div><div style="display:flex;gap:10px;flex-wrap:wrap;">' + cards + '</div></div>';
+}
+
+/* ── 6. change history (collection: followup_history) ── */
+var FU_HIST_TYPE = {status:'Status', stage:'Stage', add:'Added', remove:'Removed', import:'Import', restore:'Restore', price:'Ref. prices', edit:'Edit'};
+window.__fuHistSession = window.__fuHistSession || [];
+function fuLogMany(list){
+  try{ fuLogManyUnsafe(list); }catch(e){ console.warn('history logging failed', e); }
+}
+function fuLogManyUnsafe(list){
+  if(!list || !list.length) return;
+  var cu = (typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser) || {}, now = Date.now();
+  var entries = list.map(function(e){ return Object.assign({at:now, by:cu.email || ''}, e); });
+  entries.forEach(function(e){ window.__fuHistSession.push(e); });
+  if(window.__fuHistSession.length > 500) window.__fuHistSession = window.__fuHistSession.slice(-500);
+  try{
+    var col = db.collection('followup_history'), p = Promise.resolve();
+    for(var i = 0; i < entries.length; i += 400){
+      (function(chunk){
+        p = p.then(function(){ var b = db.batch(); chunk.forEach(function(e){ b.set(col.doc(), e); }); return b.commit(); });
+      })(entries.slice(i, i + 400));
+    }
+    p.catch(function(err){
+      console.warn('history not saved', err);
+      if(!window.__fuHistWarned){ window.__fuHistWarned = true; toast('⚠ Change history could not be saved to the cloud (check the Firestore rules for followup_history)', 'error'); }
+    });
+  }catch(e){}
+}
+function fuLogOne(type, rec, field, from, to, note){
+  try{ fuLogOneUnsafe(type, rec, field, from, to, note); }catch(e){ console.warn('history logging failed', e); }
+}
+function fuLogOneUnsafe(type, rec, field, from, to, note){
+  fuLogMany([{type:type, docId:(rec && rec.id) || '', equipment:(rec && rec.equipment) || '', project:(rec && rec.project) || '', field:field || '', from:from == null ? '' : String(from), to:to == null ? '' : String(to), note:note || ''}]);
+}
+function fuLogImport(plan, deleted, newDocs){
+  try{ fuLogImportUnsafe(plan, deleted, newDocs); }catch(e){ console.warn('history logging failed', e); }
+}
+function fuLogImportUnsafe(plan, deleted, newDocs){
+  var list = [{type:'import', docId:'', equipment:'', project:'', field:'', from:'', to:'', note:FU_MODE_LABEL[plan.mode] + ' — ' + (plan.fileName || '') + ': +' + plan.adds.length + ' new, ' + (plan.mode === 'sync' ? plan.updates.length + ' changed, ' : '') + (deleted ? plan.removes.length + ' deleted' : '0 deleted')}];
+  if(plan.mode === 'sync' && plan.updates.length <= 300){
+    plan.updates.forEach(function(u){ u.diff.forEach(function(d){ list.push({type:'edit', docId:u.id, equipment:u.equipment || '', project:u.project || '', field:FU_FIELD_LABEL[d.f] || d.f, from:String(d.from), to:String(d.to), note:'Smart Sync'}); }); });
+  }
+  fuLogMany(list);
+}
+function fuOpenHistory(docId){
+  window.__fuHistDoc = docId || '';
+  var m = document.getElementById('fu-hist-modal');
+  if(!m){ m = document.createElement('div'); m.className = 'modal-overlay'; m.id = 'fu-hist-modal'; document.body.appendChild(m); }
+  var rec = docId ? FU_DATA.find(function(r){ return r.id === docId; }) : null;
+  var sty = 'style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;"';
+  m.innerHTML = '<div class="modal" style="width:980px;max-width:96vw;"><div class="modal-title">🕘 Change history' + (rec ? ' — ' + fuEsc(rec.equipment) + ' · ' + fuEsc(rec.project) : '') + '</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:-4px 0 10px;align-items:center;">'
+    + '<input id="fu-h-q" ' + sty + ' placeholder="Search equipment / project / user…" oninput="fuRenderHistory()" style="min-width:230px;">'
+    + '<select id="fu-h-per" ' + sty + ' onchange="fuRenderHistory()"><option value="1">Today</option><option value="7" selected>Last 7 days</option><option value="30">Last 30 days</option><option value="0">All loaded</option></select>'
+    + '<select id="fu-h-type" ' + sty + ' onchange="fuRenderHistory()"><option value="">All types</option>' + Object.keys(FU_HIST_TYPE).map(function(k){ return '<option value="' + k + '">' + FU_HIST_TYPE[k] + '</option>'; }).join('') + '</select>'
+    + '<button class="btn-sm" onclick="fuHistCsv()">⬇ CSV</button></div>'
+    + '<div id="fu-h-sum" style="font-size:12px;color:var(--text-muted);margin-bottom:8px;"></div>'
+    + '<div id="fu-h-body" style="max-height:460px;overflow:auto;border:1px solid var(--border);border-radius:8px;"><div style="padding:20px;text-align:center;color:var(--text-muted);">⏳ Loading…</div></div>'
+    + '<div class="modal-actions"><button class="btn-cancel" onclick="closeModal(\'fu-hist-modal\')">Close</button></div></div>';
+  m.classList.add('open');
+  var finish = function(rows, note){ window.__fuHistRows = rows; window.__fuHistNote = note || ''; fuRenderHistory(); };
+  var session = window.__fuHistSession.slice();
+  db.collection('followup_history').orderBy('at', 'desc').limit(600).get().then(function(snap){
+    finish(snap.docs.map(function(d){ return d.data(); }));
+  }).catch(function(){
+    finish(session.slice().reverse(), 'Cloud history is not available (check the Firestore rules for followup_history) — showing this session only.');
+  });
+}
+function fuHistFiltered(){
+  var rows = window.__fuHistRows || [], q = ((document.getElementById('fu-h-q') || {}).value || '').toLowerCase(), per = Number((document.getElementById('fu-h-per') || {}).value || 0), ty = (document.getElementById('fu-h-type') || {}).value || '';
+  var since = per ? Date.now() - per * 864e5 : 0, doc = window.__fuHistDoc;
+  return rows.filter(function(e){
+    if(doc && e.docId !== doc) return false;
+    if(ty && e.type !== ty) return false;
+    if(since && e.at < since) return false;
+    if(q && (String(e.equipment) + ' ' + e.project + ' ' + e.by + ' ' + e.note + ' ' + e.field).toLowerCase().indexOf(q) < 0) return false;
+    return true;
+  });
+}
+function fuRenderHistory(){
+  var rows = fuHistFiltered(), body = document.getElementById('fu-h-body'); if(!body) return;
+  var by = {}; rows.forEach(function(e){ by[e.type] = (by[e.type] || 0) + 1; });
+  document.getElementById('fu-h-sum').innerHTML = rows.length + ' changes' + (rows.length ? ' · ' + Object.keys(by).map(function(k){ return (FU_HIST_TYPE[k] || k) + ' ' + by[k]; }).join(' · ') : '') + (window.__fuHistNote ? '<br><span style="color:var(--accent);">' + fuEsc(window.__fuHistNote) + '</span>' : '');
+  if(!rows.length){ body.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">No changes in this period.</div>'; return; }
+  var td = 'style="padding:5px 8px;border-bottom:1px solid var(--border);font-size:12px;vertical-align:top;"';
+  body.innerHTML = '<table style="width:100%;border-collapse:collapse;"><tr style="position:sticky;top:0;background:var(--surface);"><th style="text-align:left;padding:5px 8px;font-size:11px;color:var(--text-muted);">When</th><th style="text-align:left;padding:5px 8px;font-size:11px;color:var(--text-muted);">By</th><th style="text-align:left;padding:5px 8px;font-size:11px;color:var(--text-muted);">Type</th><th style="text-align:left;padding:5px 8px;font-size:11px;color:var(--text-muted);">Request</th><th style="text-align:left;padding:5px 8px;font-size:11px;color:var(--text-muted);">Change</th></tr>'
+    + rows.slice(0, 400).map(function(e){
+        return '<tr><td ' + td + '>' + new Date(e.at).toLocaleString('en-GB') + '</td><td ' + td + '>' + fuEsc(e.by) + '</td><td ' + td + '>' + fuEsc(FU_HIST_TYPE[e.type] || e.type) + '</td><td ' + td + '>' + fuEsc(e.equipment) + '<div style="color:var(--text-muted);font-size:11px;">' + fuEsc(e.project) + '</div></td>'
+          + '<td ' + td + '>' + (e.field ? '<b>' + fuEsc(e.field) + '</b>: <span style="color:var(--red)">' + fuEsc(e.from) + '</span> → <span style="color:var(--green)">' + fuEsc(e.to) + '</span>' : '') + (e.note ? '<div style="color:var(--text-muted);font-size:11px;">' + fuEsc(e.note) + '</div>' : '') + '</td></tr>';
+      }).join('') + '</table>' + (rows.length > 400 ? '<div style="padding:8px;font-size:11px;color:var(--text-muted);">… showing the newest 400 of ' + rows.length + ' (use ⬇ CSV for all)</div>' : '');
+}
+function fuDownload(name, text, mime){
+  var blob = new Blob(['\ufeff' + text], {type:mime || 'text/csv;charset=utf-8'});
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+}
+function fuCsv(rows){ return rows.map(function(r){ return r.map(function(c){ c = String(c == null ? '' : c); return /[",\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c; }).join(','); }).join('\n'); }
+function fuHistCsv(){
+  var rows = fuHistFiltered();
+  fuDownload('followup_history_' + fuStamp(new Date()) + '.csv', fuCsv([['When','By','Type','Equipment','Project','Field','From','To','Note']].concat(rows.map(function(e){ return [new Date(e.at).toLocaleString('en-GB'), e.by, FU_HIST_TYPE[e.type] || e.type, e.equipment, e.project, e.field, e.from, e.to, e.note]; }))));
+}
+
+/* ── 7. owned equipment that could cover a request (Search Owned stage) ── */
+function fuNums(s){ var m = String(s || '').replace(/,/g, '').match(/\d+(?:\.\d+)?/g); return m ? m.map(Number) : []; }
+function fuStem(t){ return t.length > 3 && /s$/.test(t) && !/ss$/.test(t) ? t.slice(0, -1) : t; }
+function fuToks(s){ return String(s || '').toLowerCase().replace(/[^a-z0-9. ]+/g, ' ').split(/\s+/).filter(function(t){ return t && ['and','with','for','the','of','general','usage','type','semi'].indexOf(t) < 0; }).map(fuStem); }
+function fuOwnedMatches(req, equipment, opts){
+  opts = opts || {};
+  var rt = fuToks(req.equipment), capNums = fuNums(req.capacity);
+  if(!rt.length) return [];
+  var out = [];
+  (equipment || []).forEach(function(e){
+    var fl = e.fleet || 'egypt';
+    if(!opts.allFleets && ['egypt','foundation','tunnelling'].indexOf(fl) < 0) return;
+    var text = [e.equipment, e.category, e.brand].join(' '), toks = fuToks(text);
+    if(!rt.every(function(t){ return toks.indexOf(t) >= 0 || toks.some(function(x){ return x.indexOf(t) === 0; }); })) return;
+    var score = 10, note = [];
+    var capText = [e.equipment, e.power, e.model, e.capacity, e.brand].join(' '), cn = fuNums(capText), capState = 'n/a';
+    if(capNums.length){
+      var hit = capNums.some(function(a){ return cn.some(function(b){ return a > 0 && Math.abs(a - b) / a <= 0.1; }); });
+      capState = hit ? 'match' : 'unknown'; score += hit ? 5 : 0;
+    }
+    ['mini','tower','crawler','mobile','wheel','telescopic'].forEach(function(q){ var inReq = rt.indexOf(q) >= 0, inEq = toks.indexOf(q) >= 0; if(inReq !== inEq){ score -= 3; note.push(inEq ? 'is ' + q : 'not ' + q); } });
+    var workshop = isCentralWorkshop(e.project);
+    if(workshop) score += 4;
+    var yr = Number(e.year) || 0; if(yr) score += Math.min(2, Math.max(0, (yr - 2000) / 15));
+    out.push({e:e, score:score, cap:capState, workshop:workshop, note:note.join(', ')});
+  });
+  out.sort(function(a, b){ return b.score - a.score; });
+  return out;
+}
+function fuSearchOwned(id){
+  var r = FU_DATA.find(function(x){ return x.id === id; }); if(!r){ toast('Record not found', 'error'); return; }
+  window.__fuOwnedReq = id;
+  var m = document.getElementById('fu-owned-modal');
+  if(!m){ m = document.createElement('div'); m.className = 'modal-overlay'; m.id = 'fu-owned-modal'; document.body.appendChild(m); }
+  var all = (typeof allEquipment !== 'undefined' ? allEquipment : []);
+  var fleets = !!(document.getElementById('fu-own-fleets') || {}).checked;
+  var res = fuOwnedMatches(r, all, {allFleets:fleets});
+  var ws = res.filter(function(x){ return x.workshop; }).length, cm = res.filter(function(x){ return x.cap === 'match'; }).length;
+  var chip = function(l, n, c){ return '<div style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-top:3px solid ' + c + ';border-radius:8px;padding:8px 12px;"><div style="font-size:20px;font-weight:700;color:' + c + ';font-family:\'JetBrains Mono\',monospace;">' + n + '</div><div style="font-size:11px;color:var(--text-muted);">' + l + '</div></div>'; };
+  var td = 'style="padding:4px 8px;border-bottom:1px solid var(--border);font-size:12px;"';
+  var h = '<div class="modal" style="width:920px;max-width:96vw;"><div class="modal-title">🔍 Owned equipment — ' + fuEsc(r.equipment) + (r.capacity ? ' · ' + fuEsc(r.capacity) : '') + '</div>';
+  h += '<div style="font-size:12px;color:var(--text-muted);margin:-8px 0 12px;">Request: <b style="color:var(--text)">' + fuEsc(r.project) + '</b> · Qty ' + (r.qty || 1) + ' · ' + fuEsc(formatExcelDate(r.date_from)) + ' → ' + fuEsc(formatExcelDate(r.date_to)) + ' · currently <b style="color:var(--text)">' + fuEsc(r.provision || '—') + '</b></div>';
+  h += '<div style="display:flex;gap:10px;flex-wrap:wrap;">' + chip('Owned units of this type', res.length, 'var(--blue)') + chip('In Central Workshop', ws, 'var(--green)') + chip('Capacity matches', cm, 'var(--accent)') + '</div>';
+  h += '<label style="display:block;font-size:12px;margin:10px 0;color:var(--text-muted);"><input type="checkbox" id="fu-own-fleets" ' + (fleets ? 'checked' : '') + ' onchange="fuSearchOwned(window.__fuOwnedReq)"> include fleets of other countries</label>';
+  if(!res.length){
+    h += '<div style="padding:14px;border:1px dashed var(--border);border-radius:8px;font-size:13px;">No owned equipment matches <b>' + fuEsc(r.equipment) + '</b> in the Equipment List — an external rental looks justified for this request.</div>';
+  } else {
+    h += '<div style="max-height:360px;overflow:auto;border:1px solid var(--border);border-radius:8px;"><table style="width:100%;border-collapse:collapse;"><tr style="position:sticky;top:0;background:var(--surface);">'
+       + ['Code','Equipment','Brand','Year','Location','Capacity','Fleet'].map(function(x){ return '<th style="text-align:left;padding:5px 8px;font-size:11px;color:var(--text-muted);">' + x + '</th>'; }).join('') + '</tr>'
+       + res.slice(0, 60).map(function(x){
+           var e = x.e, capBadge = x.cap === 'match' ? '<span style="color:var(--green)">✓ matches</span>' : (x.cap === 'unknown' ? '<span style="color:var(--text-muted)">not stated</span>' : '—');
+           return '<tr><td ' + td + '><b>' + fuEsc(e.code || '—') + '</b></td><td ' + td + '>' + fuEsc(e.equipment) + (x.note ? '<div style="font-size:10.5px;color:var(--accent);">' + fuEsc(x.note) + '</div>' : '') + '</td><td ' + td + '>' + fuEsc(e.brand || '') + '</td><td ' + td + '>' + fuEsc(e.year || '') + '</td>'
+             + '<td ' + td + '>' + (x.workshop ? '<span style="color:var(--green)">🏭 Central Workshop</span>' : fuEsc(e.project || '—')) + '</td><td ' + td + '>' + capBadge + '</td><td ' + td + '>' + fuEsc(e.fleet || 'egypt') + '</td></tr>';
+         }).join('') + '</table></div>' + (res.length > 60 ? '<div style="font-size:11px;color:var(--text-muted);margin-top:6px;">… and ' + (res.length - 60) + ' more</div>' : '');
+    h += '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;">Units in Central Workshop are the easiest to allocate; units at a project need that project\'s agreement. Matching is by equipment name and the numbers in the capacity — always confirm technically.</div>';
+  }
+  h += '<div class="modal-actions"><button class="btn-cancel" onclick="closeModal(\'fu-owned-modal\')">Close</button>'
+     + ((typeof isAdmin !== 'undefined' && isAdmin && r.provision !== 'Transfer' && res.length) ? '<button class="btn-save" onclick="closeModal(\'fu-owned-modal\');changeFuStatus(\'' + fuEsc(r.id) + '\',\'Transfer\')">Mark request as Transfer</button>' : '') + '</div></div>';
+  m.innerHTML = h; m.classList.add('open');
+}
+
+/* ── 8. reference prices from the Rental Database + cost forecast ── */
+function fuDailyFrom(last){
+  var u = String((last && (last.rate || last.rateL)) || '').toLowerCase(), c = Number(last && last.cost) || 0;
+  if(!c) return null;
+  if(/month/.test(u)) return c / 30;
+  if(/day/.test(u)) return c;
+  if(/week/.test(u)) return c / 7;
+  return null;     /* hourly / unspecified: not converted */
+}
+function fuKeyOf(r){ return [String(r.equipment || '').trim().toLowerCase(), String(r.project || '').trim().toLowerCase(), String(r.capacity || '').trim().toLowerCase()].join('|'); }
+function fuReqDays(r){
+  var d = Number(r.days) || 0; if(d > 0) return d;
+  var f = fuDayNum(fuIsoOf(r.date_from)), e = fuDayNum(fuIsoOf(r.date_to)); return (f != null && e != null && e >= f) ? e - f : 0;
+}
+function fuForecastRows(list, prices){
+  return list.map(function(r){
+    var p = prices[fuKeyOf(r)], daily = p && p.daily, days = fuReqDays(r), qty = Number(r.qty) || 1;
+    var own = Number(r.rental_cost_excl_fuel) || 0, flag = '';
+    if(daily && own > 0 && own > daily * 1.1) flag = '+' + Math.round((own / daily - 1) * 100) + '% above reference';
+    var d = fuIsoOf(r.date_from) || fuIsoOf(r.submission_date);
+    return {r:r, key:fuKeyOf(r), p:p || null, daily:daily || null, days:days, qty:qty, est:daily ? daily * days * qty : null, own:own, flag:flag, month:d ? d.slice(0, 7) : '—'};
+  });
+}
+function fuForecastPivot(rows){
+  var months = {}, proj = {};
+  rows.forEach(function(x){
+    if(x.est == null) return;
+    var pr = x.r.project || '—'; months[x.month] = 1; proj[pr] = proj[pr] || {total:0, by:{}};
+    proj[pr].by[x.month] = (proj[pr].by[x.month] || 0) + x.est; proj[pr].total += x.est;
+  });
+  return {months:Object.keys(months).sort(), proj:proj};
+}
+function fuFetchPrices(list, onProgress){
+  var keys = {}, order = [];
+  list.forEach(function(r){ var k = fuKeyOf(r); if(r.equipment && !keys[k]){ keys[k] = r; order.push(k); } });
+  var prices = {}, done = 0, i = 0;
+  return new Promise(function(resolve){
+    if(!order.length){ resolve(prices); return; }
+    var worker = function(){
+      if(i >= order.length) return;
+      var k = order[i++], r = keys[k];
+      window.rdLastPrice(r.equipment, r.project, function(res){
+        if(res && res.last){ var d = fuDailyFrom(res.last); prices[k] = {daily:d, cost:res.last.cost, rate:res.last.rateL || res.last.rate || '', ccy:res.ccy || '', vendor:res.last.vendor || '', date:res.last.dateLabel || '', plant:res.plant || '', fuel:res.last.fuel || '', converted:d != null}; }
+        else prices[k] = {error:(res && res.error) || 'none'};
+        done++; if(onProgress) onProgress(done, order.length);
+        if(done === order.length) resolve(prices); else worker();
+      }, r.capacity);
+    };
+    for(var c = 0; c < Math.min(3, order.length); c++) worker();
+  });
+}
+function fuOpenForecast(){
+  var m = document.getElementById('fu-fc-modal');
+  if(!m){ m = document.createElement('div'); m.className = 'modal-overlay'; m.id = 'fu-fc-modal'; document.body.appendChild(m); }
+  var n = getFilteredFuData().length;
+  m.innerHTML = '<div class="modal" style="width:1000px;max-width:96vw;"><div class="modal-title">💲 Reference prices & cost forecast</div>'
+    + '<div style="font-size:12px;color:var(--text-muted);margin:-8px 0 12px;">Looks up the newest matching price in the Rental Database for each request (equipment + project plant + capacity), converts it to a daily rate and multiplies by days × qty. It uses the requests currently shown in the table (' + n + ').</div>'
+    + '<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:12px;margin-bottom:10px;">Include:'
+    + ['Rental','Pending','Hold','Transfer','Cancel'].map(function(p){ return '<label><input type="checkbox" class="fu-fc-prov" value="' + p + '" ' + (p === 'Rental' || p === 'Pending' ? 'checked' : '') + '> ' + p + '</label>'; }).join('')
+    + '<button class="btn-save" id="fu-fc-go" onclick="fuRunForecast()">Fetch prices & calculate</button></div>'
+    + '<div id="fu-fc-body" style="font-size:12px;color:var(--text-muted);">Choose what to include, then press the button. Prices are read-only until you press “Save reference prices”.</div>'
+    + '<div class="modal-actions"><button class="btn-cancel" onclick="closeModal(\'fu-fc-modal\')">Close</button></div></div>';
+  m.classList.add('open');
+}
+function fuRunForecast(){
+  if(typeof window.rdLastPrice !== 'function'){ toast('Rental database module not ready yet', 'error'); return; }
+  var provs = [].slice.call(document.querySelectorAll('.fu-fc-prov:checked')).map(function(i){ return i.value; });
+  var list = getFilteredFuData().filter(function(r){ return provs.indexOf(r.provision) >= 0 && r.equipment; });
+  var body = document.getElementById('fu-fc-body'), btn = document.getElementById('fu-fc-go');
+  if(!list.length){ body.innerHTML = 'No requests match the selection.'; return; }
+  btn.disabled = true;
+  body.innerHTML = '<div id="fu-fc-prog">⏳ Fetching prices… 0 / ?</div>';
+  fuFetchPrices(list, function(d, t){ var p = document.getElementById('fu-fc-prog'); if(p) p.textContent = '⏳ Fetching prices… ' + d + ' / ' + t; }).then(function(prices){
+    btn.disabled = false; window.__fuFc = {list:list, prices:prices, rows:fuForecastRows(list, prices)}; fuRenderForecast();
+  });
+}
+function fuRenderForecast(){
+  var fc = window.__fuFc, body = document.getElementById('fu-fc-body'); if(!fc || !body) return;
+  var rows = fc.rows, priced = rows.filter(function(x){ return x.est != null; }), unpriced = rows.length - priced.length, flagged = rows.filter(function(x){ return x.flag; });
+  var total = priced.reduce(function(s, x){ return s + x.est; }, 0), pv = fuForecastPivot(rows);
+  var ccy = ''; Object.keys(fc.prices).forEach(function(k){ if(!ccy && fc.prices[k].ccy) ccy = fc.prices[k].ccy; });
+  var chip = function(l, v, c){ return '<div style="flex:1;min-width:130px;background:var(--bg);border:1px solid var(--border);border-top:3px solid ' + c + ';border-radius:8px;padding:8px 12px;"><div style="font-size:18px;font-weight:700;color:' + c + ';font-family:\'JetBrains Mono\',monospace;">' + v + '</div><div style="font-size:11px;color:var(--text-muted);">' + l + '</div></div>'; };
+  var td = 'style="padding:4px 8px;border-bottom:1px solid var(--border);font-size:12px;text-align:right;font-family:\'JetBrains Mono\',monospace;"', tl = 'style="padding:4px 8px;border-bottom:1px solid var(--border);font-size:12px;"';
+  var h = '<div style="display:flex;gap:10px;flex-wrap:wrap;color:var(--text);">' + chip('Estimated cost' + (ccy ? ' (' + ccy + ')' : ''), fuFmtInt(total), 'var(--accent)') + chip('Priced requests', priced.length, 'var(--green)') + chip('No usable price', unpriced, unpriced ? 'var(--red)' : 'var(--text-muted)') + chip('Above reference', flagged.length, flagged.length ? 'var(--red)' : 'var(--text-muted)') + '</div>';
+  var projs = Object.keys(pv.proj).sort(function(a, b){ return pv.proj[b].total - pv.proj[a].total; });
+  if(projs.length){
+    h += '<div style="font-weight:600;margin:14px 0 6px;color:var(--text);">By project and month</div><div style="max-height:260px;overflow:auto;border:1px solid var(--border);border-radius:8px;"><table style="width:100%;border-collapse:collapse;"><tr style="position:sticky;top:0;background:var(--surface);"><th style="text-align:left;padding:5px 8px;font-size:11px;color:var(--text-muted);">Project</th>'
+      + pv.months.map(function(mo){ return '<th style="text-align:right;padding:5px 8px;font-size:11px;color:var(--text-muted);">' + mo + '</th>'; }).join('') + '<th style="text-align:right;padding:5px 8px;font-size:11px;color:var(--text);">Total</th></tr>'
+      + projs.map(function(p){ return '<tr><td ' + tl + '>' + fuEsc(p) + '</td>' + pv.months.map(function(mo){ return '<td ' + td + '>' + (pv.proj[p].by[mo] ? fuFmtInt(pv.proj[p].by[mo]) : '') + '</td>'; }).join('') + '<td ' + td + '><b>' + fuFmtInt(pv.proj[p].total) + '</b></td></tr>'; }).join('') + '</table></div>';
+  }
+  if(flagged.length){
+    h += '<div style="font-weight:600;margin:14px 0 6px;color:var(--red);">⚠ Recorded daily rate above the Rental Database reference</div><div style="max-height:150px;overflow:auto;border:1px solid var(--border);border-radius:8px;">'
+      + flagged.slice(0, 40).map(function(x){ return '<div ' + tl + '>' + fuEsc(x.r.equipment) + ' · ' + fuEsc(x.r.project) + ' — recorded ' + fuFmtInt(x.own) + ' vs reference ' + fuFmtInt(x.daily) + ' / day <b style="color:var(--red)">(' + x.flag + ')</b></div>'; }).join('') + '</div>';
+  }
+  if(unpriced){
+    h += '<div style="font-size:11px;color:var(--text-muted);margin-top:10px;">' + unpriced + ' request(s) have no usable price: no match in the Rental Database, a new project, or an hourly/unspecified rate basis that cannot be converted to a daily rate.</div>';
+  }
+  h += '<div style="font-size:11px;color:var(--text-muted);margin-top:6px;">Monthly rates are divided by 30 days; daily rates are used as is. Fuel basis follows the Rental Database record.</div>';
+  h += '<div style="margin-top:12px;display:flex;gap:8px;"><button class="btn-sm" onclick="fuForecastCsv()">⬇ CSV (all requests)</button>'
+     + ((typeof isAdmin !== 'undefined' && isAdmin && priced.length) ? '<button class="btn-sm" onclick="fuSaveRefPrices()">💾 Save reference prices on ' + priced.length + ' records</button>' : '') + '</div>';
+  body.innerHTML = h;
+}
+function fuForecastCsv(){
+  var fc = window.__fuFc; if(!fc) return;
+  fuDownload('followup_price_forecast_' + fuStamp(new Date()) + '.csv', fuCsv([['Project','Equipment','Capacity','Qty','Provision','From','To','Days','Ref daily rate','Vendor','Price date','Plant','Estimated total','Recorded daily rate','Flag']].concat(fc.rows.map(function(x){
+    return [x.r.project, x.r.equipment, x.r.capacity, x.qty, x.r.provision, fuIsoOf(x.r.date_from), fuIsoOf(x.r.date_to), x.days, x.daily != null ? Math.round(x.daily) : '', x.p && x.p.vendor || '', x.p && x.p.date || '', x.p && x.p.plant || '', x.est != null ? Math.round(x.est) : '', x.own || '', x.flag];
+  }))));
+}
+function fuSaveRefPrices(){
+  var fc = window.__fuFc; if(!fc) return;
+  var rows = fc.rows.filter(function(x){ return x.daily != null && x.r.id && String(x.r.id).indexOf('local_') !== 0; });
+  if(!rows.length) return;
+  if(!confirm('Save the reference daily price (and vendor / date) on ' + rows.length + ' records?\n\nThis adds ref_price_* fields only — your existing cost and savings fields are not touched.')) return;
+  var today = fuTodayIso();
+  var ops = rows.map(function(x){ return {t:'upd', ref:db.collection('followup').doc(x.r.id), data:{ref_price_daily:Math.round(x.daily), ref_price_ccy:x.p.ccy || '', ref_price_vendor:x.p.vendor || '', ref_price_date:x.p.date || '', ref_price_at:today}}; });
+  toast('⏳ Saving reference prices…');
+  fuRunOps(ops).then(function(){
+    rows.forEach(function(x){ Object.assign(x.r, ops[rows.indexOf(x)].data); });
+    fuLogMany([{type:'price', docId:'', equipment:'', project:'', field:'', from:'', to:'', note:'Reference prices saved on ' + rows.length + ' records'}]);
+    toast('✅ Reference prices saved on ' + rows.length + ' records');
+  }).catch(function(err){ toast('❌ ' + (err && err.message || err), 'error'); });
+}
+/*FU-PRO-END*/
 
 // ─── صف القرارات: Red Flags + Workshop + Fleet Age ───
 function _mgmtDays(it){
