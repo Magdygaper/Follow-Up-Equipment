@@ -5687,20 +5687,29 @@ function fuOwnedMatches(req, equipment, opts){
     var text = [e.equipment, e.category, e.brand].join(' '), toks = fuToks(text);
     if(!rt.every(function(t){ return toks.indexOf(t) >= 0 || toks.some(function(x){ return x.indexOf(t) === 0; }); })) return;
     var score = 10, note = [];
+    var low = null;
+    if(opts.lowMap){
+      low = opts.lowMap[String(e.code == null ? '' : e.code).toUpperCase().replace(/\s+/g, '')];
+      if(!low) return;
+    }
     var capText = [e.equipment, e.power, e.model, e.capacity, e.brand].join(' '), cn = fuNums(capText), capState = 'n/a';
+    if(low && capNums.length){ var ec = ''; try{ var cc = eqCapacity(e); ec = (cc && cc.v && cc.v !== '\u2014') ? cc.v : ''; }catch(x){} if(ec) cn = fuNums(ec); }
     if(capNums.length){
       var hit = capNums.some(function(a){ return cn.some(function(b){ return a > 0 && Math.abs(a - b) / a <= 0.1; }); });
+      if(low && !hit) return;      /* Low H/M mode: same capacity only */
       capState = hit ? 'match' : 'unknown'; score += hit ? 5 : 0;
     }
+    if(low) score += 3;
     ['mini','tower','crawler','mobile','wheel','telescopic'].forEach(function(q){ var inReq = rt.indexOf(q) >= 0, inEq = toks.indexOf(q) >= 0; if(inReq !== inEq){ score -= 3; note.push(inEq ? 'is ' + q : 'not ' + q); } });
     var workshop = isCentralWorkshop(e.project);
     if(workshop) score += 4;
     var yr = Number(e.year) || 0; if(yr) score += Math.min(2, Math.max(0, (yr - 2000) / 15));
-    out.push({e:e, score:score, cap:capState, workshop:workshop, note:note.join(', ')});
+    out.push({e:e, score:score, cap:capState, workshop:workshop, note:note.join(', '), low:low});
   });
   out.sort(function(a, b){ return b.score - a.score; });
   return out;
 }
+document.addEventListener('hm-loaded', function(){ var m = document.getElementById('fu-owned-modal'); if(m && m.classList.contains('open') && window.__fuOwnedReq && window.__fuOwnLow !== false) fuSearchOwned(window.__fuOwnedReq); });
 function fuSearchOwned(id){
   var r = FU_DATA.find(function(x){ return x.id === id; }); if(!r){ toast('Record not found', 'error'); return; }
   window.__fuOwnedReq = id;
@@ -5708,23 +5717,37 @@ function fuSearchOwned(id){
   if(!m){ m = document.createElement('div'); m.className = 'modal-overlay'; m.id = 'fu-owned-modal'; document.body.appendChild(m); }
   var all = (typeof allEquipment !== 'undefined' ? allEquipment : []);
   var fleets = !!(document.getElementById('fu-own-fleets') || {}).checked;
-  var res = fuOwnedMatches(r, all, {allFleets:fleets});
+  var lowEl = document.getElementById('fu-own-low'), lowOn = lowEl ? lowEl.checked : (window.__fuOwnLow !== false);
+  window.__fuOwnLow = lowOn;
+  var lmEl = document.getElementById('fu-own-lowm'), lowYm = lmEl ? lmEl.value : '';
+  var LM = (typeof window.hmLowMap === 'function') ? window.hmLowMap(lowYm) : {map:{}, loaded:false, months:[], ym:''};
+  if(lowOn && !LM.loaded && typeof hmReload === 'function'){ try{ hmReload(); }catch(x){} }
+  var useLow = lowOn && LM.loaded;
+  var resAll = fuOwnedMatches(r, all, {allFleets:fleets});
+  var res = useLow ? fuOwnedMatches(r, all, {allFleets:fleets, lowMap:LM.map}) : resAll;
   var ws = res.filter(function(x){ return x.workshop; }).length, cm = res.filter(function(x){ return x.cap === 'match'; }).length;
   var chip = function(l, n, c){ return '<div style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-top:3px solid ' + c + ';border-radius:8px;padding:8px 12px;"><div style="font-size:20px;font-weight:700;color:' + c + ';font-family:\'JetBrains Mono\',monospace;">' + n + '</div><div style="font-size:11px;color:var(--text-muted);">' + l + '</div></div>'; };
   var td = 'style="padding:4px 8px;border-bottom:1px solid var(--border);font-size:12px;"';
   var h = '<div class="modal" style="width:920px;max-width:96vw;"><div class="modal-title">🔍 Owned equipment — ' + fuEsc(r.equipment) + (r.capacity ? ' · ' + fuEsc(r.capacity) : '') + '</div>';
   h += '<div style="font-size:12px;color:var(--text-muted);margin:-8px 0 12px;">Request: <b style="color:var(--text)">' + fuEsc(r.project) + '</b> · Qty ' + (r.qty || 1) + ' · ' + fuEsc(formatExcelDate(r.date_from)) + ' → ' + fuEsc(formatExcelDate(r.date_to)) + ' · currently <b style="color:var(--text)">' + fuEsc(r.provision || '—') + '</b></div>';
-  h += '<div style="display:flex;gap:10px;flex-wrap:wrap;">' + chip('Owned units of this type', res.length, 'var(--blue)') + chip('In Central Workshop', ws, 'var(--green)') + chip('Capacity matches', cm, 'var(--accent)') + '</div>';
+  h += '<div style="display:flex;gap:10px;flex-wrap:wrap;">' + chip(useLow ? 'Low H/M units \u00b7 same capacity' : 'Owned units of this type', res.length, 'var(--blue)') + (useLow ? chip('All owned of this type', resAll.length, 'var(--text-muted)') : '') + chip('In Central Workshop', ws, 'var(--green)') + chip('Capacity matches', cm, 'var(--accent)') + '</div>';
+  var lowOpts = '<option value="">' + (LM.loaded ? fuEsc(window.hmLowLabel(LM.months.indexOf(lowYm) >= 0 ? lowYm : (LM.ym && LM.ym !== 'all' ? LM.ym : ''))) : 'latest month') + '</option>';
+  if(LM.loaded){ lowOpts = '<option value="all"' + (lowYm === 'all' ? ' selected' : '') + '>All months</option>' + LM.months.slice().reverse().map(function(m){ return '<option value="' + m + '"' + ((lowYm || LM.ym) === m && lowYm !== 'all' ? ' selected' : '') + '>' + fuEsc(window.hmLowLabel(m)) + '</option>'; }).join(''); }
+  h += '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:10px 0 2px;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-size:12px;">'
+     + '<label style="color:var(--text);"><input type="checkbox" id="fu-own-low" ' + (lowOn ? 'checked' : '') + ' onchange="fuSearchOwned(window.__fuOwnedReq)"> <b>Only Low H/M usage units</b> (same capacity as the request)</label>'
+     + (lowOn ? '<label style="color:var(--text-muted);">Month <select id="fu-own-lowm" onchange="fuSearchOwned(window.__fuOwnedReq)" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:3px 6px;border-radius:6px;font-size:12px;">' + lowOpts + '</select></label>' : '')
+     + (lowOn && !LM.loaded ? '<span style="color:var(--accent);">H/M data not loaded yet — showing all owned units until it loads.</span>' : '')
+     + '</div>';
   h += '<label style="display:block;font-size:12px;margin:10px 0;color:var(--text-muted);"><input type="checkbox" id="fu-own-fleets" ' + (fleets ? 'checked' : '') + ' onchange="fuSearchOwned(window.__fuOwnedReq)"> include fleets of other countries</label>';
   if(!res.length){
-    h += '<div style="padding:14px;border:1px dashed var(--border);border-radius:8px;font-size:13px;">No owned equipment matches <b>' + fuEsc(r.equipment) + '</b> in the Equipment List — an external rental looks justified for this request.</div>';
+    h += '<div style="padding:14px;border:1px dashed var(--border);border-radius:8px;font-size:13px;">' + (useLow ? 'No <b>Low H/M usage</b> unit of <b>' + fuEsc(r.equipment) + '</b>' + (r.capacity ? ' with capacity <b>' + fuEsc(r.capacity) + '</b>' : '') + ' (' + resAll.length + ' owned of this type in total — untick the Low H/M box to see them).' : 'No owned equipment matches <b>' + fuEsc(r.equipment) + '</b> in the Equipment List — an external rental looks justified for this request.') + '</div>';
   } else {
     h += '<div style="max-height:360px;overflow:auto;border:1px solid var(--border);border-radius:8px;"><table style="width:100%;border-collapse:collapse;"><tr style="position:sticky;top:0;background:var(--surface);">'
-       + ['Code','Equipment','Brand','Year','Location','Capacity','Fleet'].map(function(x){ return '<th style="text-align:left;padding:5px 8px;font-size:11px;color:var(--text-muted);">' + x + '</th>'; }).join('') + '</tr>'
+       + ['Code','Equipment','Brand','Year','Location','Capacity','Fleet'].concat(useLow ? ['H/M diff','Repair'] : []).map(function(x){ return '<th style="text-align:left;padding:5px 8px;font-size:11px;color:var(--text-muted);">' + x + '</th>'; }).join('') + '</tr>'
        + res.slice(0, 60).map(function(x){
            var e = x.e, capBadge = x.cap === 'match' ? '<span style="color:var(--green)">✓ matches</span>' : (x.cap === 'unknown' ? '<span style="color:var(--text-muted)">not stated</span>' : '—');
            return '<tr><td ' + td + '><b>' + fuEsc(e.code || '—') + '</b></td><td ' + td + '>' + fuEsc(e.equipment) + (x.note ? '<div style="font-size:10.5px;color:var(--accent);">' + fuEsc(x.note) + '</div>' : '') + '</td><td ' + td + '>' + fuEsc(e.brand || '') + '</td><td ' + td + '>' + fuEsc(e.year || '') + '</td>'
-             + '<td ' + td + '>' + (x.workshop ? '<span style="color:var(--green)">🏭 Central Workshop</span>' : fuEsc(e.project || '—')) + '</td><td ' + td + '>' + capBadge + '</td><td ' + td + '>' + fuEsc(e.fleet || 'egypt') + '</td></tr>';
+             + '<td ' + td + '>' + (x.workshop ? '<span style="color:var(--green)">🏭 Central Workshop</span>' : fuEsc(e.project || '—')) + '</td><td ' + td + '>' + capBadge + '</td><td ' + td + '>' + fuEsc(e.fleet || 'egypt') + '</td>' + (useLow ? '<td ' + td + '><b style="color:var(--red);font-family:monospace;">' + fuEsc(x.low ? x.low.d : '') + '</b> <span style="color:var(--text-muted);font-size:10.5px;">/ &lt; ' + fuEsc(x.low ? x.low.lim : '') + ' h' + (LM.ym === 'all' && x.low ? ' \u00b7 ' + fuEsc(window.hmLowLabel(x.low.ym)) : '') + '</span></td><td ' + td + '>' + ((x.low && x.low.ur) ? window.hmLowBadge(x.low.ur) : '\u2014') + '</td>' : '') + '</tr>';
          }).join('') + '</table></div>' + (res.length > 60 ? '<div style="font-size:11px;color:var(--text-muted);margin-top:6px;">… and ' + (res.length - 60) + ' more</div>' : '');
     h += '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;">Units in Central Workshop are the easiest to allocate; units at a project need that project\'s agreement. Matching is by equipment name and the numbers in the capacity — always confirm technically.</div>';
   }
@@ -15937,6 +15960,25 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
     on('hml-ur','change',function(){ ST.ur=this.value; draw(); });
     on('hml-q','input',function(){ ST.q=this.value; draw(); });
   }
+  /* Used by Follow-Up > Search Owned: code -> {d,lim,ym,ur} for units below the limit (same limits as the Low H/M list) */
+  window.hmLowMap=function(ym){
+    var H=HMS(), map={}, loaded=!!(H.months&&H.months.length);
+    if(!loaded) return {map:map,loaded:false,months:[],ym:''};
+    var sel=(ym&&ym!=='all')?ym:(H.sel||H.latest), months=(ym==='all')?H.months:[sel];
+    (typeof allEquipment!=='undefined'?allEquipment:[]).forEach(function(e){
+      if((e.fleet||'egypt')==='archive'||!e.code) return;
+      var lim=isGen(e)?thr.gen:thr.eq;
+      months.forEach(function(m){
+        var r=reading(e.code,m); if(!r||r.s==null) return;
+        var d=r.e-r.s; if(!(d<lim)) return;
+        var k=norm(e.code), cur=map[k];
+        if(!cur||d<cur.d) map[k]={d:d,lim:lim,ym:m,ur:repairInfo(e.code,m)};
+      });
+    });
+    return {map:map,loaded:true,months:H.months,ym:(ym==='all')?'all':sel};
+  };
+  window.hmLowBadge=function(info){ return urBadge(info); };
+  window.hmLowLabel=lab;
   window.hmLowOpen=function(){
     ensureModal(); var H=HMS();
     if(!H.loaded&&typeof hmReload==='function'){ hmReload(); }
