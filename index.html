@@ -5679,6 +5679,9 @@ function fuToks(s){ return String(s || '').toLowerCase().replace(/[^a-z0-9. ]+/g
 function fuOwnedMatches(req, equipment, opts){
   opts = opts || {};
   var rt = fuToks(req.equipment), capNums = fuNums(req.capacity);
+  /* a capacity like "4 Light" is a lamp COUNT, not a rating: only compare numbers when the request carries a real capacity unit */
+  var capComparable = /(kva|k\.?\s*w|\bhp\b|\bton|\btonne|\bt\b|\bkg\b|m\s*[3\u00b3]|\blit|\bl\b|\bbar\b|\bmm\b|\bcm\b|\bm\b|\bkn\b|\bhz\b|\bv\b|\bamp)/i.test(String(req.capacity || ''));
+  if(opts.lowMap && !capComparable) capNums = [];
   if(!rt.length) return [];
   var out = [];
   (equipment || []).forEach(function(e){
@@ -5723,6 +5726,7 @@ function fuSearchOwned(id){
   var LM = (typeof window.hmLowMap === 'function') ? window.hmLowMap(lowYm) : {map:{}, loaded:false, months:[], ym:''};
   if(lowOn && !LM.loaded && typeof hmReload === 'function'){ try{ hmReload(); }catch(x){} }
   var useLow = lowOn && LM.loaded;
+  var capIgnored = useLow && r.capacity && !/(kva|k\.?\s*w|\bhp\b|\bton|\btonne|\bt\b|\bkg\b|m\s*[3\u00b3]|\blit|\bl\b|\bbar\b|\bmm\b|\bcm\b|\bm\b|\bkn\b|\bhz\b|\bv\b|\bamp)/i.test(String(r.capacity));
   var resAll = fuOwnedMatches(r, all, {allFleets:fleets});
   var res = useLow ? fuOwnedMatches(r, all, {allFleets:fleets, lowMap:LM.map}) : resAll;
   var ws = res.filter(function(x){ return x.workshop; }).length, cm = res.filter(function(x){ return x.cap === 'match'; }).length;
@@ -5736,6 +5740,7 @@ function fuSearchOwned(id){
   h += '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:10px 0 2px;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-size:12px;">'
      + '<label style="color:var(--text);"><input type="checkbox" id="fu-own-low" ' + (lowOn ? 'checked' : '') + ' onchange="fuSearchOwned(window.__fuOwnedReq)"> <b>Only Low H/M usage units</b> (same capacity as the request)</label>'
      + (lowOn ? '<label style="color:var(--text-muted);">Month <select id="fu-own-lowm" onchange="fuSearchOwned(window.__fuOwnedReq)" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:3px 6px;border-radius:6px;font-size:12px;">' + lowOpts + '</select></label>' : '')
+     + (capIgnored ? '<span style="color:var(--text-muted);">Capacity "' + fuEsc(r.capacity) + '" is not a rating (kW / ton ...), so all Low H/M units of this type are listed.</span>' : '')
      + (lowOn && !LM.loaded ? '<span style="color:var(--accent);">H/M data not loaded yet — showing all owned units until it loads.</span>' : '')
      + '</div>';
   h += '<label style="display:block;font-size:12px;margin:10px 0;color:var(--text-muted);"><input type="checkbox" id="fu-own-fleets" ' + (fleets ? 'checked' : '') + ' onchange="fuSearchOwned(window.__fuOwnedReq)"> include fleets of other countries</label>';
