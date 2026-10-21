@@ -962,6 +962,7 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
             <button id="fu-btn-backups" class="btn-sm" style="display:none;" onclick="fuOpenBackups()" title="Automatic backups taken before every import — undo / restore">🛟 Backups</button>
             <button id="fu-btn-history" class="btn-sm" onclick="fuOpenHistory()" title="Who changed what, and when (status, stage, imports)">🕘 History</button>
             <button id="fu-btn-forecast" class="btn-sm" onclick="fuOpenForecast()" title="Reference prices from the Rental Database and cost forecast per project / month">💲 Forecast</button>
+            <button id="fu-btn-bulk" class="btn-sm" onclick="fuOpenBulk()" title="Check every request against owned equipment in one table (Low H/M, same capacity, free in the period)">🔍 Bulk owned search</button>
             <button id="fu-btn-erms" class="btn-sm" style="display:none;" onclick="fuOpenErms()" title="Owners per equipment category and time limits per ERMS stage">⚙ ERMS</button>
             <button id="fu-btn-clear" class="btn-sm" style="display:none;background:rgba(248,81,73,.1);border-color:rgba(248,81,73,.3);color:var(--red);" onclick="clearFollowUpData()">🗑 Clear Data</button>
           </div>
@@ -5461,7 +5462,8 @@ function fuStageCell(r){
     chip = '<span title="' + (info.kind === 'stage' ? 'Days in this stage' : 'Days since submission') + ' · limit ' + info.sla + ' d" style="font-size:10px;font-family:\'JetBrains Mono\',monospace;color:' + col + ';border:1px solid ' + col + ';border-radius:10px;padding:0 6px;margin-left:4px;">⏱ ' + info.days + 'd' + (info.overdue ? ' !' : '') + '</span>';
   }
   var tools = '<button class="btn-edit" title="Owned equipment that could cover this request" style="padding:1px 6px;font-size:10px;margin-left:4px;" onclick="event.stopPropagation();fuSearchOwned(\'' + id + '\')">🔍</button>'
-            + '<button class="btn-edit" title="Change history of this request" style="padding:1px 6px;font-size:10px;" onclick="event.stopPropagation();fuOpenHistory(\'' + id + '\')">🕘</button>';
+            + '<button class="btn-edit" title="Change history of this request" style="padding:1px 6px;font-size:10px;" onclick="event.stopPropagation();fuOpenHistory(\'' + id + '\')">🕘</button>'
+            + ((r.allocated && r.allocated.length) ? '<span title="Allocated units: ' + fuEsc(r.allocated.join(', ')) + '" style="font-size:10px;color:var(--green);border:1px solid var(--green);border-radius:10px;padding:0 6px;margin-left:4px;cursor:default;">📌 ' + r.allocated.length + '/' + (Number(r.qty) || 1) + '</span>' : '');
   return '<div style="display:flex;align-items:center;gap:2px;flex-wrap:wrap;">' + sel + chip + '</div>'
        + '<div style="font-size:10.5px;color:var(--text-muted);margin-top:3px;">' + (owner ? '👤 ' + fuEsc(owner) : '') + tools + '</div>';
 }
@@ -5712,6 +5714,202 @@ function fuOwnedMatches(req, equipment, opts){
   out.sort(function(a, b){ return b.score - a.score; });
   return out;
 }
+/* ── availability: is this owned unit busy during the request period? (workshop · transfers · units already allocated to other requests) ── */
+function fuNormCode(c){ return String(c == null ? '' : c).toUpperCase().replace(/\s+/g, ''); }
+function fuReqWindow(r){ var a = fuIsoOf(r.date_from), b = fuIsoOf(r.date_to); if(!a && !b) return null; return {from:a || b, to:b || a}; }
+function fuConflicts(e, req, win){
+  var out = [], code = fuNormCode(e.code), today = new Date().toISOString().slice(0, 10);
+  if(!win) return out;
+  /* 1 · workshop: still in the workshop (not Ready / Dispatched) and the stay overlaps the period */
+  (typeof wsEquipment !== 'undefined' ? wsEquipment : []).forEach(function(w){
+    if(!code || fuNormCode(w.code) !== code) return;
+    if(w.status === 'Ready' || w.status === 'Dispatched') return;
+    var en = fuIsoOf(w.entryDate), ex = fuIsoOf(w.exitDate);
+    if(en && en > win.to) return;
+    if(ex && ex < win.from) return;
+    out.push({t:'ws', text:'In workshop' + (w.status ? ' (' + w.status + ')' : '') + (en ? ' since ' + en : '') + (ex ? ' · exit ' + ex : ' · no exit date')});
+  });
+  /* 2 · transfers to another project dated inside the period (or still in the future) */
+  (typeof allTransfers !== 'undefined' ? allTransfers : []).forEach(function(t){
+    if(!(t.equipmentId && t.equipmentId === e.id) && !(code && fuNormCode(t.code) === code)) return;
+    var d = fuIsoOf(t.date); if(!d) return;
+    if(String(t.to || '').trim().toLowerCase() === String(req.project || '').trim().toLowerCase()) return;
+    if((d >= win.from && d <= win.to) || d > today) out.push({t:'tr', text:'Transfer to ' + (t.to || '—') + ' on ' + d});
+  });
+  /* 3 · allocated to another follow-up request that overlaps (field written by the Allocate action) */
+  (typeof FU_DATA !== 'undefined' ? FU_DATA : []).forEach(function(o){
+    if(!o || o.id === req.id || !Array.isArray(o.allocated) || o.allocated.map(fuNormCode).indexOf(code) < 0) return;
+    var w2 = fuReqWindow(o); if(!w2 || w2.from > win.to || w2.to < win.from) return;
+    out.push({t:'fu', text:'Allocated to ' + (o.project || 'another request') + ' (' + w2.from + ' → ' + w2.to + ')'});
+  });
+  return out;
+}
+/* ── Follow-Up workflow add-ons: repair filter · allocate · transfer message · saving · export · bulk search ── */
+function fuRepairRefYm(LM){ var H = window.HM_STATE || {}; return (LM && LM.ym && LM.ym !== 'all') ? LM.ym : (H.sel || H.latest || ''); }
+function fuUnderRepair(e, ym){ try{ if(typeof window.hmRepairInfo !== 'function' || !ym || !e.code) return null; var i = window.hmRepairInfo(e.code, ym); return (i && i.label === 'Under Repair') ? i : null; }catch(x){ return null; } }
+function fuIsAllocated(r, e){ return (r.allocated || []).map(fuNormCode).indexOf(fuNormCode(e.code)) >= 0; }
+function fuCapOf(e){ try{ var c = eqCapacity(e); return (c && c.v && c.v !== '\u2014') ? c.v : ''; }catch(x){ return ''; } }
+function fuEquipByCode(code){ var k = fuNormCode(code), f = null; (typeof allEquipment !== 'undefined' ? allEquipment : []).some(function(e){ if(fuNormCode(e.code) === k){ f = e; return true; } return false; }); return f; }
+/* one request -> owned candidates (same filters as the Search Owned window): resAll · res · free (not busy / not under repair, allocated kept) */
+function fuOwnedFor(r, o){
+  var all = (typeof allEquipment !== 'undefined' ? allEquipment : []);
+  var resAll = fuOwnedMatches(r, all, {allFleets:!!o.fleets});
+  var res = (o.low && o.LM && o.LM.loaded) ? fuOwnedMatches(r, all, {allFleets:!!o.fleets, lowMap:o.LM.map}) : resAll;
+  var win = fuReqWindow(r), ym = fuRepairRefYm(o.LM);
+  res.forEach(function(x){ x.busy = win ? fuConflicts(x.e, r, win) : []; x.rep = fuUnderRepair(x.e, ym); x.alloc = fuIsAllocated(r, x.e); });
+  var free = res.filter(function(x){ return x.alloc || (!x.rep && !x.busy.length); });
+  free.sort(function(a, b){ return (b.alloc ? 1 : 0) - (a.alloc ? 1 : 0) || b.score - a.score; });
+  return {resAll:resAll, res:res, free:free, win:win};
+}
+/* ② allocate / release a specific unit on a request (saved on the follow-up record, logged in History) */
+function fuAllocToggle(id, enc){
+  var code = decodeURIComponent(enc), r = FU_DATA.find(function(x){ return x.id === id; }); if(!r) return;
+  if(!(typeof isAdmin !== 'undefined' && isAdmin)){ toast('Only admins can allocate units', 'error'); return; }
+  var old = (r.allocated || []).slice(), arr = old.slice(), k = fuNormCode(code), i = arr.map(fuNormCode).indexOf(k), qty = Number(r.qty) || 1;
+  if(i >= 0) arr.splice(i, 1);
+  else {
+    if(arr.length >= qty && !confirm('This request needs ' + qty + ' unit(s) and ' + arr.length + ' are already allocated.\nAllocate one more anyway?')) return;
+    arr.push(code);
+  }
+  r.allocated = arr;
+  var done = function(){
+    fuLogOne('edit', r, 'Allocated units', old.join(', '), arr.join(', '));
+    toast(i >= 0 ? 'Released ' + code : '\u2713 ' + code + ' allocated to ' + (r.project || 'the request'));
+    try{ renderFollowUpTable(); }catch(x){}
+    if(document.getElementById('fu-owned-modal') && document.getElementById('fu-owned-modal').classList.contains('open')) fuSearchOwned(id);
+    if(document.getElementById('fu-bulk-modal') && document.getElementById('fu-bulk-modal').classList.contains('open')) fuRenderBulk();
+  };
+  if(!r.id || String(r.id).indexOf('local_') === 0){ done(); return; }
+  db.collection('followup').doc(r.id).update({allocated:arr}).then(done).catch(function(err){ r.allocated = old; toast('Could not save the allocation', 'error'); console.warn(err); });
+}
+/* ⑤ ready-to-send transfer message */
+function fuCopyText(t, ok){
+  var done = function(){ toast(ok || 'Copied \u2713'); };
+  if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(t).then(done).catch(function(){ fuCopyFallback(t, done); }); } else fuCopyFallback(t, done);
+}
+function fuCopyFallback(t, done){ var ta = document.createElement('textarea'); ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy'); done(); }catch(e){ toast('Copy failed \u2014 select the text manually', 'error'); } ta.remove(); }
+function fuTransferMsg(id, enc){
+  var code = decodeURIComponent(enc), r = FU_DATA.find(function(x){ return x.id === id; }), e = fuEquipByCode(code); if(!r || !e) return;
+  var win = fuReqWindow(r), days = fuReqDays(r), here = isCentralWorkshop(e.project) ? 'Central Workshop' : (e.project || '\u2014');
+  var lowI = (typeof window.hmLowMap === 'function') ? window.hmLowMap('') : null, low = lowI && lowI.loaded ? lowI.map[fuNormCode(e.code)] : null;
+  var L = ['Subject: Request to release owned equipment \u2014 ' + (e.equipment || '') + ' (' + e.code + ')', '', 'Dear Team,', '',
+    'Please confirm the availability and release of the following owned unit for ' + (r.project || 'our project') + ':', '',
+    '\u2022 Equipment: ' + (e.equipment || '') + (e.brand ? ' \u2014 ' + e.brand : ''),
+    '\u2022 Code: ' + e.code + (fuCapOf(e) ? '   \u2022 Capacity: ' + fuCapOf(e) : '') + (e.year ? '   \u2022 Year: ' + e.year : ''),
+    '\u2022 Current location: ' + here,
+    '\u2022 Required for: ' + (r.project || '\u2014') + (r.sap ? '   (SAP ' + r.sap + ')' : ''),
+    '\u2022 Period: ' + (win ? win.from + ' \u2192 ' + win.to : 'to be confirmed') + (days ? '  (' + days + ' days)' : '') + '   \u2022 Qty requested: ' + (Number(r.qty) || 1)];
+  if(low) L.push('\u2022 Note: low utilization \u2014 ' + low.d + ' h in ' + window.hmLowLabel(low.ym) + ' (limit ' + low.lim + ' h)');
+  L.push('', 'Kindly reply with the release date and the current condition of the unit.', '', 'Best regards,');
+  var m = document.getElementById('fu-msg-modal');
+  if(!m){ m = document.createElement('div'); m.className = 'modal-overlay'; m.id = 'fu-msg-modal'; document.body.appendChild(m); }
+  m.innerHTML = '<div class="modal" style="width:640px;max-width:96vw;"><div class="modal-title">\u2709 Transfer request \u2014 ' + fuEsc(e.code) + '</div>'
+    + '<textarea id="fu-msg-text" style="width:100%;height:290px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:12.5px;font-family:inherit;">' + fuEsc(L.join('\n')) + '</textarea>'
+    + '<div class="modal-actions"><button class="btn-cancel" onclick="closeModal(\'fu-msg-modal\')">Close</button><button class="btn-save" onclick="fuCopyText(document.getElementById(\'fu-msg-text\').value)">Copy message</button></div></div>';
+  m.classList.add('open');
+}
+/* ④ estimated saving when the request is covered from owned units instead of an external rental */
+function fuOwnSaving(r, n){
+  var id = r.id;
+  fuFetchPrices([r]).then(function(prices){
+    var b = document.getElementById('fu-own-sav'); if(!b || window.__fuOwnedReq !== id) return;
+    var p = prices[fuKeyOf(r)], days = fuReqDays(r), qty = Number(r.qty) || 1, cover = Math.min(qty, n);
+    if(!p || p.error || !p.daily){ b.innerHTML = '\ud83d\udcb2 No daily reference price in the Rental Database for this request \u2014 the saving cannot be estimated.'; return; }
+    if(!days){ b.innerHTML = '\ud83d\udcb2 Reference price found (' + fuEsc(Math.round(p.daily).toLocaleString('en-US')) + ' ' + fuEsc(p.ccy || '') + ' / day) but the request has no dates, so the period cost cannot be estimated.'; return; }
+    var est = p.daily * days * cover, f = function(v){ return Math.round(v).toLocaleString('en-US'); };
+    b.style.color = 'var(--text)';
+    b.innerHTML = '\ud83d\udcb2 <b style="color:var(--green);font-size:14px;">\u2248 ' + f(est) + ' ' + fuEsc(p.ccy || '') + '</b> saved if ' + cover + ' of ' + qty + ' unit(s) come from Owned \u2014 '
+      + f(p.daily) + ' / day \u00d7 ' + days + ' days \u00d7 ' + cover + '<div style="font-size:10.5px;color:var(--text-muted);margin-top:3px;">Reference: last rental price in the Rental Database' + (p.vendor ? ' \u00b7 ' + fuEsc(p.vendor) : '') + (p.date ? ' \u00b7 ' + fuEsc(p.date) : '') + ' (excl. fuel / operator differences) \u2014 an estimate, not a quotation.</div>';
+  }).catch(function(){ var b = document.getElementById('fu-own-sav'); if(b) b.textContent = '\ud83d\udcb2 Could not load reference prices.'; });
+}
+/* ⑥ export the listed units (current filters) */
+function fuOwnExport(kind){
+  var L = window.__fuOwnLast; if(!L || !L.res.length){ toast('Nothing to export', 'error'); return; }
+  var r = L.r, rows = L.res.map(function(x){
+    var e = x.e, av = [];
+    if(x.alloc) av.push('Allocated'); if(x.rep) av.push('Under repair'); (x.busy || []).forEach(function(c){ av.push(c.text); });
+    return {code:e.code || '', eq:e.equipment || '', brand:e.brand || '', year:e.year || '', loc:x.workshop ? 'Central Workshop' : (e.project || ''), cap:fuCapOf(e), fleet:e.fleet || 'egypt',
+            hm:x.low ? (x.low.d + ' h (limit ' + x.low.lim + ')') : '', av:av.length ? av.join(' | ') : 'Free'};
+  });
+  function f(k){ return function(o){ return o[k]; }; }
+  var cols = [{h:'#', g:function(o, i){ return i + 1; }, t:'t'}, {h:'Code', g:f('code'), t:'t'}, {h:'Equipment', g:f('eq'), t:'t'}, {h:'Brand', g:f('brand'), t:'t'}, {h:'Year', g:f('year'), t:'t'},
+    {h:'Location', g:f('loc'), t:'t'}, {h:'Capacity', g:f('cap'), t:'t'}, {h:'Fleet', g:f('fleet'), t:'t'}, {h:'H/M diff', g:f('hm'), t:'t'}, {h:'Availability', g:f('av'), t:'t'}];
+  var title = 'HAC \u00b7 PMV \u2014 Owned equipment for ' + (r.project || '') + ' \u00b7 ' + (r.equipment || '') + (r.capacity ? ' ' + r.capacity : '');
+  window.hacPdfTable({title:title, cols:cols, rows:rows, kpis:[{label:'Units listed', value:rows.length}, {label:'Qty requested', value:Number(r.qty) || 1}, {label:'Days', value:fuReqDays(r) || 0}]}, kind);
+}
+/* ③ one screen for every request: how many owned units could cover it */
+function fuOpenBulk(){
+  var m = document.getElementById('fu-bulk-modal');
+  if(!m){ m = document.createElement('div'); m.className = 'modal-overlay'; m.id = 'fu-bulk-modal'; document.body.appendChild(m); }
+  m.classList.add('open'); fuRenderBulk();
+}
+function fuRenderBulk(){
+  var m = document.getElementById('fu-bulk-modal'); if(!m) return;
+  var scEl = document.getElementById('fu-bulk-scope'), sc = scEl ? scEl.value : 'Pending';
+  var lEl = document.getElementById('fu-bulk-low'), low = lEl ? lEl.checked : (window.__fuOwnLow !== false);
+  var fEl = document.getElementById('fu-bulk-fleets'), fleets = fEl ? fEl.checked : false;
+  var LM = (typeof window.hmLowMap === 'function') ? window.hmLowMap('') : {map:{}, loaded:false};
+  if(low && !LM.loaded && typeof hmReload === 'function'){ try{ hmReload(); }catch(x){} }
+  var useLow = low && LM.loaded, tok = (window.__fuBulkTok = (window.__fuBulkTok || 0) + 1);
+  var list = FU_DATA.filter(function(r){ return r.equipment && (sc === 'all' || String(r.provision || 'Pending') === sc); });
+  var rows = list.map(function(r){
+    var o = fuOwnedFor(r, {low:useLow, LM:LM, fleets:fleets}), qty = Number(r.qty) || 1, alloc = (r.allocated || []).length;
+    var fresh = o.free.filter(function(x){ return !x.alloc; }), cover = Math.min(qty, alloc + fresh.length);
+    return {r:r, o:o, qty:qty, alloc:alloc, nFree:fresh.length, cover:cover, cands:o.free.slice(0, 4).map(function(x){ return x.e.code; }).filter(Boolean).join(', '), saving:null};
+  });
+  var nFull = rows.filter(function(x){ return x.cover >= x.qty; }).length, nPart = rows.filter(function(x){ return x.cover > 0 && x.cover < x.qty; }).length, nNone = rows.length - nFull - nPart;
+  var inp = 'background:var(--surface);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:6px;font-size:12px;';
+  var th = function(t){ return '<th style="text-align:left;padding:6px 8px;font-size:11px;color:var(--text-muted);position:sticky;top:0;background:var(--surface);">' + t + '</th>'; };
+  var td = 'style="padding:5px 8px;border-bottom:1px solid var(--border);font-size:12px;vertical-align:top;"';
+  var chip = function(l, n, c){ return '<div style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-top:3px solid ' + c + ';border-radius:8px;padding:8px 12px;"><div style="font-size:20px;font-weight:700;color:' + c + ';font-family:\'JetBrains Mono\',monospace;">' + n + '</div><div style="font-size:11px;color:var(--text-muted);">' + l + '</div></div>'; };
+  var h = '<div class="modal" style="width:1180px;max-width:97vw;max-height:92vh;display:flex;flex-direction:column;"><div class="modal-title">\ud83d\udd0d Bulk owned search \u2014 every request at once</div>'
+    + '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:10px;font-size:12px;">'
+    + '<label>Requests <select id="fu-bulk-scope" onchange="fuRenderBulk()" style="' + inp + '"><option value="Pending"' + (sc === 'Pending' ? ' selected' : '') + '>Pending only</option><option value="all"' + (sc === 'all' ? ' selected' : '') + '>All requests</option></select></label>'
+    + '<label><input type="checkbox" id="fu-bulk-low" ' + (low ? 'checked' : '') + ' onchange="window.__fuOwnLow=this.checked;fuRenderBulk()"> Only Low H/M usage units (same capacity)</label>'
+    + '<label><input type="checkbox" id="fu-bulk-fleets" ' + (fleets ? 'checked' : '') + ' onchange="fuRenderBulk()"> include other countries\' fleets</label>'
+    + '<span style="margin-left:auto;display:flex;gap:6px;"><button class="btn-sm" onclick="fuBulkExport(\'xlsx\')">\ud83d\udcca Excel</button><button class="btn-sm" onclick="fuBulkExport(\'pdf\')">\ud83d\udcc4 PDF</button></span></div>'
+    + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">' + chip('Requests checked', rows.length, 'var(--blue)') + chip('Fully covered by owned', nFull, 'var(--green)') + chip('Partly covered', nPart, 'var(--accent)') + chip('No owned unit \u2192 external', nNone, 'var(--red)') + '<div id="fu-bulk-total" style="flex:1.4;min-width:200px;background:var(--bg);border:1px solid var(--border);border-top:3px solid var(--green);border-radius:8px;padding:8px 12px;font-size:11px;color:var(--text-muted);">\ud83d\udcb2 Estimating total saving\u2026</div></div>'
+    + (low && !LM.loaded ? '<div style="font-size:12px;color:var(--accent);margin-bottom:8px;">H/M data is not loaded yet \u2014 showing all owned units until it loads.</div>' : '')
+    + '<div id="fu-bulk-body" style="overflow:auto;border:1px solid var(--border);border-radius:8px;"><table style="width:100%;border-collapse:collapse;"><thead><tr>' + ['#', 'Equipment', 'Project', 'Period', 'Qty', 'Status', 'Allocated', 'Free units', 'Owned total', 'Coverage', 'Candidates', 'Est. saving', ''].map(th).join('') + '</tr></thead><tbody>';
+  if(!rows.length) h += '<tr><td colspan="13" style="padding:24px;text-align:center;color:var(--text-muted);">No requests in this scope.</td></tr>';
+  rows.forEach(function(x, i){
+    var r = x.r, w = x.o.win, cov = x.cover >= x.qty ? '<span style="color:var(--green);font-weight:700;">\u2705 Covered</span>' : (x.cover > 0 ? '<span style="color:var(--accent);font-weight:700;">\u26a0 ' + x.cover + ' of ' + x.qty + '</span>' : '<span style="color:var(--red);font-weight:700;">\u2716 External</span>');
+    h += '<tr><td ' + td + '>' + (i + 1) + '</td><td ' + td + '><b>' + fuEsc(r.equipment) + '</b>' + (r.capacity ? '<div style="color:var(--text-muted);font-size:11px;">' + fuEsc(r.capacity) + '</div>' : '') + '</td><td ' + td + '>' + fuEsc(r.project || '\u2014') + '</td><td ' + td + ' style="white-space:nowrap">' + (w ? fuEsc(w.from) + ' \u2192 ' + fuEsc(w.to) : '\u2014') + '</td><td ' + td + '>' + x.qty + '</td><td ' + td + '>' + fuEsc(r.provision || 'Pending') + '</td>'
+      + '<td ' + td + '>' + (x.alloc ? '<b style="color:var(--green);">\ud83d\udccc ' + x.alloc + '</b>' : '\u2014') + '</td><td ' + td + '><b>' + x.nFree + '</b></td><td ' + td + '><span style="color:var(--text-muted);">' + x.o.resAll.length + '</span></td><td ' + td + '>' + cov + '</td><td ' + td + '><span style="font-family:monospace;font-size:11px;">' + fuEsc(x.cands || '\u2014') + '</span></td><td ' + td + ' id="fu-bsav-' + i + '">' + (x.cover > 0 ? '\u2026' : '\u2014') + '</td>'
+      + '<td ' + td + '><button class="btn-edit" style="padding:1px 7px;font-size:10px;" onclick="closeModal(\'fu-bulk-modal\');fuSearchOwned(\'' + fuEsc(r.id) + '\')">Open</button></td></tr>';
+  });
+  h += '</tbody></table></div><div class="modal-actions"><button class="btn-cancel" onclick="closeModal(\'fu-bulk-modal\')">Close</button></div></div>';
+  m.innerHTML = h; window.__fuBulkRows = rows;
+  var need = rows.filter(function(x){ return x.cover > 0; }).map(function(x){ return x.r; });
+  var tot = document.getElementById('fu-bulk-total');
+  if(!need.length){ if(tot) tot.textContent = '\ud83d\udcb2 No request can be covered from owned units.'; return; }
+  fuFetchPrices(need).then(function(prices){
+    if(window.__fuBulkTok !== tok || !document.getElementById('fu-bulk-body')) return;
+    var sum = 0, ccy = '', f = function(v){ return Math.round(v).toLocaleString('en-US'); };
+    rows.forEach(function(x, i){
+      var el = document.getElementById('fu-bsav-' + i); if(!el || !(x.cover > 0)) return;
+      var p = prices[fuKeyOf(x.r)], d = fuReqDays(x.r);
+      if(!p || p.error || !p.daily || !d){ el.innerHTML = '<span style="color:var(--text-muted);" title="No daily reference price or no dates">n/a</span>'; return; }
+      x.saving = p.daily * d * x.cover; sum += x.saving; ccy = ccy || p.ccy || '';
+      el.innerHTML = '<b style="color:var(--green);">' + f(x.saving) + '</b>';
+    });
+    if(tot) tot.innerHTML = '\ud83d\udcb2 <b style="color:var(--green);font-size:15px;">\u2248 ' + f(sum) + ' ' + fuEsc(ccy) + '</b><div>estimated saving if every covered request is served from Owned (Rental Database reference prices)</div>';
+  }).catch(function(){ if(tot) tot.textContent = '\ud83d\udcb2 Could not load reference prices.'; });
+}
+function fuBulkExport(kind){
+  var rows = window.__fuBulkRows || []; if(!rows.length){ toast('Nothing to export', 'error'); return; }
+  var data = rows.map(function(x){
+    var r = x.r, w = x.o.win;
+    return {eq:r.equipment || '', cap:r.capacity || '', proj:r.project || '', from:w ? w.from : '', to:w ? w.to : '', qty:x.qty, st:r.provision || 'Pending', alloc:x.alloc, free:x.nFree, tot:x.o.resAll.length,
+            cov:x.cover >= x.qty ? 'Covered' : (x.cover > 0 ? x.cover + ' of ' + x.qty : 'External'), cands:x.cands, sav:x.saving != null ? Math.round(x.saving) : ''};
+  });
+  function f(k){ return function(o){ return o[k]; }; }
+  var cols = [{h:'#', g:function(o, i){ return i + 1; }, t:'t'}, {h:'Equipment', g:f('eq'), t:'t'}, {h:'Capacity', g:f('cap'), t:'t'}, {h:'Project', g:f('proj'), t:'t'}, {h:'From', g:f('from'), t:'t'}, {h:'To', g:f('to'), t:'t'},
+    {h:'Qty', g:f('qty'), t:'i', s:true}, {h:'Status', g:f('st'), t:'t'}, {h:'Allocated', g:f('alloc'), t:'i', s:true}, {h:'Free units', g:f('free'), t:'i', s:true}, {h:'Owned total', g:f('tot'), t:'i', s:true},
+    {h:'Coverage', g:f('cov'), t:'t'}, {h:'Candidate codes', g:f('cands'), t:'t'}, {h:'Est. saving', g:f('sav'), t:'t'}];
+  var nFull = data.filter(function(d){ return d.cov === 'Covered'; }).length;
+  window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 Owned equipment coverage of follow-up requests', cols:cols, rows:data, kpis:[{label:'Requests', value:data.length}, {label:'Fully covered', value:nFull}, {label:'No owned unit', value:data.filter(function(d){ return d.cov === 'External'; }).length}]}, kind);
+}
 document.addEventListener('hm-loaded', function(){ var m = document.getElementById('fu-owned-modal'); if(m && m.classList.contains('open') && window.__fuOwnedReq && window.__fuOwnLow !== false) fuSearchOwned(window.__fuOwnedReq); });
 function fuSearchOwned(id){
   var r = FU_DATA.find(function(x){ return x.id === id; }); if(!r){ toast('Record not found', 'error'); return; }
@@ -5729,36 +5927,69 @@ function fuSearchOwned(id){
   var capIgnored = useLow && r.capacity && !/(kva|k\.?\s*w|\bhp\b|\bton|\btonne|\bt\b|\bkg\b|m\s*[3\u00b3]|\blit|\bl\b|\bbar\b|\bmm\b|\bcm\b|\bm\b|\bkn\b|\bhz\b|\bv\b|\bamp)/i.test(String(r.capacity));
   var resAll = fuOwnedMatches(r, all, {allFleets:fleets});
   var res = useLow ? fuOwnedMatches(r, all, {allFleets:fleets, lowMap:LM.map}) : resAll;
+  var reqWin = fuReqWindow(r), bEl = document.getElementById('fu-own-busy'), hideBusy = !!reqWin && (bEl ? bEl.checked : (window.__fuOwnBusy !== false));
+  window.__fuOwnBusy = hideBusy;
+  var rEl = document.getElementById('fu-own-rep'), hideRep = rEl ? rEl.checked : (window.__fuOwnRep !== false);
+  window.__fuOwnRep = hideRep;
+  var refYm = fuRepairRefYm(LM), busyHidden = 0, repHidden = 0;
+  res.forEach(function(x){ x.busy = reqWin ? fuConflicts(x.e, r, reqWin) : []; x.rep = fuUnderRepair(x.e, refYm); x.alloc = fuIsAllocated(r, x.e); });
+  res = res.filter(function(x){
+    if(x.alloc) return true;
+    if(hideRep && x.rep){ repHidden++; return false; }
+    if(hideBusy && x.busy.length){ busyHidden++; return false; }
+    return true;
+  });
+  res.sort(function(a, b){ return (b.alloc ? 1 : 0) - (a.alloc ? 1 : 0) || b.score - a.score; });
   var ws = res.filter(function(x){ return x.workshop; }).length, cm = res.filter(function(x){ return x.cap === 'match'; }).length;
   var chip = function(l, n, c){ return '<div style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-top:3px solid ' + c + ';border-radius:8px;padding:8px 12px;"><div style="font-size:20px;font-weight:700;color:' + c + ';font-family:\'JetBrains Mono\',monospace;">' + n + '</div><div style="font-size:11px;color:var(--text-muted);">' + l + '</div></div>'; };
   var td = 'style="padding:4px 8px;border-bottom:1px solid var(--border);font-size:12px;"';
-  var h = '<div class="modal" style="width:920px;max-width:96vw;"><div class="modal-title">🔍 Owned equipment — ' + fuEsc(r.equipment) + (r.capacity ? ' · ' + fuEsc(r.capacity) : '') + '</div>';
+  var h = '<div class="modal" style="width:1080px;max-width:96vw;"><div class="modal-title">🔍 Owned equipment — ' + fuEsc(r.equipment) + (r.capacity ? ' · ' + fuEsc(r.capacity) : '') + '</div>';
   h += '<div style="font-size:12px;color:var(--text-muted);margin:-8px 0 12px;">Request: <b style="color:var(--text)">' + fuEsc(r.project) + '</b> · Qty ' + (r.qty || 1) + ' · ' + fuEsc(formatExcelDate(r.date_from)) + ' → ' + fuEsc(formatExcelDate(r.date_to)) + ' · currently <b style="color:var(--text)">' + fuEsc(r.provision || '—') + '</b></div>';
-  h += '<div style="display:flex;gap:10px;flex-wrap:wrap;">' + chip(useLow ? 'Low H/M units \u00b7 same capacity' : 'Owned units of this type', res.length, 'var(--blue)') + (useLow ? chip('All owned of this type', resAll.length, 'var(--text-muted)') : '') + chip('In Central Workshop', ws, 'var(--green)') + chip('Capacity matches', cm, 'var(--accent)') + '</div>';
+  h += '<div style="display:flex;gap:10px;flex-wrap:wrap;">' + chip(useLow ? 'Low H/M units \u00b7 same capacity' : 'Owned units of this type', res.length, 'var(--blue)') + (useLow ? chip('All owned of this type', resAll.length, 'var(--text-muted)') : '') + chip('In Central Workshop', ws, 'var(--green)') + chip('Capacity matches', cm, 'var(--accent)') + (hideRep && repHidden ? chip('Hidden \u2014 under repair', repHidden, 'var(--red)') : '') + (reqWin ? chip(hideBusy ? 'Hidden \u2014 busy in period' : 'Busy in period', hideBusy ? busyHidden : res.filter(function(x){ return x.busy && x.busy.length; }).length, 'var(--red)') : '') + '</div>';
   var lowOpts = '<option value="">' + (LM.loaded ? fuEsc(window.hmLowLabel(LM.months.indexOf(lowYm) >= 0 ? lowYm : (LM.ym && LM.ym !== 'all' ? LM.ym : ''))) : 'latest month') + '</option>';
   if(LM.loaded){ lowOpts = '<option value="all"' + (lowYm === 'all' ? ' selected' : '') + '>All months</option>' + LM.months.slice().reverse().map(function(m){ return '<option value="' + m + '"' + ((lowYm || LM.ym) === m && lowYm !== 'all' ? ' selected' : '') + '>' + fuEsc(window.hmLowLabel(m)) + '</option>'; }).join(''); }
   h += '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:10px 0 2px;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-size:12px;">'
      + '<label style="color:var(--text);"><input type="checkbox" id="fu-own-low" ' + (lowOn ? 'checked' : '') + ' onchange="fuSearchOwned(window.__fuOwnedReq)"> <b>Only Low H/M usage units</b> (same capacity as the request)</label>'
      + (lowOn ? '<label style="color:var(--text-muted);">Month <select id="fu-own-lowm" onchange="fuSearchOwned(window.__fuOwnedReq)" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:3px 6px;border-radius:6px;font-size:12px;">' + lowOpts + '</select></label>' : '')
+     + '<label style="color:var(--text);"><input type="checkbox" id="fu-own-rep" ' + (hideRep ? 'checked' : '') + ' onchange="fuSearchOwned(window.__fuOwnedReq)"> <b>Hide units under repair</b></label>'
+     + (reqWin ? '<label style="color:var(--text);"><input type="checkbox" id="fu-own-busy" ' + (hideBusy ? 'checked' : '') + ' onchange="fuSearchOwned(window.__fuOwnedReq)"> <b>Hide units busy in the request period</b> <span style="color:var(--text-muted);">(' + fuEsc(reqWin.from) + ' \u2192 ' + fuEsc(reqWin.to) + ')</span></label>' : '')
      + (capIgnored ? '<span style="color:var(--text-muted);">Capacity "' + fuEsc(r.capacity) + '" is not a rating (kW / ton ...), so all Low H/M units of this type are listed.</span>' : '')
      + (lowOn && !LM.loaded ? '<span style="color:var(--accent);">H/M data not loaded yet — showing all owned units until it loads.</span>' : '')
      + '</div>';
   h += '<label style="display:block;font-size:12px;margin:10px 0;color:var(--text-muted);"><input type="checkbox" id="fu-own-fleets" ' + (fleets ? 'checked' : '') + ' onchange="fuSearchOwned(window.__fuOwnedReq)"> include fleets of other countries</label>';
+  var alCodes = (r.allocated || []);
+  if(alCodes.length) h += '<div style="margin:6px 0 10px;padding:8px 10px;border:1px solid var(--green);border-radius:8px;font-size:12px;background:rgba(63,185,80,.07);">\ud83d\udccc <b>Allocated to this request (' + alCodes.length + ' of ' + (Number(r.qty) || 1) + '):</b> ' + alCodes.map(function(c){ var enc = encodeURIComponent(c); return '<span style="font-family:monospace;border:1px solid var(--border);border-radius:10px;padding:1px 8px;margin-right:4px;">' + fuEsc(c) + (typeof isAdmin !== 'undefined' && isAdmin ? ' <a style="cursor:pointer;color:var(--red);" title="Release" onclick="fuAllocToggle(window.__fuOwnedReq,\'' + enc + '\')">\u2715</a>' : '') + ' <a style="cursor:pointer;" title="Copy transfer message" onclick="fuTransferMsg(window.__fuOwnedReq,\'' + enc + '\')">\u2709</a></span>'; }).join('') + '</div>';
   if(!res.length){
     h += '<div style="padding:14px;border:1px dashed var(--border);border-radius:8px;font-size:13px;">' + (useLow ? 'No <b>Low H/M usage</b> unit of <b>' + fuEsc(r.equipment) + '</b>' + (r.capacity ? ' with capacity <b>' + fuEsc(r.capacity) + '</b>' : '') + ' (' + resAll.length + ' owned of this type in total — untick the Low H/M box to see them).' : 'No owned equipment matches <b>' + fuEsc(r.equipment) + '</b> in the Equipment List — an external rental looks justified for this request.') + '</div>';
   } else {
     h += '<div style="max-height:360px;overflow:auto;border:1px solid var(--border);border-radius:8px;"><table style="width:100%;border-collapse:collapse;"><tr style="position:sticky;top:0;background:var(--surface);">'
-       + ['Code','Equipment','Brand','Year','Location','Capacity','Fleet'].concat(useLow ? ['H/M diff','Repair'] : []).map(function(x){ return '<th style="text-align:left;padding:5px 8px;font-size:11px;color:var(--text-muted);">' + x + '</th>'; }).join('') + '</tr>'
+       + ['Code','Equipment','Brand','Year','Location','Capacity','Fleet'].concat(useLow ? ['H/M diff','Repair'] : []).concat(['Availability', 'Actions']).map(function(x){ return '<th style="text-align:left;padding:5px 8px;font-size:11px;color:var(--text-muted);">' + x + '</th>'; }).join('') + '</tr>'
        + res.slice(0, 60).map(function(x){
            var e = x.e, capBadge = x.cap === 'match' ? '<span style="color:var(--green)">✓ matches</span>' : (x.cap === 'unknown' ? '<span style="color:var(--text-muted)">not stated</span>' : '—');
            return '<tr><td ' + td + '><b>' + fuEsc(e.code || '—') + '</b></td><td ' + td + '>' + fuEsc(e.equipment) + (x.note ? '<div style="font-size:10.5px;color:var(--accent);">' + fuEsc(x.note) + '</div>' : '') + '</td><td ' + td + '>' + fuEsc(e.brand || '') + '</td><td ' + td + '>' + fuEsc(e.year || '') + '</td>'
-             + '<td ' + td + '>' + (x.workshop ? '<span style="color:var(--green)">🏭 Central Workshop</span>' : fuEsc(e.project || '—')) + '</td><td ' + td + '>' + capBadge + '</td><td ' + td + '>' + fuEsc(e.fleet || 'egypt') + '</td>' + (useLow ? '<td ' + td + '><b style="color:var(--red);font-family:monospace;">' + fuEsc(x.low ? x.low.d : '') + '</b> <span style="color:var(--text-muted);font-size:10.5px;">/ &lt; ' + fuEsc(x.low ? x.low.lim : '') + ' h' + (LM.ym === 'all' && x.low ? ' \u00b7 ' + fuEsc(window.hmLowLabel(x.low.ym)) : '') + '</span></td><td ' + td + '>' + ((x.low && x.low.ur) ? window.hmLowBadge(x.low.ur) : '\u2014') + '</td>' : '') + '</tr>';
+             + '<td ' + td + '>' + (x.workshop ? '<span style="color:var(--green)">🏭 Central Workshop</span>' : fuEsc(e.project || '—')) + '</td><td ' + td + '>' + capBadge + '</td><td ' + td + '>' + fuEsc(e.fleet || 'egypt') + '</td>' + (useLow ? '<td ' + td + '><b style="color:var(--red);font-family:monospace;">' + fuEsc(x.low ? x.low.d : '') + '</b> <span style="color:var(--text-muted);font-size:10.5px;">/ &lt; ' + fuEsc(x.low ? x.low.lim : '') + ' h' + (LM.ym === 'all' && x.low ? ' \u00b7 ' + fuEsc(window.hmLowLabel(x.low.ym)) : '') + '</span></td><td ' + td + '>' + ((x.low && x.low.ur) ? window.hmLowBadge(x.low.ur) : '\u2014') + '</td>' : '') + (function(){
+                var av = '', al = x.alloc, enc = encodeURIComponent(e.code || '');
+                if(al) av += '<div style="color:var(--green);font-size:11px;font-weight:700;white-space:nowrap;">\ud83d\udccc Allocated</div>';
+                if(x.rep) av += '<div style="color:var(--red);font-size:11px;white-space:nowrap;">\ud83d\udd27 Under repair</div>';
+                (x.busy || []).forEach(function(c){ av += '<div style="color:var(--red);font-size:11px;white-space:nowrap;">\u26d4 ' + fuEsc(c.text) + '</div>'; });
+                if(!av) av = '<span style="color:var(--green);">\u2713 Free</span>';
+                var act = '';
+                if(typeof isAdmin !== 'undefined' && isAdmin && e.code) act += '<button class="btn-edit" style="padding:1px 7px;font-size:10px;" onclick="fuAllocToggle(window.__fuOwnedReq,\'' + enc + '\')">' + (al ? 'Release' : 'Allocate') + '</button> ';
+                if(e.code) act += '<button class="btn-edit" style="padding:1px 7px;font-size:10px;" title="Copy a ready transfer request message" onclick="fuTransferMsg(window.__fuOwnedReq,\'' + enc + '\')">\u2709</button>';
+                return '<td ' + td + '>' + av + '</td><td ' + td + '>' + act + '</td>';
+              })() + '</tr>';
          }).join('') + '</table></div>' + (res.length > 60 ? '<div style="font-size:11px;color:var(--text-muted);margin-top:6px;">… and ' + (res.length - 60) + ' more</div>' : '');
     h += '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;">Units in Central Workshop are the easiest to allocate; units at a project need that project\'s agreement. Matching is by equipment name and the numbers in the capacity — always confirm technically.</div>';
   }
+  if(res.length) h += '<div id="fu-own-sav" style="margin-top:10px;padding:10px 12px;border:1px solid var(--border);border-left:3px solid var(--green);border-radius:8px;font-size:12px;background:var(--bg);color:var(--text-muted);">\ud83d\udcb2 Estimating the saving vs. an external rental\u2026</div>';
+  if(repHidden) h += '<div style="font-size:11.5px;color:var(--accent);margin-top:8px;">' + repHidden + ' unit(s) hidden because they are under repair \u2014 untick "Hide units under repair" to see them.</div>';
+  if(busyHidden) h += '<div style="font-size:11.5px;color:var(--accent);margin-top:8px;">' + busyHidden + ' unit(s) hidden because they are busy (workshop / transfer / allocated) during the request period \u2014 untick "Hide units busy" to see them with the reason.</div>';
   h += '<div class="modal-actions"><button class="btn-cancel" onclick="closeModal(\'fu-owned-modal\')">Close</button>'
+     + (res.length ? '<button class="btn-sm" onclick="fuOwnExport(\'xlsx\')">\ud83d\udcca Excel</button><button class="btn-sm" onclick="fuOwnExport(\'pdf\')">\ud83d\udcc4 PDF</button>' : '')
      + ((typeof isAdmin !== 'undefined' && isAdmin && r.provision !== 'Transfer' && res.length) ? '<button class="btn-save" onclick="closeModal(\'fu-owned-modal\');changeFuStatus(\'' + fuEsc(r.id) + '\',\'Transfer\')">Mark request as Transfer</button>' : '') + '</div></div>';
   m.innerHTML = h; m.classList.add('open');
+  window.__fuOwnLast = {r:r, res:res};
+  if(res.length) fuOwnSaving(r, res.length);
 }
 
 /* ── 8. reference prices from the Rental Database + cost forecast ── */
