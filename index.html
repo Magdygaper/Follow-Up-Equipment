@@ -5829,7 +5829,7 @@ function fuOwnSaving(r, n){
 /* ⑥ export the listed units (current filters) */
 function fuFlatUnit(x){
   var e = x.e, ws = x.workshop || isCentralWorkshop(e.project), E = ws ? [] : fuEngFor(e.project), L = x.last, src = x.low || L, av = [];
-  if(x.alloc) av.push('Allocated'); if(x.rep) av.push('Under repair'); (x.busy || []).forEach(function(c){ av.push(c.text); });
+  if(x.alloc) av.push('Allocated'); if(x.proposed) av.push('Proposed for this request'); if(x.takenBy) av.push('Fits but goes to request #' + x.takenBy); if(x.rep) av.push('Under repair'); (x.busy || []).forEach(function(c){ av.push(c.text); });
   return {code:e.code || '', eq:e.equipment || '', cap:fuCapOf(e), brand:e.brand || '', year:e.year || '', proj:ws ? 'Central Workshop' : (e.project || ''),
           eng:E.map(function(g){ return g.n; }).join(' / '), title:E.map(function(g){ return g.t; }).join(' / '), mob:E.map(function(g){ return g.m; }).join(' / '), mail:E.map(function(g){ return g.e; }).filter(Boolean).join(' / '),
           lm:L ? fuMLab(L.m) : '', behind:L ? fuMonthsBehind(L.m, L.latest) : '', d:(src && src.d != null) ? Math.round(src.d * 10) / 10 : '', lim:src ? src.lim : '', low:(src && src.d != null) ? (src.d < src.lim ? 'Low' : 'OK') : '',
@@ -5856,15 +5856,33 @@ function fuRenderBulk(){
   var scEl = document.getElementById('fu-bulk-scope'), sc = scEl ? scEl.value : 'Pending';
   var lEl = document.getElementById('fu-bulk-low'), low = lEl ? lEl.checked : (window.__fuOwnLow !== false);
   var fEl = document.getElementById('fu-bulk-fleets'), fleets = fEl ? fEl.checked : false;
+  var eEl = document.getElementById('fu-bulk-ended'), incEnd = eEl ? eEl.checked : false;
   var yEl = document.getElementById('fu-bulk-lowm'), ym = yEl ? yEl.value : (window.__fuLowYm || 'last'); window.__fuLowYm = ym;
   var LM = (typeof window.hmLowMap === 'function') ? window.hmLowMap(ym) : {map:{}, loaded:false, months:[]};
   if(low && !LM.loaded && typeof hmReload === 'function'){ try{ hmReload(); }catch(x){} }
-  var useLow = low && LM.loaded, tok = (window.__fuBulkTok = (window.__fuBulkTok || 0) + 1);
-  var list = FU_DATA.filter(function(r){ return r.equipment && (sc === 'all' || String(r.provision || 'Pending') === sc); });
+  var useLow = low && LM.loaded, tok = (window.__fuBulkTok = (window.__fuBulkTok || 0) + 1), today = fuTodayIso();
+  /* same requests as the Follow-Up cards: the page filters apply, and "Pending" means provision = Pending */
+  var scoped = (typeof getScopedFuData === 'function') ? getScopedFuData() : FU_DATA;
+  var base = scoped.filter(function(r){ return r.equipment && (sc === 'all' || r.provision === sc); });
+  var nEnded = 0;
+  var list = base.filter(function(r){ var w = fuReqWindow(r); if(w && w.to < today && !incEnd){ nEnded++; return false; } return true; });
   var rows = list.map(function(r){
-    var o = fuOwnedFor(r, {low:useLow, LM:LM, fleets:fleets}), qty = Number(r.qty) || 1, alloc = (r.allocated || []).length;
-    var fresh = o.free.filter(function(x){ return !x.alloc; }), cover = Math.min(qty, alloc + fresh.length);
-    return {r:r, o:o, qty:qty, alloc:alloc, nFree:fresh.length, cover:cover, saving:null};
+    var o = fuOwnedFor(r, {low:useLow, LM:LM, fleets:fleets});
+    return {r:r, o:o, qty:Number(r.qty) || 1, alloc:(r.allocated || []).length, nFree:o.free.filter(function(u){ return !u.alloc; }).length, assigned:[], takenN:0, cover:0, saving:null};
+  });
+  /* a unit can serve only one request at a time: share the units out in order of request start date */
+  var order = rows.map(function(x, i){ return {x:x, i:i}; }).sort(function(a, b){ var fa = a.x.o.win ? a.x.o.win.from : '9999', fb = b.x.o.win ? b.x.o.win.from : '9999'; return fa < fb ? -1 : (fa > fb ? 1 : a.i - b.i); });
+  var taken = {};
+  rows.forEach(function(x, i){ var w0 = x.o.win || {from:'0000-00-00', to:'9999-99-99'}; (x.r.allocated || []).forEach(function(c){ var k = fuNormCode(c); (taken[k] = taken[k] || []).push({from:w0.from, to:w0.to, n:i + 1}); }); });   /* allocated units are reserved first */
+  order.forEach(function(it){
+    var x = it.x, n = it.i + 1, win = x.o.win || {from:'0000-00-00', to:'9999-99-99'}, need = Math.max(0, x.qty - x.alloc);
+    x.o.free.forEach(function(u){
+      if(u.alloc) return;
+      var k = fuNormCode(u.e.code), clash = (taken[k] || []).filter(function(t){ return t.n !== n && t.from <= win.to && t.to >= win.from; })[0];
+      if(clash){ u.takenBy = clash.n; x.takenN++; return; }
+      if(x.assigned.length < need){ x.assigned.push(u); u.proposed = true; (taken[k] = taken[k] || []).push({from:win.from, to:win.to, n:n}); }
+    });
+    x.cover = Math.min(x.qty, x.alloc + x.assigned.length);
   });
   var nFull = rows.filter(function(x){ return x.cover >= x.qty; }).length, nPart = rows.filter(function(x){ return x.cover > 0 && x.cover < x.qty; }).length, nNone = rows.length - nFull - nPart;
   var noEng = {}; rows.forEach(function(x){ x.o.free.forEach(function(u){ var p = u.e.project; if(p && !isCentralWorkshop(p) && !fuEngFor(p).length) noEng[p] = 1; }); });
@@ -5875,28 +5893,35 @@ function fuRenderBulk(){
   var chip = function(l, n, c){ return '<div style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-top:3px solid ' + c + ';border-radius:8px;padding:8px 12px;"><div style="font-size:20px;font-weight:700;color:' + c + ';font-family:\'JetBrains Mono\',monospace;">' + n + '</div><div style="font-size:11px;color:var(--text-muted);">' + l + '</div></div>'; };
   var basis = '';
   if(LM.loaded) basis = '<option value="last"' + (ym === 'last' ? ' selected' : '') + '>Last reading of each unit</option><option value="all"' + (ym === 'all' ? ' selected' : '') + '>Any month (lowest)</option>' + LM.months.slice().reverse().map(function(q){ return '<option value="' + q + '"' + (ym === q ? ' selected' : '') + '>' + fuEsc(window.hmLowLabel(q)) + '</option>'; }).join('');
-  var h = '<div class="modal" style="width:1240px;max-width:97vw;max-height:92vh;display:flex;flex-direction:column;"><div class="modal-title">\ud83d\udd0d Bulk owned search \u2014 every request at once</div>'
+  var showSt = (sc === 'all');
+  var h = '<div class="modal" style="width:1240px;max-width:97vw;max-height:92vh;display:flex;flex-direction:column;"><div class="modal-title">\ud83d\udd0d Bulk owned search \u2014 what was requested vs. what Owned can give</div>'
     + '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:10px;font-size:12px;">'
-    + '<label>Requests <select id="fu-bulk-scope" onchange="fuRenderBulk()" style="' + inp + '"><option value="Pending"' + (sc === 'Pending' ? ' selected' : '') + '>Pending only</option><option value="all"' + (sc === 'all' ? ' selected' : '') + '>All requests</option></select></label>'
+    + '<label>Requests <select id="fu-bulk-scope" onchange="fuRenderBulk()" style="' + inp + '"><option value="Pending"' + (sc === 'Pending' ? ' selected' : '') + '>Pending (as in the Follow-Up card)</option><option value="all"' + (sc === 'all' ? ' selected' : '') + '>All requests</option></select></label>'
+    + '<label><input type="checkbox" id="fu-bulk-ended" ' + (incEnd ? 'checked' : '') + ' onchange="fuRenderBulk()"> include requests whose period already ended</label>'
     + '<label><input type="checkbox" id="fu-bulk-low" ' + (low ? 'checked' : '') + ' onchange="window.__fuOwnLow=this.checked;fuRenderBulk()"> Only Low H/M usage units (same capacity)</label>'
     + (low && LM.loaded ? '<label>H/M basis <select id="fu-bulk-lowm" onchange="fuRenderBulk()" style="' + inp + '">' + basis + '</select></label>' : '')
     + '<label><input type="checkbox" id="fu-bulk-fleets" ' + (fleets ? 'checked' : '') + ' onchange="fuRenderBulk()"> include other countries\' fleets</label>'
     + fuUnitBox()
-    + '<span style="margin-left:auto;display:flex;gap:6px;"><button class="btn-sm" onclick="fuBulkAll(true)">\u25be Expand all</button><button class="btn-sm" onclick="fuBulkAll(false)">\u25b8 Collapse</button><button class="btn-sm" onclick="fuBulkExport(\'xlsx\')">\ud83d\udcca Excel</button><button class="btn-sm" onclick="fuBulkExport(\'pdf\')">\ud83d\udcc4 PDF</button></span></div>'
-    + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">' + chip('Requests checked', rows.length, 'var(--blue)') + chip('Fully covered by owned', nFull, 'var(--green)') + chip('Partly covered', nPart, 'var(--accent)') + chip('No owned unit \u2192 external', nNone, 'var(--red)') + '<div id="fu-bulk-total" style="flex:1.4;min-width:200px;background:var(--bg);border:1px solid var(--border);border-top:3px solid var(--green);border-radius:8px;padding:8px 12px;font-size:11px;color:var(--text-muted);">\ud83d\udcb2 Estimating total saving\u2026</div></div>'
+    + '<span style="margin-left:auto;display:flex;gap:6px;"><button class="btn-sm" onclick="fuBulkAll(true)">\u25be Expand all</button><button class="btn-sm" onclick="fuBulkAll(false)">\u25b8 Collapse</button><button class="btn-sm" onclick="fuBulkExport(\'xlsx\')" title="One row per request">\ud83d\udcca Excel</button><button class="btn-sm" onclick="fuBulkExport(\'pdf\')">\ud83d\udcc4 PDF</button><button class="btn-sm" onclick="fuBulkExportUnits(\'xlsx\')" title="One row per request + unit pair">\ud83d\udcca Excel (per unit)</button></span></div>'
+    + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">' + chip('Requests checked', rows.length, 'var(--blue)') + chip('Covered by Owned', nFull, 'var(--green)') + chip('Partly covered', nPart, 'var(--accent)') + chip('Nothing available \u2192 external', nNone, 'var(--red)') + '<div id="fu-bulk-total" style="flex:1.4;min-width:200px;background:var(--bg);border:1px solid var(--border);border-top:3px solid var(--green);border-radius:8px;padding:8px 12px;font-size:11px;color:var(--text-muted);">\ud83d\udcb2 Estimating total saving\u2026</div></div>'
     + (low && !LM.loaded ? '<div style="font-size:12px;color:var(--accent);margin-bottom:8px;">H/M data is not loaded yet \u2014 showing all owned units until it loads.</div>' : '')
-    + '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:6px;">Click \u25b8 on a request to see each unit: code, the project it is in now, that project\'s engineer, and its last hour-meter reading.</div>'
-    + '<div id="fu-bulk-body" style="overflow:auto;border:1px solid var(--border);border-radius:8px;"><table style="width:100%;border-collapse:collapse;"><thead><tr>' + ['', '#', 'Equipment', 'Project', 'Period', 'Qty', 'Status', 'Allocated', 'Free units', 'Owned total', 'Coverage', 'Held at (projects)', 'Est. saving', ''].map(th).join('') + '</tr></thead><tbody>';
-  if(!rows.length) h += '<tr><td colspan="14" style="padding:24px;text-align:center;color:var(--text-muted);">No requests in this scope.</td></tr>';
+    + '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:6px;line-height:1.7;">Each row is one request. <b>Available from Owned</b> = owned units of the same type (and capacity) that are in Low H/M, free in the request\'s dates and not under repair. A unit is given to <b>one request only</b> \u2014 the one that starts first \u2014 so it is never counted twice. Click \u25b8 to see the units, their project, engineer and last reading.'
+    + (scoped.length !== FU_DATA.length ? '<br><span style="color:var(--accent);">Follow-Up filters are active (' + scoped.length + ' of ' + FU_DATA.length + ' requests) \u2014 clear them in Follow-Up to check everything.</span>' : '')
+    + (nEnded ? '<br><span style="color:var(--accent);">' + nEnded + ' request(s) are hidden because their dates already ended \u2014 tick "include requests whose period already ended" to see them.</span>' : '') + '</div>'
+    + '<div id="fu-bulk-body" style="overflow:auto;border:1px solid var(--border);border-radius:8px;"><table style="width:100%;border-collapse:collapse;"><thead><tr>' + ['', '#', 'Requested', 'For project', 'Period', 'Qty'].concat(showSt ? ['Status'] : []).concat(['Available from Owned', 'Result', 'Proposed units (project)', 'Est. saving', '']).map(th).join('') + '</tr></thead><tbody>';
+  var nc = showSt ? 12 : 11;
+  if(!rows.length) h += '<tr><td colspan="' + nc + '" style="padding:24px;text-align:center;color:var(--text-muted);">No requests to check.</td></tr>';
   rows.forEach(function(x, i){
-    var r = x.r, w = x.o.win, cov = x.cover >= x.qty ? '<span style="color:var(--green);font-weight:700;">\u2705 Covered</span>' : (x.cover > 0 ? '<span style="color:var(--accent);font-weight:700;">\u26a0 ' + x.cover + ' of ' + x.qty + '</span>' : '<span style="color:var(--red);font-weight:700;">\u2716 External</span>');
-    var pc = {}; x.o.free.forEach(function(u){ var p = isCentralWorkshop(u.e.project) ? 'Central Workshop' : (u.e.project || '\u2014'); pc[p] = (pc[p] || 0) + 1; });
-    var pk = Object.keys(pc).sort(function(a, b){ return pc[b] - pc[a]; });
-    var held = pk.length ? pk.slice(0, 3).map(function(p){ return fuEsc(p) + ' <span style="color:var(--text-muted);">(' + pc[p] + ')</span>'; }).join('<br>') + (pk.length > 3 ? '<div style="color:var(--text-muted);font-size:10.5px;">+' + (pk.length - 3) + ' more</div>' : '') : '\u2014';
-    h += '<tr><td ' + td + '>' + (x.o.free.length ? '<a id="fu-bt-' + i + '" style="cursor:pointer;font-size:14px;" title="Show the units" onclick="fuBulkToggle(' + i + ')">\u25b8</a>' : '') + '</td><td ' + td + '>' + (i + 1) + '</td><td ' + td + '><b>' + fuEsc(r.equipment) + '</b>' + (r.capacity ? '<div style="color:var(--text-muted);font-size:11px;">' + fuEsc(r.capacity) + '</div>' : '') + '</td><td ' + td + '>' + fuEsc(r.project || '\u2014') + '</td><td ' + td + ' style="white-space:nowrap">' + (w ? fuEsc(w.from) + ' \u2192 ' + fuEsc(w.to) : '\u2014') + '</td><td ' + td + '>' + x.qty + '</td><td ' + td + '>' + fuEsc(r.provision || 'Pending') + '</td>'
-      + '<td ' + td + '>' + (x.alloc ? '<b style="color:var(--green);">\ud83d\udccc ' + x.alloc + '</b>' : '\u2014') + '</td><td ' + td + '><b>' + x.nFree + '</b></td><td ' + td + '><span style="color:var(--text-muted);">' + x.o.resAll.length + '</span></td><td ' + td + '>' + cov + '</td><td ' + td + ' style="padding:5px 8px;border-bottom:1px solid var(--border);font-size:11.5px;vertical-align:top;">' + held + '</td><td ' + td + ' id="fu-bsav-' + i + '">' + (x.cover > 0 ? '\u2026' : '\u2014') + '</td>'
+    var r = x.r, w = x.o.win;
+    var cov = x.cover >= x.qty ? '<span style="color:var(--green);font-weight:700;">\u2705 Covered</span>' : (x.cover > 0 ? '<span style="color:var(--accent);font-weight:700;">\u26a0 ' + x.cover + ' of ' + x.qty + '</span>' : '<span style="color:var(--red);font-weight:700;">\u2716 External</span>');
+    if(x.alloc) cov += '<div style="font-size:10.5px;color:var(--green);">\ud83d\udccc ' + x.alloc + ' allocated</div>';
+    if(x.takenN) cov += '<div style="font-size:10.5px;color:var(--accent);">' + x.takenN + ' more fit but go to earlier request(s)</div>';
+    var give = x.o.free.filter(function(u){ return u.alloc || u.proposed; });
+    var pu = give.length ? give.slice(0, 3).map(function(u){ var p = isCentralWorkshop(u.e.project) ? 'Central Workshop' : (u.e.project || '\u2014'); return '<a style="cursor:pointer;font-weight:700;color:var(--blue);" onclick="fuUnitLookup(decodeURIComponent(\'' + encodeURIComponent(u.e.code || '') + '\'))">' + fuEsc(u.e.code || '\u2014') + '</a> <span style="color:var(--text-muted);">' + fuEsc(p) + '</span>'; }).join('<br>') + (give.length > 3 ? '<div style="color:var(--text-muted);font-size:10.5px;">+' + (give.length - 3) + ' more</div>' : '') : '\u2014';
+    h += '<tr><td ' + td + '>' + (x.o.free.length ? '<a id="fu-bt-' + i + '" style="cursor:pointer;font-size:14px;" title="Show the units" onclick="fuBulkToggle(' + i + ')">\u25b8</a>' : '') + '</td><td ' + td + '>' + (i + 1) + '</td><td ' + td + '><b>' + fuEsc(r.equipment) + '</b>' + (r.capacity ? '<div style="color:var(--text-muted);font-size:11px;">' + fuEsc(r.capacity) + '</div>' : '') + '</td><td ' + td + '>' + fuEsc(r.project || '\u2014') + '</td><td ' + td + ' style="white-space:nowrap">' + (w ? fuEsc(w.from) + ' \u2192 ' + fuEsc(w.to) : '\u2014') + '</td><td ' + td + '>' + x.qty + '</td>' + (showSt ? '<td ' + td + '>' + fuEsc(r.provision || '\u2014') + '</td>' : '')
+      + '<td ' + td + '><b>' + x.nFree + '</b> <span style="color:var(--text-muted);font-size:10.5px;">of ' + x.o.resAll.length + ' owned of this type</span></td><td ' + td + '>' + cov + '</td><td ' + td + '>' + pu + '</td><td ' + td + ' id="fu-bsav-' + i + '">' + (x.cover > 0 ? '\u2026' : '\u2014') + '</td>'
       + '<td ' + td + '><button class="btn-edit" style="padding:1px 7px;font-size:10px;" onclick="closeModal(\'fu-bulk-modal\');fuSearchOwned(\'' + fuEsc(r.id) + '\')">Open</button></td></tr>'
-      + '<tr id="fu-bd-' + i + '" style="display:none;"><td colspan="14" id="fu-bdc-' + i + '" style="padding:8px 12px 12px 34px;background:var(--bg);border-bottom:1px solid var(--border);"></td></tr>';
+      + '<tr id="fu-bd-' + i + '" style="display:none;"><td colspan="' + nc + '" id="fu-bdc-' + i + '" style="padding:8px 12px 12px 34px;background:var(--bg);border-bottom:1px solid var(--border);"></td></tr>';
   });
   h += '</tbody></table></div>' + (noEngL.length ? '<div style="font-size:11px;color:var(--accent);margin-top:8px;">\u26a0 ' + noEngL.length + ' project name(s) have no engineer in the contact list (names differ): ' + fuEsc(noEngL.slice(0, 10).join(' \u00b7 ')) + (noEngL.length > 10 ? ' \u2026' : '') + '</div>' : '')
     + '<div class="modal-actions"><button class="btn-cancel" onclick="closeModal(\'fu-bulk-modal\')">Close</button></div></div>';
@@ -5915,7 +5940,7 @@ function fuRenderBulk(){
       x.saving = p.daily * d * x.cover; sum += x.saving; ccy = ccy || p.ccy || '';
       el.innerHTML = '<b style="color:var(--green);">' + f(x.saving) + '</b>';
     });
-    if(tot) tot.innerHTML = '\ud83d\udcb2 <b style="color:var(--green);font-size:15px;">\u2248 ' + f(sum) + ' ' + fuEsc(ccy) + '</b><div>estimated saving if every covered request is served from Owned (Rental Database reference prices)</div>';
+    if(tot) tot.innerHTML = '\ud83d\udcb2 <b style="color:var(--green);font-size:15px;">\u2248 ' + f(sum) + ' ' + fuEsc(ccy) + '</b><div>estimated saving if the covered requests are served from Owned (Rental Database reference prices)</div>';
   }).catch(function(){ if(tot) tot.textContent = '\ud83d\udcb2 Could not load reference prices.'; });
 }
 function fuBulkToggle(i, forceOpen){
@@ -5929,19 +5954,32 @@ function fuBulkToggle(i, forceOpen){
 function fuBulkAll(on){ (window.__fuBulkRows || []).forEach(function(x, i){ if(!x.o.free.length) return; var tr = document.getElementById('fu-bd-' + i); if(!tr) return; var isOpen = tr.style.display !== 'none'; if(on !== isOpen) fuBulkToggle(i, on); }); }
 function fuBulkExport(kind){
   var rows = window.__fuBulkRows || []; if(!rows.length){ toast('Nothing to export', 'error'); return; }
-  var data = [];
-  rows.forEach(function(x){
-    var r = x.r, w = x.o.win, cov = x.cover >= x.qty ? 'Covered' : (x.cover > 0 ? x.cover + ' of ' + x.qty : 'External');
-    var base = {req:r.equipment || '', rcap:r.capacity || '', rproj:r.project || '', qty:x.qty, from:w ? w.from : '', to:w ? w.to : '', cov:cov, sav:x.saving != null ? Math.round(x.saving) : ''};
-    if(!x.o.free.length) data.push(Object.assign({}, base, {code:'', eq:'', cap:'', proj:'', eng:'', title:'', mob:'', mail:'', lm:'', d:'', lim:'', low:'', av:'No free owned unit', alloc:''}));
-    x.o.free.forEach(function(u){ data.push(Object.assign({}, base, fuFlatUnit(u))); });
+  var data = rows.map(function(x){
+    var r = x.r, w = x.o.win, give = x.o.free.filter(function(u){ return u.alloc || u.proposed; }).map(fuFlatUnit);
+    return {req:r.equipment || '', rcap:r.capacity || '', rproj:r.project || '', qty:x.qty, from:w ? w.from : '', to:w ? w.to : '', st:r.provision || '',
+            avail:x.nFree, tot:x.o.resAll.length, cov:x.cover >= x.qty ? 'Covered' : (x.cover > 0 ? x.cover + ' of ' + x.qty : 'External'),
+            units:give.map(function(u){ return u.code + ' (' + (u.proj || '\u2014') + (u.eng ? ' \u00b7 ' + u.eng + (u.mob ? ' ' + u.mob : '') : '') + (u.lm ? ' \u00b7 ' + u.lm + (u.d !== '' ? ': ' + u.d + ' h' : '') : '') + ')'; }).join(' | '),
+            more:x.takenN ? x.takenN + ' more fit but go to earlier request(s)' : '', sav:x.saving != null ? Math.round(x.saving) : ''};
   });
   function f(k){ return function(o){ return o[k]; }; }
-  var cols = [{h:'#', g:function(o, i){ return i + 1; }, t:'t'}, {h:'Requested equipment', g:f('req'), t:'t'}, {h:'Req. capacity', g:f('rcap'), t:'t'}, {h:'Request project', g:f('rproj'), t:'t'}, {h:'Qty', g:f('qty'), t:'t'}, {h:'From', g:f('from'), t:'t'}, {h:'To', g:f('to'), t:'t'}, {h:'Coverage', g:f('cov'), t:'t'},
-    {h:'Unit code', g:f('code'), t:'t'}, {h:'Unit equipment', g:f('eq'), t:'t'}, {h:'Unit capacity', g:f('cap'), t:'t'}, {h:'Current project', g:f('proj'), t:'t'}, {h:'Engineer', g:f('eng'), t:'t'}, {h:'Title', g:f('title'), t:'t'}, {h:'Mobile', g:f('mob'), t:'t'},
-    {h:'Last reading', g:f('lm'), t:'t'}, {h:'H/M diff (h)', g:f('d'), t:'t'}, {h:'Limit (h)', g:f('lim'), t:'t'}, {h:'Availability', g:f('av'), t:'t'}, {h:'Est. saving', g:f('sav'), t:'t'}];
-  var nFull = rows.filter(function(x){ return x.cover >= x.qty; }).length;
-  window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 Owned equipment coverage of follow-up requests (one row per candidate unit)', cols:cols, rows:data, kpis:[{label:'Requests', value:rows.length}, {label:'Fully covered', value:nFull}, {label:'Candidate rows', value:data.length}]}, kind);
+  var cols = [{h:'#', g:function(o, i){ return i + 1; }, t:'t'}, {h:'Requested equipment', g:f('req'), t:'t'}, {h:'Capacity', g:f('rcap'), t:'t'}, {h:'For project', g:f('rproj'), t:'t'}, {h:'Qty', g:f('qty'), t:'t'}, {h:'From', g:f('from'), t:'t'}, {h:'To', g:f('to'), t:'t'}, {h:'Status', g:f('st'), t:'t'},
+    {h:'Available from Owned', g:f('avail'), t:'t'}, {h:'Owned of this type (all)', g:f('tot'), t:'t'}, {h:'Result', g:f('cov'), t:'t'}, {h:'Proposed units (project \u00b7 engineer \u00b7 last reading)', g:f('units'), t:'t'}, {h:'Note', g:f('more'), t:'t'}, {h:'Est. saving (EGP)', g:f('sav'), t:'t'}];
+  var nFull = rows.filter(function(x){ return x.cover >= x.qty; }).length, nPart = rows.filter(function(x){ return x.cover > 0 && x.cover < x.qty; }).length;
+  window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 Requested equipment vs. what Owned can give', cols:cols, rows:data, kpis:[{label:'Requests', value:rows.length}, {label:'Covered by Owned', value:nFull}, {label:'Partly covered', value:nPart}, {label:'External', value:rows.length - nFull - nPart}]}, kind);
+}
+function fuBulkExportUnits(kind){
+  var rows = window.__fuBulkRows || []; if(!rows.length){ toast('Nothing to export', 'error'); return; }
+  var data = [];
+  rows.forEach(function(x, i){
+    var r = x.r, w = x.o.win, base = {n:i + 1, req:r.equipment || '', rcap:r.capacity || '', rproj:r.project || '', qty:x.qty, from:w ? w.from : '', to:w ? w.to : ''};
+    x.o.free.forEach(function(u){ data.push(Object.assign({}, base, fuFlatUnit(u))); });
+  });
+  if(!data.length){ toast('No unit to list', 'error'); return; }
+  function f(k){ return function(o){ return o[k]; }; }
+  var cols = [{h:'Request #', g:f('n'), t:'t'}, {h:'Requested equipment', g:f('req'), t:'t'}, {h:'Req. capacity', g:f('rcap'), t:'t'}, {h:'For project', g:f('rproj'), t:'t'}, {h:'Qty', g:f('qty'), t:'t'}, {h:'From', g:f('from'), t:'t'}, {h:'To', g:f('to'), t:'t'},
+    {h:'Unit code', g:f('code'), t:'t'}, {h:'Unit equipment', g:f('eq'), t:'t'}, {h:'Unit capacity', g:f('cap'), t:'t'}, {h:'Current project', g:f('proj'), t:'t'}, {h:'Engineer', g:f('eng'), t:'t'}, {h:'Mobile', g:f('mob'), t:'t'},
+    {h:'Last reading', g:f('lm'), t:'t'}, {h:'H/M diff (h)', g:f('d'), t:'t'}, {h:'Limit (h)', g:f('lim'), t:'t'}, {h:'Availability', g:f('av'), t:'t'}];
+  window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 Owned units that fit each request (one row per request + unit pair, so a unit can appear under several requests)', cols:cols, rows:data, kpis:[{label:'Requests', value:rows.length}, {label:'Request + unit pairs', value:data.length}]}, kind);
 }
 /* ── Rental Pull-Back Watch: rented units with very few working days and NO "intermittent work" note on the contract ── */
 var RW_KW = ['\u0645\u062a\u0642\u0637\u0639','intermittent','on call','on-call','oncall','as needed','as required','when needed','when required','\u0639\u0646\u062f \u0627\u0644\u0637\u0644\u0628','\u062d\u0633\u0628 \u0627\u0644\u062d\u0627\u062c\u0629','\u062d\u0633\u0628 \u0627\u0644\u0637\u0644\u0628','seasonal','\u0645\u0648\u0633\u0645\u064a','part time','part-time'];
@@ -6236,6 +6274,8 @@ function fuCandTable(list, r, o){
   list.slice(0, max).forEach(function(x){
     var e = x.e, enc = encodeURIComponent(e.code || ''), ws = x.workshop || isCentralWorkshop(e.project), cap = fuCapOf(e), av = '', al = x.alloc, act = '';
     if(al) av += '<div style="color:var(--green);font-size:11px;font-weight:700;white-space:nowrap;">\ud83d\udccc Allocated</div>';
+    if(x.proposed) av += '<div style="color:var(--green);font-size:11px;font-weight:700;white-space:nowrap;">\u2713 Proposed for this request</div>';
+    if(x.takenBy) av += '<div style="color:var(--accent);font-size:11px;white-space:nowrap;">\ud83d\udd01 Fits, but goes to request #' + x.takenBy + '</div>';
     if(x.rep) av += '<div style="color:var(--red);font-size:11px;white-space:nowrap;">\ud83d\udd27 Under repair</div>';
     (x.busy || []).forEach(function(c){ av += '<div style="color:var(--red);font-size:11px;white-space:nowrap;">\u26d4 ' + fuEsc(c.text) + '</div>'; });
     if(!av) av = '<span style="color:var(--green);">\u2713 Free</span>';
