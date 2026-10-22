@@ -5973,6 +5973,7 @@ function fuBulkExport(kind){
 function fuBulkXlsxPro(rows){
   var EJ = window.ExcelJS; if(!EJ){ toast('Excel library did not load \u2014 check the internet connection', 'error'); return; }
   var NAVY='FF0D1B2E', AMBER='FFF0A500', thin={style:'thin',color:{argb:'FFE3E7ED'}};
+  var clean=function(v){ return typeof v === 'string' ? v.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, '') : v; };
   var fill=function(c){ return {type:'pattern',pattern:'solid',fgColor:{argb:c}}; };
   var nFull = rows.filter(function(x){ return x.cover >= x.qty; }).length, nPart = rows.filter(function(x){ return x.cover > 0 && x.cover < x.qty; }).length;
   var kpis = [{label:'Requests', value:rows.length}, {label:'Covered by Owned', value:nFull}, {label:'Partly covered', value:nPart}, {label:'External', value:rows.length - nFull - nPart}];
@@ -5985,7 +5986,7 @@ function fuBulkXlsxPro(rows){
             avail:x.nFree, tot:x.o.resAll.length, cov:covTxt(x), prop:give.map(function(u){ return u.e.code || ''; }).join(' , '),
             more:x.takenN ? x.takenN + ' more fit but go to earlier request(s)' : '', sav:x.saving != null ? Math.round(x.saving) : ''};
   });
-  function f(k){ return function(o){ return o[k]; }; }
+  function f(k){ return function(o){ return clean(o[k]); }; }
   var sumCols = [{h:'#', g:f('n'), t:'t'}, {h:'Requested equipment', g:f('req'), t:'t'}, {h:'Capacity', g:f('rcap'), t:'t'}, {h:'For project', g:f('rproj'), t:'t'}, {h:'Qty', g:f('qty'), t:'t'}, {h:'From', g:f('from'), t:'t'}, {h:'To', g:f('to'), t:'t'}, {h:'Status', g:f('st'), t:'t'},
     {h:'Available from Owned (click \u2192 units)', g:f('avail'), t:'i'}, {h:'Owned of this type (all)', g:f('tot'), t:'i'}, {h:'Result', g:f('cov'), t:'t'}, {h:'Proposed unit(s)', g:f('prop'), t:'t'}, {h:'Note', g:f('more'), t:'t'}, {h:'Est. saving (EGP)', g:f('sav'), t:'z', s:true}];
   var wsS = window.hacBuildXlsx({title:'HAC \u00b7 PMV \u2014 Requested equipment vs. what Owned can give', sheetName:'Summary', cols:sumCols, rows:data, kpis:kpis, wb:wb}, EJ).getWorksheet('Summary');
@@ -6016,8 +6017,8 @@ function fuBulkXlsxPro(rows){
     var g = ws.getRow(rowNo++);
     ws.mergeCells(g.number, 1, g.number, nC);
     var gc = g.getCell(1);
-    gc.value = '#' + (i + 1) + '  \u00b7  ' + (r.equipment || '') + (r.capacity ? ' ' + r.capacity : '') + '  \u00b7  for ' + (r.project || '\u2014') + '  \u00b7  ' + (w ? w.from + ' \u2192 ' + w.to : 'no dates') + '  \u00b7  Qty ' + x.qty
-      + '   |   Available: ' + x.nFree + ' of ' + x.o.resAll.length + ' owned   |   ' + covTxt(x) + (x.takenN ? '   |   ' + x.takenN + ' more fit but go to earlier request(s)' : '');
+    gc.value = clean('#' + (i + 1) + '  \u00b7  ' + (r.equipment || '') + (r.capacity ? ' ' + r.capacity : '') + '  \u00b7  for ' + (r.project || '\u2014') + '  \u00b7  ' + (w ? w.from + ' \u2192 ' + w.to : 'no dates') + '  \u00b7  Qty ' + x.qty
+      + '   |   Available: ' + x.nFree + ' of ' + x.o.resAll.length + ' owned   |   ' + covTxt(x) + (x.takenN ? '   |   ' + x.takenN + ' more fit but go to earlier request(s)' : ''));
     gc.font = {name:'Calibri', size:11, bold:true, color:{argb:NAVY}}; gc.alignment = {vertical:'middle', horizontal:'left'};
     gc.fill = fill(x.cover >= x.qty ? 'FFDFF3E3' : (x.cover > 0 ? 'FFFFF0CC' : 'FFFBE3E1')); gc.border = {top:{style:'medium', color:{argb:AMBER}}, bottom:thin}; g.height = 22;
     if(!x.o.free.length){
@@ -6037,7 +6038,7 @@ function fuBulkXlsxPro(rows){
       vals = vals.concat([fl.lm || '', fl.d === '' ? '' : fl.d, fl.lim === '' ? '' : fl.lim, fl.behind === '' ? '' : fl.behind, dec]);
       var row = ws.getRow(rowNo++); row.outlineLevel = 1;
       vals.forEach(function(v, j){
-        var c = row.getCell(j + 1); c.value = v; c.font = {name:'Calibri', size:10}; c.border = {bottom:thin}; c.alignment = {vertical:'middle', horizontal:(typeof v === 'number') ? 'right' : 'left'};
+        var c = row.getCell(j + 1); c.value = clean(v); c.font = {name:'Calibri', size:10}; c.border = {bottom:thin}; c.alignment = {vertical:'middle', horizontal:(typeof v === 'number') ? 'right' : 'left'};
         if(k2 % 2) c.fill = fill('FFF8FAFC');
         var L = String(v == null ? '' : v).length + 2; if(L > widths[j]) widths[j] = Math.min(44, L);
       });
@@ -6049,11 +6050,10 @@ function fuBulkXlsxPro(rows){
     });
   });
   ws.columns = widths.map(function(w){ return {width:Math.min(44, w)}; });
-  ws.properties.outlineProperties = {summaryBelow:false};
-  ws.autoFilter = {from:{row:3, column:1}, to:{row:3, column:nC}};
+  ws.autoFilter = {from:{row:3, column:1}, to:{row:Math.max(4, rowNo - 1), column:nC}};
   ws.pageSetup = {paperSize:9, orientation:'landscape', fitToPage:true, fitToWidth:1, fitToHeight:0, margins:{left:.3, right:.3, top:.4, bottom:.5, header:.2, footer:.2}, printTitlesRow:'3:3'};
   /* summary: the "Available" number jumps to that request's units */
-  rows.forEach(function(x, i){ if(!x.o.free.length) return; var c = wsS.getCell(5 + i, 9); c.value = {text:String(x.nFree), hyperlink:"#'Matching Units'!A" + groupRow[i]}; c.font = {name:'Calibri', size:10, bold:true, underline:true, color:{argb:'FF1F6FEB'}}; });
+  rows.forEach(function(x, i){ if(!x.o.free.length) return; var c = wsS.getCell(5 + i, 9); c.value = {formula:'HYPERLINK("#\'Matching Units\'!A' + groupRow[i] + '","' + x.nFree + '")', result:x.nFree}; c.font = {name:'Calibri', size:10, bold:true, underline:true, color:{argb:'FF1F6FEB'}}; });
   var d = new Date(), two = function(n){ return (n < 10 ? '0' : '') + n; };
   var fname = 'Requested_equipment_vs_Owned_' + d.getFullYear() + '-' + two(d.getMonth() + 1) + '-' + two(d.getDate()) + '.xlsx';
   wb.xlsx.writeBuffer().then(function(buf){
