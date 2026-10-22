@@ -5983,13 +5983,17 @@ function fuBulkXlsxPro(rows){
   var data = rows.map(function(x, i){
     var r = x.r, w = x.o.win, give = x.o.free.filter(function(u){ return u.alloc || u.proposed; });
     return {n:i + 1, req:r.equipment || '', rcap:r.capacity || '', rproj:r.project || '', qty:x.qty, from:w ? w.from : '', to:w ? w.to : '', st:r.provision || '',
-            avail:x.nFree, tot:x.o.resAll.length, cov:covTxt(x), prop:give.map(function(u){ return u.e.code || ''; }).join(' , '),
+            avail:x.nFree, tot:x.o.resAll.length, cov:covTxt(x), prop:give.map(function(u){ return u.e.code || ''; }).join('\n'),
+            pproj:give.map(function(u){ return fuFlatUnit(u).proj || '\u2014'; }).join('\n'),
+            peng:give.map(function(u){ var E = (u.workshop || isCentralWorkshop(u.e.project)) ? [] : fuEngFor(u.e.project); return E.length ? E.map(function(g){ return g.n; }).join(' / ') : '\u2014'; }).join('\n'),
+            pmob:give.map(function(u){ var E = (u.workshop || isCentralWorkshop(u.e.project)) ? [] : fuEngFor(u.e.project); return E.length ? E.map(function(g){ return g.m; }).join(' / ') : '\u2014'; }).join('\n'),
             more:x.takenN ? x.takenN + ' more fit but go to earlier request(s)' : '', sav:x.saving != null ? Math.round(x.saving) : ''};
   });
   function f(k){ return function(o){ return clean(o[k]); }; }
   var sumCols = [{h:'#', g:f('n'), t:'t'}, {h:'Requested equipment', g:f('req'), t:'t'}, {h:'Capacity', g:f('rcap'), t:'t'}, {h:'For project', g:f('rproj'), t:'t'}, {h:'Qty', g:f('qty'), t:'t'}, {h:'From', g:f('from'), t:'t'}, {h:'To', g:f('to'), t:'t'}, {h:'Status', g:f('st'), t:'t'},
-    {h:'Available from Owned (click \u2192 units)', g:f('avail'), t:'i'}, {h:'Owned of this type (all)', g:f('tot'), t:'i'}, {h:'Result', g:f('cov'), t:'t'}, {h:'Proposed unit(s)', g:f('prop'), t:'t'}, {h:'Note', g:f('more'), t:'t'}, {h:'Est. saving (EGP)', g:f('sav'), t:'z', s:true}];
+    {h:'Available from Owned (click \u2192 units)', g:f('avail'), t:'i'}, {h:'Owned of this type (all)', g:f('tot'), t:'i'}, {h:'Result', g:f('cov'), t:'t'}, {h:'Proposed unit(s)', g:f('prop'), t:'t'}, {h:'Current project', g:f('pproj'), t:'t'}, {h:'Engineer', g:f('peng'), t:'t'}, {h:'Mobile', g:f('pmob'), t:'t'}, {h:'Note', g:f('more'), t:'t'}, {h:'Est. saving (EGP)', g:f('sav'), t:'z', s:true}];
   var wsS = window.hacBuildXlsx({title:'HAC \u00b7 PMV \u2014 Requested equipment vs. what Owned can give', sheetName:'Summary', cols:sumCols, rows:data, kpis:kpis, wb:wb}, EJ).getWorksheet('Summary');
+  for(var rr = 0; rr < rows.length; rr++){ for(var cc = 12; cc <= 15; cc++){ var wc = wsS.getCell(5 + rr, cc); wc.alignment = {vertical:'top', horizontal:'left', wrapText:true}; } }
   /* ---------- sheet 2: matching units ---------- */
   var ws = wb.addWorksheet('Matching Units', {views:[{state:'frozen', ySplit:3, activeCell:'A4'}], properties:{tabColor:{argb:'FF3FB950'}}});
   var maxEng = 1;
@@ -6012,6 +6016,7 @@ function fuBulkXlsxPro(rows){
   var rowNo = 4, groupRow = {};
   rows.forEach(function(x, i){
     var r = x.r, w = x.o.win;
+    if(covTxt(x) === 'External') return;   /* external requests are not listed in this sheet */
     groupRow[i] = rowNo;
     /* request header row */
     var g = ws.getRow(rowNo++);
@@ -6053,7 +6058,7 @@ function fuBulkXlsxPro(rows){
   ws.autoFilter = {from:{row:3, column:1}, to:{row:Math.max(4, rowNo - 1), column:nC}};
   ws.pageSetup = {paperSize:9, orientation:'landscape', fitToPage:true, fitToWidth:1, fitToHeight:0, margins:{left:.3, right:.3, top:.4, bottom:.5, header:.2, footer:.2}, printTitlesRow:'3:3'};
   /* summary: the "Available" number jumps to that request's units */
-  rows.forEach(function(x, i){ if(!x.o.free.length) return; var c = wsS.getCell(5 + i, 9); c.value = {formula:'HYPERLINK("#\'Matching Units\'!A' + groupRow[i] + '","' + x.nFree + '")', result:x.nFree}; c.font = {name:'Calibri', size:10, bold:true, underline:true, color:{argb:'FF1F6FEB'}}; });
+  rows.forEach(function(x, i){ if(groupRow[i] == null || !x.o.free.length) return; var c = wsS.getCell(5 + i, 9); c.value = {formula:'HYPERLINK("#\'Matching Units\'!A' + groupRow[i] + '","' + x.nFree + '")', result:x.nFree}; c.font = {name:'Calibri', size:10, bold:true, underline:true, color:{argb:'FF1F6FEB'}}; });
   var d = new Date(), two = function(n){ return (n < 10 ? '0' : '') + n; };
   var fname = 'Requested_equipment_vs_Owned_' + d.getFullYear() + '-' + two(d.getMonth() + 1) + '-' + two(d.getDate()) + '.xlsx';
   wb.xlsx.writeBuffer().then(function(buf){
