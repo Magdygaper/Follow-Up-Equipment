@@ -572,6 +572,10 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
         Rental Database
       </button>
+      <button class="nav-item" id="nav-rentwatch" onclick="rwOpen()" title="Rented units with very few working days and no 'intermittent work' note on the contract">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg>
+        Rental Pull-Back
+      </button>
 
     </div>
 
@@ -5745,7 +5749,7 @@ function fuConflicts(e, req, win){
   return out;
 }
 /* ── Follow-Up workflow add-ons: repair filter · allocate · transfer message · saving · export · bulk search ── */
-function fuRepairRefYm(LM){ var H = window.HM_STATE || {}; return (LM && LM.ym && LM.ym !== 'all') ? LM.ym : (H.sel || H.latest || ''); }
+function fuRepairRefYm(LM){ var H = window.HM_STATE || {}; return (LM && LM.ym && LM.ym !== 'all' && LM.ym !== 'last') ? LM.ym : (H.sel || H.latest || ''); }
 function fuUnderRepair(e, ym){ try{ if(typeof window.hmRepairInfo !== 'function' || !ym || !e.code) return null; var i = window.hmRepairInfo(e.code, ym); return (i && i.label === 'Under Repair') ? i : null; }catch(x){ return null; } }
 function fuIsAllocated(r, e){ return (r.allocated || []).map(fuNormCode).indexOf(fuNormCode(e.code)) >= 0; }
 function fuCapOf(e){ try{ var c = eqCapacity(e); return (c && c.v && c.v !== '\u2014') ? c.v : ''; }catch(x){ return ''; } }
@@ -5756,7 +5760,7 @@ function fuOwnedFor(r, o){
   var resAll = fuOwnedMatches(r, all, {allFleets:!!o.fleets});
   var res = (o.low && o.LM && o.LM.loaded) ? fuOwnedMatches(r, all, {allFleets:!!o.fleets, lowMap:o.LM.map}) : resAll;
   var win = fuReqWindow(r), ym = fuRepairRefYm(o.LM);
-  res.forEach(function(x){ x.busy = win ? fuConflicts(x.e, r, win) : []; x.rep = fuUnderRepair(x.e, ym); x.alloc = fuIsAllocated(r, x.e); });
+  res.forEach(function(x){ x.busy = win ? fuConflicts(x.e, r, win) : []; x.rep = fuUnderRepair(x.e, ym); x.alloc = fuIsAllocated(r, x.e); x.last = fuLastOf(x.e); });
   var free = res.filter(function(x){ return x.alloc || (!x.rep && !x.busy.length); });
   free.sort(function(a, b){ return (b.alloc ? 1 : 0) - (a.alloc ? 1 : 0) || b.score - a.score; });
   return {resAll:resAll, res:res, free:free, win:win};
@@ -5796,7 +5800,7 @@ function fuTransferMsg(id, enc){
     'Please confirm the availability and release of the following owned unit for ' + (r.project || 'our project') + ':', '',
     '\u2022 Equipment: ' + (e.equipment || '') + (e.brand ? ' \u2014 ' + e.brand : ''),
     '\u2022 Code: ' + e.code + (fuCapOf(e) ? '   \u2022 Capacity: ' + fuCapOf(e) : '') + (e.year ? '   \u2022 Year: ' + e.year : ''),
-    '\u2022 Current location: ' + here,
+    '\u2022 Current location: ' + here, '\u2022 Project engineer: ' + (isCentralWorkshop(e.project) ? '\u2014' : fuEngLine(e.project)),
     '\u2022 Required for: ' + (r.project || '\u2014') + (r.sap ? '   (SAP ' + r.sap + ')' : ''),
     '\u2022 Period: ' + (win ? win.from + ' \u2192 ' + win.to : 'to be confirmed') + (days ? '  (' + days + ' days)' : '') + '   \u2022 Qty requested: ' + (Number(r.qty) || 1)];
   if(low) L.push('\u2022 Note: low utilization \u2014 ' + low.d + ' h in ' + window.hmLowLabel(low.ym) + ' (limit ' + low.lim + ' h)');
@@ -5823,17 +5827,20 @@ function fuOwnSaving(r, n){
   }).catch(function(){ var b = document.getElementById('fu-own-sav'); if(b) b.textContent = '\ud83d\udcb2 Could not load reference prices.'; });
 }
 /* ⑥ export the listed units (current filters) */
+function fuFlatUnit(x){
+  var e = x.e, ws = x.workshop || isCentralWorkshop(e.project), E = ws ? [] : fuEngFor(e.project), L = x.last, src = x.low || L, av = [];
+  if(x.alloc) av.push('Allocated'); if(x.rep) av.push('Under repair'); (x.busy || []).forEach(function(c){ av.push(c.text); });
+  return {code:e.code || '', eq:e.equipment || '', cap:fuCapOf(e), brand:e.brand || '', year:e.year || '', proj:ws ? 'Central Workshop' : (e.project || ''),
+          eng:E.map(function(g){ return g.n; }).join(' / '), title:E.map(function(g){ return g.t; }).join(' / '), mob:E.map(function(g){ return g.m; }).join(' / '), mail:E.map(function(g){ return g.e; }).filter(Boolean).join(' / '),
+          lm:L ? fuMLab(L.m) : '', behind:L ? fuMonthsBehind(L.m, L.latest) : '', d:(src && src.d != null) ? Math.round(src.d * 10) / 10 : '', lim:src ? src.lim : '', low:(src && src.d != null) ? (src.d < src.lim ? 'Low' : 'OK') : '',
+          av:av.length ? av.join(' | ') : 'Free', alloc:x.alloc ? 'Yes' : ''};
+}
 function fuOwnExport(kind){
   var L = window.__fuOwnLast; if(!L || !L.res.length){ toast('Nothing to export', 'error'); return; }
-  var r = L.r, rows = L.res.map(function(x){
-    var e = x.e, av = [];
-    if(x.alloc) av.push('Allocated'); if(x.rep) av.push('Under repair'); (x.busy || []).forEach(function(c){ av.push(c.text); });
-    return {code:e.code || '', eq:e.equipment || '', brand:e.brand || '', year:e.year || '', loc:x.workshop ? 'Central Workshop' : (e.project || ''), cap:fuCapOf(e), fleet:e.fleet || 'egypt',
-            hm:x.low ? (x.low.d + ' h (limit ' + x.low.lim + ')') : '', av:av.length ? av.join(' | ') : 'Free'};
-  });
+  var r = L.r, rows = L.res.map(function(x){ return fuFlatUnit(x); });
   function f(k){ return function(o){ return o[k]; }; }
-  var cols = [{h:'#', g:function(o, i){ return i + 1; }, t:'t'}, {h:'Code', g:f('code'), t:'t'}, {h:'Equipment', g:f('eq'), t:'t'}, {h:'Brand', g:f('brand'), t:'t'}, {h:'Year', g:f('year'), t:'t'},
-    {h:'Location', g:f('loc'), t:'t'}, {h:'Capacity', g:f('cap'), t:'t'}, {h:'Fleet', g:f('fleet'), t:'t'}, {h:'H/M diff', g:f('hm'), t:'t'}, {h:'Availability', g:f('av'), t:'t'}];
+  var cols = [{h:'#', g:function(o, i){ return i + 1; }, t:'t'}, {h:'Code', g:f('code'), t:'t'}, {h:'Equipment', g:f('eq'), t:'t'}, {h:'Capacity', g:f('cap'), t:'t'}, {h:'Brand', g:f('brand'), t:'t'}, {h:'Year', g:f('year'), t:'t'}, {h:'Current project', g:f('proj'), t:'t'},
+    {h:'Engineer', g:f('eng'), t:'t'}, {h:'Title', g:f('title'), t:'t'}, {h:'Mobile', g:f('mob'), t:'t'}, {h:'Last reading', g:f('lm'), t:'t'}, {h:'H/M diff (h)', g:f('d'), t:'t'}, {h:'Limit (h)', g:f('lim'), t:'t'}, {h:'Availability', g:f('av'), t:'t'}];
   var title = 'HAC \u00b7 PMV \u2014 Owned equipment for ' + (r.project || '') + ' \u00b7 ' + (r.equipment || '') + (r.capacity ? ' ' + r.capacity : '');
   window.hacPdfTable({title:title, cols:cols, rows:rows, kpis:[{label:'Units listed', value:rows.length}, {label:'Qty requested', value:Number(r.qty) || 1}, {label:'Days', value:fuReqDays(r) || 0}]}, kind);
 }
@@ -5845,41 +5852,56 @@ function fuOpenBulk(){
 }
 function fuRenderBulk(){
   var m = document.getElementById('fu-bulk-modal'); if(!m) return;
+  fuEngEnsure();
   var scEl = document.getElementById('fu-bulk-scope'), sc = scEl ? scEl.value : 'Pending';
   var lEl = document.getElementById('fu-bulk-low'), low = lEl ? lEl.checked : (window.__fuOwnLow !== false);
   var fEl = document.getElementById('fu-bulk-fleets'), fleets = fEl ? fEl.checked : false;
-  var LM = (typeof window.hmLowMap === 'function') ? window.hmLowMap('') : {map:{}, loaded:false};
+  var yEl = document.getElementById('fu-bulk-lowm'), ym = yEl ? yEl.value : (window.__fuLowYm || 'last'); window.__fuLowYm = ym;
+  var LM = (typeof window.hmLowMap === 'function') ? window.hmLowMap(ym) : {map:{}, loaded:false, months:[]};
   if(low && !LM.loaded && typeof hmReload === 'function'){ try{ hmReload(); }catch(x){} }
   var useLow = low && LM.loaded, tok = (window.__fuBulkTok = (window.__fuBulkTok || 0) + 1);
   var list = FU_DATA.filter(function(r){ return r.equipment && (sc === 'all' || String(r.provision || 'Pending') === sc); });
   var rows = list.map(function(r){
     var o = fuOwnedFor(r, {low:useLow, LM:LM, fleets:fleets}), qty = Number(r.qty) || 1, alloc = (r.allocated || []).length;
     var fresh = o.free.filter(function(x){ return !x.alloc; }), cover = Math.min(qty, alloc + fresh.length);
-    return {r:r, o:o, qty:qty, alloc:alloc, nFree:fresh.length, cover:cover, cands:o.free.slice(0, 4).map(function(x){ return x.e.code; }).filter(Boolean).join(', '), saving:null};
+    return {r:r, o:o, qty:qty, alloc:alloc, nFree:fresh.length, cover:cover, saving:null};
   });
   var nFull = rows.filter(function(x){ return x.cover >= x.qty; }).length, nPart = rows.filter(function(x){ return x.cover > 0 && x.cover < x.qty; }).length, nNone = rows.length - nFull - nPart;
+  var noEng = {}; rows.forEach(function(x){ x.o.free.forEach(function(u){ var p = u.e.project; if(p && !isCentralWorkshop(p) && !fuEngFor(p).length) noEng[p] = 1; }); });
+  var noEngL = Object.keys(noEng).sort();
   var inp = 'background:var(--surface);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:6px;font-size:12px;';
-  var th = function(t){ return '<th style="text-align:left;padding:6px 8px;font-size:11px;color:var(--text-muted);position:sticky;top:0;background:var(--surface);">' + t + '</th>'; };
+  var th = function(t){ return '<th style="text-align:left;padding:6px 8px;font-size:11px;color:var(--text-muted);position:sticky;top:0;background:var(--surface);z-index:1;white-space:nowrap;">' + t + '</th>'; };
   var td = 'style="padding:5px 8px;border-bottom:1px solid var(--border);font-size:12px;vertical-align:top;"';
   var chip = function(l, n, c){ return '<div style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-top:3px solid ' + c + ';border-radius:8px;padding:8px 12px;"><div style="font-size:20px;font-weight:700;color:' + c + ';font-family:\'JetBrains Mono\',monospace;">' + n + '</div><div style="font-size:11px;color:var(--text-muted);">' + l + '</div></div>'; };
-  var h = '<div class="modal" style="width:1180px;max-width:97vw;max-height:92vh;display:flex;flex-direction:column;"><div class="modal-title">\ud83d\udd0d Bulk owned search \u2014 every request at once</div>'
+  var basis = '';
+  if(LM.loaded) basis = '<option value="last"' + (ym === 'last' ? ' selected' : '') + '>Last reading of each unit</option><option value="all"' + (ym === 'all' ? ' selected' : '') + '>Any month (lowest)</option>' + LM.months.slice().reverse().map(function(q){ return '<option value="' + q + '"' + (ym === q ? ' selected' : '') + '>' + fuEsc(window.hmLowLabel(q)) + '</option>'; }).join('');
+  var h = '<div class="modal" style="width:1240px;max-width:97vw;max-height:92vh;display:flex;flex-direction:column;"><div class="modal-title">\ud83d\udd0d Bulk owned search \u2014 every request at once</div>'
     + '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:10px;font-size:12px;">'
     + '<label>Requests <select id="fu-bulk-scope" onchange="fuRenderBulk()" style="' + inp + '"><option value="Pending"' + (sc === 'Pending' ? ' selected' : '') + '>Pending only</option><option value="all"' + (sc === 'all' ? ' selected' : '') + '>All requests</option></select></label>'
     + '<label><input type="checkbox" id="fu-bulk-low" ' + (low ? 'checked' : '') + ' onchange="window.__fuOwnLow=this.checked;fuRenderBulk()"> Only Low H/M usage units (same capacity)</label>'
+    + (low && LM.loaded ? '<label>H/M basis <select id="fu-bulk-lowm" onchange="fuRenderBulk()" style="' + inp + '">' + basis + '</select></label>' : '')
     + '<label><input type="checkbox" id="fu-bulk-fleets" ' + (fleets ? 'checked' : '') + ' onchange="fuRenderBulk()"> include other countries\' fleets</label>'
-    + '<span style="margin-left:auto;display:flex;gap:6px;"><button class="btn-sm" onclick="fuBulkExport(\'xlsx\')">\ud83d\udcca Excel</button><button class="btn-sm" onclick="fuBulkExport(\'pdf\')">\ud83d\udcc4 PDF</button></span></div>'
+    + fuUnitBox()
+    + '<span style="margin-left:auto;display:flex;gap:6px;"><button class="btn-sm" onclick="fuBulkAll(true)">\u25be Expand all</button><button class="btn-sm" onclick="fuBulkAll(false)">\u25b8 Collapse</button><button class="btn-sm" onclick="fuBulkExport(\'xlsx\')">\ud83d\udcca Excel</button><button class="btn-sm" onclick="fuBulkExport(\'pdf\')">\ud83d\udcc4 PDF</button></span></div>'
     + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">' + chip('Requests checked', rows.length, 'var(--blue)') + chip('Fully covered by owned', nFull, 'var(--green)') + chip('Partly covered', nPart, 'var(--accent)') + chip('No owned unit \u2192 external', nNone, 'var(--red)') + '<div id="fu-bulk-total" style="flex:1.4;min-width:200px;background:var(--bg);border:1px solid var(--border);border-top:3px solid var(--green);border-radius:8px;padding:8px 12px;font-size:11px;color:var(--text-muted);">\ud83d\udcb2 Estimating total saving\u2026</div></div>'
     + (low && !LM.loaded ? '<div style="font-size:12px;color:var(--accent);margin-bottom:8px;">H/M data is not loaded yet \u2014 showing all owned units until it loads.</div>' : '')
-    + '<div id="fu-bulk-body" style="overflow:auto;border:1px solid var(--border);border-radius:8px;"><table style="width:100%;border-collapse:collapse;"><thead><tr>' + ['#', 'Equipment', 'Project', 'Period', 'Qty', 'Status', 'Allocated', 'Free units', 'Owned total', 'Coverage', 'Candidates', 'Est. saving', ''].map(th).join('') + '</tr></thead><tbody>';
-  if(!rows.length) h += '<tr><td colspan="13" style="padding:24px;text-align:center;color:var(--text-muted);">No requests in this scope.</td></tr>';
+    + '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:6px;">Click \u25b8 on a request to see each unit: code, the project it is in now, that project\'s engineer, and its last hour-meter reading.</div>'
+    + '<div id="fu-bulk-body" style="overflow:auto;border:1px solid var(--border);border-radius:8px;"><table style="width:100%;border-collapse:collapse;"><thead><tr>' + ['', '#', 'Equipment', 'Project', 'Period', 'Qty', 'Status', 'Allocated', 'Free units', 'Owned total', 'Coverage', 'Held at (projects)', 'Est. saving', ''].map(th).join('') + '</tr></thead><tbody>';
+  if(!rows.length) h += '<tr><td colspan="14" style="padding:24px;text-align:center;color:var(--text-muted);">No requests in this scope.</td></tr>';
   rows.forEach(function(x, i){
     var r = x.r, w = x.o.win, cov = x.cover >= x.qty ? '<span style="color:var(--green);font-weight:700;">\u2705 Covered</span>' : (x.cover > 0 ? '<span style="color:var(--accent);font-weight:700;">\u26a0 ' + x.cover + ' of ' + x.qty + '</span>' : '<span style="color:var(--red);font-weight:700;">\u2716 External</span>');
-    h += '<tr><td ' + td + '>' + (i + 1) + '</td><td ' + td + '><b>' + fuEsc(r.equipment) + '</b>' + (r.capacity ? '<div style="color:var(--text-muted);font-size:11px;">' + fuEsc(r.capacity) + '</div>' : '') + '</td><td ' + td + '>' + fuEsc(r.project || '\u2014') + '</td><td ' + td + ' style="white-space:nowrap">' + (w ? fuEsc(w.from) + ' \u2192 ' + fuEsc(w.to) : '\u2014') + '</td><td ' + td + '>' + x.qty + '</td><td ' + td + '>' + fuEsc(r.provision || 'Pending') + '</td>'
-      + '<td ' + td + '>' + (x.alloc ? '<b style="color:var(--green);">\ud83d\udccc ' + x.alloc + '</b>' : '\u2014') + '</td><td ' + td + '><b>' + x.nFree + '</b></td><td ' + td + '><span style="color:var(--text-muted);">' + x.o.resAll.length + '</span></td><td ' + td + '>' + cov + '</td><td ' + td + '><span style="font-family:monospace;font-size:11px;">' + fuEsc(x.cands || '\u2014') + '</span></td><td ' + td + ' id="fu-bsav-' + i + '">' + (x.cover > 0 ? '\u2026' : '\u2014') + '</td>'
-      + '<td ' + td + '><button class="btn-edit" style="padding:1px 7px;font-size:10px;" onclick="closeModal(\'fu-bulk-modal\');fuSearchOwned(\'' + fuEsc(r.id) + '\')">Open</button></td></tr>';
+    var pc = {}; x.o.free.forEach(function(u){ var p = isCentralWorkshop(u.e.project) ? 'Central Workshop' : (u.e.project || '\u2014'); pc[p] = (pc[p] || 0) + 1; });
+    var pk = Object.keys(pc).sort(function(a, b){ return pc[b] - pc[a]; });
+    var held = pk.length ? pk.slice(0, 3).map(function(p){ return fuEsc(p) + ' <span style="color:var(--text-muted);">(' + pc[p] + ')</span>'; }).join('<br>') + (pk.length > 3 ? '<div style="color:var(--text-muted);font-size:10.5px;">+' + (pk.length - 3) + ' more</div>' : '') : '\u2014';
+    h += '<tr><td ' + td + '>' + (x.o.free.length ? '<a id="fu-bt-' + i + '" style="cursor:pointer;font-size:14px;" title="Show the units" onclick="fuBulkToggle(' + i + ')">\u25b8</a>' : '') + '</td><td ' + td + '>' + (i + 1) + '</td><td ' + td + '><b>' + fuEsc(r.equipment) + '</b>' + (r.capacity ? '<div style="color:var(--text-muted);font-size:11px;">' + fuEsc(r.capacity) + '</div>' : '') + '</td><td ' + td + '>' + fuEsc(r.project || '\u2014') + '</td><td ' + td + ' style="white-space:nowrap">' + (w ? fuEsc(w.from) + ' \u2192 ' + fuEsc(w.to) : '\u2014') + '</td><td ' + td + '>' + x.qty + '</td><td ' + td + '>' + fuEsc(r.provision || 'Pending') + '</td>'
+      + '<td ' + td + '>' + (x.alloc ? '<b style="color:var(--green);">\ud83d\udccc ' + x.alloc + '</b>' : '\u2014') + '</td><td ' + td + '><b>' + x.nFree + '</b></td><td ' + td + '><span style="color:var(--text-muted);">' + x.o.resAll.length + '</span></td><td ' + td + '>' + cov + '</td><td ' + td + ' style="padding:5px 8px;border-bottom:1px solid var(--border);font-size:11.5px;vertical-align:top;">' + held + '</td><td ' + td + ' id="fu-bsav-' + i + '">' + (x.cover > 0 ? '\u2026' : '\u2014') + '</td>'
+      + '<td ' + td + '><button class="btn-edit" style="padding:1px 7px;font-size:10px;" onclick="closeModal(\'fu-bulk-modal\');fuSearchOwned(\'' + fuEsc(r.id) + '\')">Open</button></td></tr>'
+      + '<tr id="fu-bd-' + i + '" style="display:none;"><td colspan="14" id="fu-bdc-' + i + '" style="padding:8px 12px 12px 34px;background:var(--bg);border-bottom:1px solid var(--border);"></td></tr>';
   });
-  h += '</tbody></table></div><div class="modal-actions"><button class="btn-cancel" onclick="closeModal(\'fu-bulk-modal\')">Close</button></div></div>';
+  h += '</tbody></table></div>' + (noEngL.length ? '<div style="font-size:11px;color:var(--accent);margin-top:8px;">\u26a0 ' + noEngL.length + ' project name(s) have no engineer in the contact list (names differ): ' + fuEsc(noEngL.slice(0, 10).join(' \u00b7 ')) + (noEngL.length > 10 ? ' \u2026' : '') + '</div>' : '')
+    + '<div class="modal-actions"><button class="btn-cancel" onclick="closeModal(\'fu-bulk-modal\')">Close</button></div></div>';
   m.innerHTML = h; window.__fuBulkRows = rows;
+  var open = window.__fuBulkOpen || {}; rows.forEach(function(x, i){ if(open[x.r.id] && x.o.free.length) fuBulkToggle(i, true); });
   var need = rows.filter(function(x){ return x.cover > 0; }).map(function(x){ return x.r; });
   var tot = document.getElementById('fu-bulk-total');
   if(!need.length){ if(tot) tot.textContent = '\ud83d\udcb2 No request can be covered from owned units.'; return; }
@@ -5896,19 +5918,369 @@ function fuRenderBulk(){
     if(tot) tot.innerHTML = '\ud83d\udcb2 <b style="color:var(--green);font-size:15px;">\u2248 ' + f(sum) + ' ' + fuEsc(ccy) + '</b><div>estimated saving if every covered request is served from Owned (Rental Database reference prices)</div>';
   }).catch(function(){ if(tot) tot.textContent = '\ud83d\udcb2 Could not load reference prices.'; });
 }
+function fuBulkToggle(i, forceOpen){
+  var x = (window.__fuBulkRows || [])[i]; if(!x) return;
+  var tr = document.getElementById('fu-bd-' + i), c = document.getElementById('fu-bdc-' + i), a = document.getElementById('fu-bt-' + i); if(!tr || !c) return;
+  var opening = forceOpen === true || tr.style.display === 'none';
+  window.__fuBulkOpen = window.__fuBulkOpen || {};
+  if(opening){ c.innerHTML = fuCandTable(x.o.free, x.r, {max:40, maxH:320}); tr.style.display = ''; if(a) a.textContent = '\u25be'; window.__fuBulkOpen[x.r.id] = true; }
+  else { tr.style.display = 'none'; if(a) a.textContent = '\u25b8'; delete window.__fuBulkOpen[x.r.id]; }
+}
+function fuBulkAll(on){ (window.__fuBulkRows || []).forEach(function(x, i){ if(!x.o.free.length) return; var tr = document.getElementById('fu-bd-' + i); if(!tr) return; var isOpen = tr.style.display !== 'none'; if(on !== isOpen) fuBulkToggle(i, on); }); }
 function fuBulkExport(kind){
   var rows = window.__fuBulkRows || []; if(!rows.length){ toast('Nothing to export', 'error'); return; }
-  var data = rows.map(function(x){
-    var r = x.r, w = x.o.win;
-    return {eq:r.equipment || '', cap:r.capacity || '', proj:r.project || '', from:w ? w.from : '', to:w ? w.to : '', qty:x.qty, st:r.provision || 'Pending', alloc:x.alloc, free:x.nFree, tot:x.o.resAll.length,
-            cov:x.cover >= x.qty ? 'Covered' : (x.cover > 0 ? x.cover + ' of ' + x.qty : 'External'), cands:x.cands, sav:x.saving != null ? Math.round(x.saving) : ''};
+  var data = [];
+  rows.forEach(function(x){
+    var r = x.r, w = x.o.win, cov = x.cover >= x.qty ? 'Covered' : (x.cover > 0 ? x.cover + ' of ' + x.qty : 'External');
+    var base = {req:r.equipment || '', rcap:r.capacity || '', rproj:r.project || '', qty:x.qty, from:w ? w.from : '', to:w ? w.to : '', cov:cov, sav:x.saving != null ? Math.round(x.saving) : ''};
+    if(!x.o.free.length) data.push(Object.assign({}, base, {code:'', eq:'', cap:'', proj:'', eng:'', title:'', mob:'', mail:'', lm:'', d:'', lim:'', low:'', av:'No free owned unit', alloc:''}));
+    x.o.free.forEach(function(u){ data.push(Object.assign({}, base, fuFlatUnit(u))); });
   });
   function f(k){ return function(o){ return o[k]; }; }
-  var cols = [{h:'#', g:function(o, i){ return i + 1; }, t:'t'}, {h:'Equipment', g:f('eq'), t:'t'}, {h:'Capacity', g:f('cap'), t:'t'}, {h:'Project', g:f('proj'), t:'t'}, {h:'From', g:f('from'), t:'t'}, {h:'To', g:f('to'), t:'t'},
-    {h:'Qty', g:f('qty'), t:'i', s:true}, {h:'Status', g:f('st'), t:'t'}, {h:'Allocated', g:f('alloc'), t:'i', s:true}, {h:'Free units', g:f('free'), t:'i', s:true}, {h:'Owned total', g:f('tot'), t:'i', s:true},
-    {h:'Coverage', g:f('cov'), t:'t'}, {h:'Candidate codes', g:f('cands'), t:'t'}, {h:'Est. saving', g:f('sav'), t:'t'}];
-  var nFull = data.filter(function(d){ return d.cov === 'Covered'; }).length;
-  window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 Owned equipment coverage of follow-up requests', cols:cols, rows:data, kpis:[{label:'Requests', value:data.length}, {label:'Fully covered', value:nFull}, {label:'No owned unit', value:data.filter(function(d){ return d.cov === 'External'; }).length}]}, kind);
+  var cols = [{h:'#', g:function(o, i){ return i + 1; }, t:'t'}, {h:'Requested equipment', g:f('req'), t:'t'}, {h:'Req. capacity', g:f('rcap'), t:'t'}, {h:'Request project', g:f('rproj'), t:'t'}, {h:'Qty', g:f('qty'), t:'t'}, {h:'From', g:f('from'), t:'t'}, {h:'To', g:f('to'), t:'t'}, {h:'Coverage', g:f('cov'), t:'t'},
+    {h:'Unit code', g:f('code'), t:'t'}, {h:'Unit equipment', g:f('eq'), t:'t'}, {h:'Unit capacity', g:f('cap'), t:'t'}, {h:'Current project', g:f('proj'), t:'t'}, {h:'Engineer', g:f('eng'), t:'t'}, {h:'Title', g:f('title'), t:'t'}, {h:'Mobile', g:f('mob'), t:'t'},
+    {h:'Last reading', g:f('lm'), t:'t'}, {h:'H/M diff (h)', g:f('d'), t:'t'}, {h:'Limit (h)', g:f('lim'), t:'t'}, {h:'Availability', g:f('av'), t:'t'}, {h:'Est. saving', g:f('sav'), t:'t'}];
+  var nFull = rows.filter(function(x){ return x.cover >= x.qty; }).length;
+  window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 Owned equipment coverage of follow-up requests (one row per candidate unit)', cols:cols, rows:data, kpis:[{label:'Requests', value:rows.length}, {label:'Fully covered', value:nFull}, {label:'Candidate rows', value:data.length}]}, kind);
+}
+/* ── Rental Pull-Back Watch: rented units with very few working days and NO "intermittent work" note on the contract ── */
+var RW_KW = ['\u0645\u062a\u0642\u0637\u0639','intermittent','on call','on-call','oncall','as needed','as required','when needed','when required','\u0639\u0646\u062f \u0627\u0644\u0637\u0644\u0628','\u062d\u0633\u0628 \u0627\u0644\u062d\u0627\u062c\u0629','\u062d\u0633\u0628 \u0627\u0644\u0637\u0644\u0628','seasonal','\u0645\u0648\u0633\u0645\u064a','part time','part-time'];
+var RW = {thr:10, last:1, month:'', showKeep:false, showDone:false, kw:RW_KW.slice(), dec:{}, view:[], res:null, busy:false};
+function rwNorm(x){ return String(x == null ? '' : x).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ''); }
+function rwEq(a, b){ return !!a && !!b && (a === b || (a.length >= 4 && b.indexOf(a) >= 0) || (b.length >= 4 && a.indexOf(b) >= 0)); }
+function rwHash(x){ var h = 5381; x = String(x); for(var i = 0; i < x.length; i++) h = ((h << 5) + h + x.charCodeAt(i)) | 0; return (h >>> 0).toString(36); }
+function rwMonthLabel(m){ var M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'], p = String(m || '').split('-'); return p.length > 1 ? (M[+p[1] - 1] || p[1]) + ' ' + p[0] : (m || ''); }
+/* pure: Master Rental rows + Rental Database rows -> candidate list */
+function rwCompute(mr, rd, o){
+  var thr = Number(o.thr), N = Math.max(1, Number(o.last) || 1), kw = (o.kw || []).map(function(k){ return String(k).toLowerCase().trim(); }).filter(Boolean);
+  var seen = {}; mr.forEach(function(r){ if(r.month) seen[r.month] = 1; });
+  var ml = Object.keys(seen).sort(), idx = ml.indexOf(o.month), out = {months:ml, rows:[], stats:{low:0, hourly:0, keepNote:0, noHistory:false}};
+  if(idx < 0) return out;
+  if(idx - N + 1 < 0){ out.stats.noHistory = true; return out; }
+  var win = ml.slice(idx - N + 1, idx + 1), U = {};
+  mr.forEach(function(r){
+    if(win.indexOf(r.month) < 0) return;
+    var qty = Number(r.qty) || 0; if(qty <= 0) return;
+    var key = [rwNorm(r.sap), rwNorm(r.plant), rwNorm(r.equipment), rwNorm(r.project), rwNorm(r.subcon)].join('|');
+    var u = U[key] || (U[key] = {key:key, by:{}});
+    u.sap = r.sap; u.plant = r.plant; u.equipment = r.equipment; u.model = r.model || r.maincap || ''; u.project = r.project; u.od = r.od; u.subcon = r.subcon; u.category = r.category;
+    var b = u.by[r.month] || (u.by[r.month] = {days:0, qty:0, total:0, unit:0});
+    b.days += Number(r.days) || 0; b.qty += qty; b.total += Number(r.totalPrice) || 0; b.unit = Number(r.unitPrice) || b.unit;
+  });
+  var X = rd.map(function(r){ return {r:r, v:rwNorm(r.vendor), p:rwNorm(r.project), i:rwNorm(r.item), m:rwNorm(r.model)}; });
+  Object.keys(U).forEach(function(k){
+    var u = U[k], cur = u.by[o.month];
+    if(!cur || !(cur.total > 0)) return;
+    var low = win.every(function(m){ return u.by[m] && u.by[m].days < thr; });
+    if(!low) return;
+    out.stats.low++;
+    var v = rwNorm(u.subcon), p = rwNorm(u.project), i = rwNorm(u.equipment), md = rwNorm(u.model);
+    var c = X.filter(function(x){ return rwEq(v, x.v) && rwEq(i, x.i); }), loose = false;
+    if(c.length){ var cp = c.filter(function(x){ return rwEq(p, x.p); }); if(cp.length) c = cp; else loose = true; }
+    else { c = X.filter(function(x){ return rwEq(p, x.p) && rwEq(i, x.i); }); loose = c.length > 0; }
+    if(c.length > 1 && md){ var cm = c.filter(function(x){ return x.m && (x.m === md || x.m.indexOf(md) >= 0 || md.indexOf(x.m) >= 0); }); if(cm.length) c = cm; }
+    var rates = {}, notes = [], contracts = {};
+    c.forEach(function(x){ if(x.r.rate) rates[x.r.rate] = 1; if(x.r.note) notes.push(x.r.note); if(x.r.contract) contracts[x.r.contract] = 1; });
+    var joined = notes.join(' \u2022 '), lower = joined.toLowerCase();
+    var inter = kw.some(function(w){ return lower.indexOf(w) >= 0; });
+    var hourly = Object.keys(rates).indexOf('hour') >= 0;
+    var row = {key:k, sap:u.sap, equipment:u.equipment, model:u.model, project:u.project, od:u.od, subcon:u.subcon, qty:cur.qty, days:cur.days, total:cur.total, unit:cur.unit,
+               hist:win.map(function(m){ return {m:m, days:u.by[m].days}; }), matched:c.length > 0, loose:loose, contract:Object.keys(contracts).join(', '), note:joined, basis:Object.keys(rates).join('/'), inter:inter, hourly:hourly};
+    if(hourly){ out.stats.hourly++; return; }
+    row.verdict = !row.matched ? 'verify' : (inter ? 'keep' : 'pull');
+    if(inter) out.stats.keepNote++;
+    out.rows.push(row);
+  });
+  out.rows.sort(function(a, b){ return b.total - a.total; });
+  return out;
+}
+function rwLoad(){
+  if(RW.busy) return Promise.resolve();
+  RW.busy = true;
+  var mr = (window.MR && window.MR.load) ? window.MR.load() : Promise.resolve([]);
+  var rd = (typeof window.rdAllRows === 'function') ? window.rdAllRows() : Promise.resolve([]);
+  var st = db.collection('settings').doc('rentalWatch').get().then(function(d){ return d && d.exists ? d.data() : {}; }).catch(function(){ return {}; });
+  return Promise.all([mr, rd, st]).then(function(a){
+    RW.mr = (window.MR && window.MR.data) ? window.MR.data() : (a[0] || []); RW.rd = a[1] || []; var s = a[2] || {};
+    RW.dec = s.dec || {}; if(Array.isArray(s.kw) && s.kw.length) RW.kw = s.kw;
+    var ms = {}; RW.mr.forEach(function(r){ if(r.month) ms[r.month] = 1; }); var ml = Object.keys(ms).sort();
+    if(!RW.month || ml.indexOf(RW.month) < 0) RW.month = ml[ml.length - 1] || '';
+    RW.busy = false;
+  }).catch(function(e){ RW.busy = false; console.warn(e); });
+}
+function rwOpen(){
+  var m = document.getElementById('rw-modal');
+  if(!m){ m = document.createElement('div'); m.className = 'modal-overlay'; m.id = 'rw-modal'; document.body.appendChild(m); }
+  m.classList.add('open');
+  m.innerHTML = '<div class="modal" style="width:420px;"><div class="modal-title">\ud83d\udd3b Rental pull-back watch</div><div style="padding:18px;color:var(--text-muted);font-size:13px;">Loading Master Rental and Rental Database\u2026</div></div>';
+  rwLoad().then(rwRender);
+}
+function rwSet(k, v){ RW[k] = (k === 'thr' || k === 'last') ? Number(v) : v; rwRender(); }
+function rwRender(){
+  var m = document.getElementById('rw-modal'); if(!m) return;
+  if(!RW.mr || !RW.mr.length){ m.innerHTML = '<div class="modal" style="width:460px;"><div class="modal-title">\ud83d\udd3b Rental pull-back watch</div><div style="padding:16px;font-size:13px;">Master Rental has no data loaded. Open the Master Rental page once (or import the month) and try again.</div><div class="modal-actions"><button class="btn-cancel" onclick="closeModal(\'rw-modal\')">Close</button></div></div>'; return; }
+  var R = rwCompute(RW.mr, RW.rd || [], {thr:RW.thr, last:RW.last, month:RW.month, kw:RW.kw});
+  RW.res = R;
+  var all = R.rows, shown = all.filter(function(x){
+    var d = RW.dec[rwHash(x.key)]; x.dec = d || null;
+    if(x.verdict === 'keep' && !RW.showKeep) return false;
+    if(d && d.s === 'keep' && !RW.showDone) return false;
+    return true;
+  });
+  RW.view = shown;
+  var nPull = shown.filter(function(x){ return x.verdict === 'pull'; }).length, nVer = shown.filter(function(x){ return x.verdict === 'verify'; }).length;
+  var risk = shown.filter(function(x){ return x.verdict !== 'keep' && !(x.dec && x.dec.s === 'keep'); }).reduce(function(a, x){ return a + x.total; }, 0);
+  var f0 = function(v){ return Math.round(v).toLocaleString('en-US'); };
+  var inp = 'background:var(--surface);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:6px;font-size:12px;';
+  var chip = function(l, n, c){ return '<div style="flex:1;min-width:130px;background:var(--bg);border:1px solid var(--border);border-top:3px solid ' + c + ';border-radius:8px;padding:8px 12px;"><div style="font-size:20px;font-weight:700;color:' + c + ';font-family:\'JetBrains Mono\',monospace;">' + n + '</div><div style="font-size:11px;color:var(--text-muted);">' + l + '</div></div>'; };
+  var th = function(t){ return '<th style="text-align:left;padding:6px 8px;font-size:11px;color:var(--text-muted);position:sticky;top:0;background:var(--surface);white-space:nowrap;">' + t + '</th>'; };
+  var td = 'style="padding:5px 8px;border-bottom:1px solid var(--border);font-size:12px;vertical-align:top;"';
+  var admin = (typeof isAdmin !== 'undefined' && isAdmin);
+  var h = '<div class="modal" style="width:1240px;max-width:97vw;max-height:92vh;display:flex;flex-direction:column;"><div class="modal-title">\ud83d\udd3b Rental pull-back watch \u2014 rented units paid for but barely used</div>'
+    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">A rented unit is listed when its <b>working days</b> in the chosen month are below the limit <u>and</u> its contract in the Rental Database has <b>no note</b> saying the work is intermittent / on call.</div>'
+    + '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:10px;font-size:12px;">'
+    + '<label>Month <select onchange="rwSet(\'month\',this.value)" style="' + inp + '">' + R.months.slice().reverse().map(function(x){ return '<option value="' + x + '"' + (x === RW.month ? ' selected' : '') + '>' + rwMonthLabel(x) + '</option>'; }).join('') + '</select></label>'
+    + '<label>Working days below <input type="number" min="1" max="31" value="' + RW.thr + '" onchange="rwSet(\'thr\',this.value)" style="' + inp + 'width:56px;"></label>'
+    + '<label>Low for the last <select onchange="rwSet(\'last\',this.value)" style="' + inp + '">' + [1, 2, 3].map(function(n){ return '<option value="' + n + '"' + (RW.last === n ? ' selected' : '') + '>' + n + ' month' + (n > 1 ? 's' : '') + '</option>'; }).join('') + '</select></label>'
+    + '<label><input type="checkbox" ' + (RW.showKeep ? 'checked' : '') + ' onchange="rwSet(\'showKeep\',this.checked)"> show units whose contract note says intermittent</label>'
+    + '<label><input type="checkbox" ' + (RW.showDone ? 'checked' : '') + ' onchange="rwSet(\'showDone\',this.checked)"> show units already marked Keep</label>'
+    + (admin ? '<button class="btn-sm" onclick="rwEditKw()" title="Words searched for in the contract note">\u2699 Note keywords</button>' : '')
+    + '<span style="margin-left:auto;display:flex;gap:6px;"><button class="btn-sm" onclick="rwNotice()">\u2709 Release notice by vendor</button><button class="btn-sm" onclick="rwExport(\'xlsx\')">\ud83d\udcca Excel</button><button class="btn-sm" onclick="rwExport(\'pdf\')">\ud83d\udcc4 PDF</button></span></div>'
+    + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">' + chip('Low-use units (all)', R.stats.low, 'var(--blue)') + chip('No note \u2192 pull back', nPull, 'var(--red)') + chip('Contract not found \u2192 verify', nVer, 'var(--accent)') + chip('Month value of listed units (EGP)', f0(risk), 'var(--red)') + chip('Excluded: intermittent note', R.stats.keepNote, 'var(--green)') + chip('Excluded: hourly-rated', R.stats.hourly, 'var(--text-muted)') + '</div>';
+  if(R.stats.noHistory) h += '<div style="font-size:12px;color:var(--accent);margin-bottom:8px;">Not enough earlier months in Master Rental for a ' + RW.last + '-month check \u2014 choose a later month or a shorter window.</div>';
+  h += '<div style="overflow:auto;border:1px solid var(--border);border-radius:8px;"><table style="width:100%;border-collapse:collapse;"><thead><tr>' + ['<input type="checkbox" onclick="rwAll(this.checked)" title="Select all">', 'Equipment', 'Project / O.D', 'Vendor', 'Qty', 'Working days', 'Month value', 'Contract / note', 'Verdict', 'Decision'].map(th).join('') + '</tr></thead><tbody>';
+  if(!shown.length) h += '<tr><td colspan="10" style="padding:24px;text-align:center;color:var(--text-muted);">Nothing to pull back for these settings.</td></tr>';
+  shown.forEach(function(x, i){
+    var enc = encodeURIComponent(x.key), d = x.dec;
+    var vd = x.verdict === 'pull' ? '<span style="color:var(--red);font-weight:700;">\u26d4 No note \u2014 pull back</span>' : (x.verdict === 'verify' ? '<span style="color:var(--accent);font-weight:700;">\u26a0 Contract not found \u2014 check the note</span>' : '<span style="color:var(--green);font-weight:700;">\u2713 Intermittent note \u2014 keep</span>');
+    if(x.loose && x.matched) vd += '<div style="font-size:10.5px;color:var(--text-muted);">matched by vendor + item only</div>';
+    var decHtml = d ? '<div style="font-size:11px;font-weight:700;color:' + (d.s === 'keep' ? 'var(--green)' : (d.s === 'pull' ? 'var(--red)' : 'var(--accent)')) + ';">' + (d.s === 'keep' ? 'Keep' : (d.s === 'pull' ? 'Pull back' : 'Under review')) + '</div><div style="font-size:10.5px;color:var(--text-muted);">' + fuEsc(d.note || '') + ' ' + fuEsc(d.by ? '\u00b7 ' + String(d.by).split('@')[0] : '') + ' ' + fuEsc(d.at || '') + '</div>' : '';
+    var btn = function(s, t){ return '<button class="btn-edit" style="padding:1px 7px;font-size:10px;margin:1px;" onclick="rwDecide(\'' + enc + '\',\'' + s + '\')">' + t + '</button>'; };
+    h += '<tr><td ' + td + '><input type="checkbox" class="rw-chk" data-i="' + i + '"></td>'
+      + '<td ' + td + '><b>' + fuEsc(x.equipment) + '</b>' + (x.model ? '<div style="color:var(--text-muted);font-size:11px;">' + fuEsc(x.model) + '</div>' : '') + (x.sap ? '<div style="font-family:monospace;font-size:10.5px;color:var(--text-muted);">' + fuEsc(x.sap) + '</div>' : '') + '</td>'
+      + '<td ' + td + '>' + fuEsc(x.project || '\u2014') + (x.od ? '<div style="color:var(--text-muted);font-size:11px;">' + fuEsc(x.od) + '</div>' : '') + '</td><td ' + td + '>' + fuEsc(x.subcon || '\u2014') + '</td><td ' + td + '>' + x.qty + '</td>'
+      + '<td ' + td + '><b style="color:var(--red);font-family:monospace;">' + (Math.round(x.days * 10) / 10) + '</b>' + (x.hist.length > 1 ? '<div style="font-size:10.5px;color:var(--text-muted);white-space:nowrap;">' + x.hist.map(function(q){ return rwMonthLabel(q.m).slice(0, 3) + ': ' + Math.round(q.days * 10) / 10; }).join(' \u00b7 ') + '</div>' : '') + '</td>'
+      + '<td ' + td + '><b>' + f0(x.total) + '</b></td>'
+      + '<td ' + td + '>' + (x.matched ? '<div style="font-size:11px;">' + fuEsc(x.contract || '\u2014') + (x.basis ? ' <span style="color:var(--text-muted);">(' + fuEsc(x.basis) + ')</span>' : '') + '</div><div style="font-size:11px;color:var(--text-muted);max-width:260px;">' + (x.note ? fuEsc(x.note.length > 140 ? x.note.slice(0, 140) + '\u2026' : x.note) : '<i>no note</i>') + '</div>' : '<span style="color:var(--text-muted);font-size:11px;">not in Rental Database</span>') + '</td>'
+      + '<td ' + td + '>' + vd + '</td><td ' + td + '>' + decHtml + (admin ? btn('pull', 'Pull back') + btn('keep', 'Keep') + btn('review', 'Review') + (d ? btn('reset', '\u21ba') : '') : '') + '</td></tr>';
+  });
+  h += '</tbody></table></div><div style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.6;">\u2022 <b>Working days</b> is the "Actual working hr/days/month" column of Master Rental; a unit with a blank value reads as 0, so check blanks before pulling back.<br>\u2022 The contract is found by matching <b>vendor + equipment + project</b> against the Rental Database; <b>Month value</b> is the Total Value of that month, not a saving estimate.</div>'
+    + '<div class="modal-actions"><button class="btn-cancel" onclick="closeModal(\'rw-modal\')">Close</button></div></div>';
+  m.innerHTML = h;
+}
+function rwAll(on){ [].forEach.call(document.querySelectorAll('#rw-modal .rw-chk'), function(c){ c.checked = on; }); }
+function rwPicked(){
+  var pick = [].filter.call(document.querySelectorAll('#rw-modal .rw-chk'), function(c){ return c.checked; }).map(function(c){ return RW.view[+c.getAttribute('data-i')]; }).filter(Boolean);
+  if(pick.length) return pick;
+  return RW.view.filter(function(x){ return x.verdict === 'pull' && !(x.dec && x.dec.s === 'keep'); });
+}
+function rwSaveDoc(patch, okMsg){
+  db.collection('settings').doc('rentalWatch').set(patch, {merge:true}).then(function(){ if(okMsg) toast(okMsg); }).catch(function(e){ console.warn(e); toast('Could not save \u2014 check permissions', 'error'); });
+}
+function rwDecide(enc, s){
+  if(!(typeof isAdmin !== 'undefined' && isAdmin)){ toast('Only admins can record a decision', 'error'); return; }
+  var key = decodeURIComponent(enc), x = RW.view.filter(function(r){ return r.key === key; })[0], h = rwHash(key), val, note = '';
+  if(s !== 'reset'){ note = prompt('Note for this decision (optional):', (x && x.dec && x.dec.note) || ''); if(note === null) return; }
+  if(s === 'reset'){ delete RW.dec[h]; val = firebase.firestore.FieldValue.delete(); }
+  else { val = {s:s, note:note, by:(auth.currentUser && auth.currentUser.email) || '', at:new Date().toISOString().slice(0, 10), label:x ? (x.equipment + ' \u00b7 ' + (x.project || '')) : ''}; RW.dec[h] = val; }
+  var dec = {}; dec[h] = val; rwSaveDoc({dec:dec}, s === 'reset' ? 'Decision cleared' : 'Saved');
+  rwRender();
+}
+function rwEditKw(){
+  if(!(typeof isAdmin !== 'undefined' && isAdmin)) return;
+  var v = prompt('Words that mark a contract as "intermittent work" (comma separated, Arabic or English).\nA unit whose contract note contains any of them is NOT listed for pull-back:', RW.kw.join(', '));
+  if(v === null) return;
+  var kw = v.split(',').map(function(a){ return a.trim(); }).filter(Boolean); if(!kw.length) kw = RW_KW.slice();
+  RW.kw = kw; rwSaveDoc({kw:kw}, 'Keywords saved'); rwRender();
+}
+/* \u2709 one release notice per vendor for the ticked rows (or every "no note" row when nothing is ticked) */
+function rwNotice(){
+  var list = rwPicked(); if(!list.length){ toast('No units to include', 'error'); return; }
+  var by = {}; list.forEach(function(x){ (by[x.subcon || '(vendor not stated)'] = by[x.subcon || '(vendor not stated)'] || []).push(x); });
+  var ml = rwMonthLabel(RW.month), T = [];
+  Object.keys(by).sort().forEach(function(v){
+    T.push('Subject: Request to release rented equipment \u2014 ' + v, '', 'Dear ' + v + ',', '', 'The units below showed minimal utilization in ' + ml + ' (less than ' + RW.thr + ' working days' + (RW.last > 1 ? ' in each of the last ' + RW.last + ' months' : '') + ') and the contract does not provide for intermittent work. Please arrange their release / collection and stop billing from the release date:', '');
+    by[v].forEach(function(x, i){ T.push((i + 1) + '. ' + x.equipment + (x.model ? ' (' + x.model + ')' : '') + (x.sap ? ' \u2014 SAP ' + x.sap : '') + ' \u2014 Qty ' + x.qty + ' \u2014 ' + (x.project || '\u2014') + ' \u2014 ' + (Math.round(x.days * 10) / 10) + ' working day(s)' + (x.contract ? ' \u2014 Contract ' + x.contract : '')); });
+    T.push('', 'Kindly confirm the release date.', '', 'Best regards,', '', '\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014', '');
+  });
+  var m = document.getElementById('rw-msg-modal');
+  if(!m){ m = document.createElement('div'); m.className = 'modal-overlay'; m.id = 'rw-msg-modal'; document.body.appendChild(m); }
+  m.innerHTML = '<div class="modal" style="width:700px;max-width:96vw;"><div class="modal-title">\u2709 Release notice \u2014 ' + Object.keys(by).length + ' vendor(s), ' + list.length + ' unit(s)</div><textarea id="rw-msg-text" style="width:100%;height:340px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:12.5px;font-family:inherit;">' + fuEsc(T.join('\n')) + '</textarea><div class="modal-actions"><button class="btn-cancel" onclick="closeModal(\'rw-msg-modal\')">Close</button><button class="btn-save" onclick="fuCopyText(document.getElementById(\'rw-msg-text\').value)">Copy</button></div></div>';
+  m.classList.add('open');
+}
+function rwExport(kind){
+  var list = RW.view || []; if(!list.length){ toast('Nothing to export', 'error'); return; }
+  var rows = list.map(function(x){ return {eq:x.equipment || '', model:x.model || '', sap:x.sap || '', proj:x.project || '', od:x.od || '', ven:x.subcon || '', qty:x.qty, days:Math.round(x.days * 10) / 10, tot:Math.round(x.total), con:x.contract || '', note:x.note || '', vd:x.verdict === 'pull' ? 'No note - pull back' : (x.verdict === 'verify' ? 'Contract not found - verify' : 'Intermittent note - keep'), dec:x.dec ? ((x.dec.s === 'keep' ? 'Keep' : (x.dec.s === 'pull' ? 'Pull back' : 'Review')) + (x.dec.note ? ': ' + x.dec.note : '')) : ''}; });
+  function f(k){ return function(o){ return o[k]; }; }
+  var cols = [{h:'#', g:function(o, i){ return i + 1; }, t:'t'}, {h:'Equipment', g:f('eq'), t:'t'}, {h:'Model / Capacity', g:f('model'), t:'t'}, {h:'SAP', g:f('sap'), t:'t'}, {h:'Project', g:f('proj'), t:'t'}, {h:'O.D', g:f('od'), t:'t'}, {h:'Vendor', g:f('ven'), t:'t'},
+    {h:'Qty', g:f('qty'), t:'i', s:true}, {h:'Working days', g:f('days'), t:'t'}, {h:'Month value (EGP)', g:f('tot'), t:'i', s:true}, {h:'Contract', g:f('con'), t:'t'}, {h:'Contract note', g:f('note'), t:'t'}, {h:'Verdict', g:f('vd'), t:'t'}, {h:'Decision', g:f('dec'), t:'t'}];
+  window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 Rental pull-back watch \u00b7 ' + rwMonthLabel(RW.month) + ' (< ' + RW.thr + ' working days)', cols:cols, rows:rows, kpis:[{label:'Units listed', value:rows.length}, {label:'No note - pull back', value:list.filter(function(x){ return x.verdict === 'pull'; }).length}, {label:'Contract not found', value:list.filter(function(x){ return x.verdict === 'verify'; }).length}]}, kind);
+}
+/* ── Engineers (project -> responsible engineer), unit card, candidate table ── */
+var FU_ENG_DEFAULT = [{"n": "Ahmed Abdelmaboud", "t": "Sr. Maintenance Engineer", "p": "El Shohada Hospital", "m": "01270959526", "e": "ahmed.abdelmaboud@hassanallam.com"}, {"n": "Abdel Kader Mohamed", "t": "Equipment Manager", "p": "El Dabaa NPP", "m": "01008428530", "e": "abdelkader.mohamed@hassanallam.com"}, {"n": "Khaled Rashed", "t": "Maintenance Section Head", "p": "El Dabaa NPP", "m": "01094485857", "e": "khaled.rashed@hassanallam.com"}, {"n": "Mohamed Elgammal", "t": "Maintenance Section Head", "p": "Swan Lake Extension", "m": "01028921527", "e": "mohammed.elgammal@hassanallam.com"}, {"n": "Khaled El Sayed", "t": "Maintenance Section Head", "p": "Allam Steel", "m": "01200877473", "e": "khaled.elbaqly@hassanallam.com"}, {"n": "Ayman El Sayed", "t": "Maintenance Section Head", "p": "Lokanda", "m": "01147037101", "e": "ayman.elsayed@hassanallam.com"}, {"n": "Mostafa Qamar", "t": "Maintenance Section Head", "p": "Soul", "m": "01020754405", "e": "mostafa.kamar@hassanallam.com"}, {"n": "Ayman Gad", "t": "Maintenance Manager", "p": "Mostakbal Masr Zone (G)", "m": "01120378388", "e": "ayman.gad@hassanallam.com"}, {"n": "Ahmed El Khodary", "t": "Maintenance Section Head", "p": "Alex Raml Tram", "m": "01112453393", "e": "ahmed.khodry@hassanallam.com"}, {"n": "Mohamed Ashraf", "t": "Maintenance Section Head", "p": "Silver Sand", "m": "01016445101", "e": "mohamed.aabdelmohsen@hassanallam.com"}, {"n": "Ahmed El Labban", "t": "Maintenance Section Head", "p": "Alameen station / Wadi Elnatroon", "m": "01024733946", "e": "ahmed.ellabban@hassanallam.com"}, {"n": "Hany Rashwan", "t": "Equipment Manager", "p": "Ras El Hekma (JV)", "m": "01278163331", "e": "hany.rashwan@hassanallam.com"}, {"n": "Radwan EL Sayed", "t": "Maintenance Section Head", "p": "Ras El Hekma (DPP6)", "m": "01151713597", "e": "radwan.ahmed@hassanallam.com"}, {"n": "Khaled Ibrahim", "t": "Sr. Maintenance Engineer", "p": "U - Section Alex", "m": "01227191802", "e": "khaled.dessoki@hassanallam.com"}, {"n": "Mohamed Abdelnaby", "t": "Sr. Maintenance Engineer", "p": "Hub-mall & LRT", "m": "01002380170", "e": "mohamed.msalama@hassanallam.com"}, {"n": "Hesham Amr", "t": "Sr. Maintenance Engineer", "p": "Bab Masr", "m": "01014600541", "e": "hesham.alrkaiby@hassanallam.com"}, {"n": "Ahmed Anwar", "t": "Maintenance Section Head", "p": "Haptowen", "m": "01159107120", "e": "ahmed.anwar@hassanallam.com"}, {"n": "Mohamed Shaban", "t": "Equipment Manager", "p": "Metro Line 4", "m": "01271407930", "e": "mohamed.sabdelghany@hassanallam.com"}, {"n": "Mohamed Brakat", "t": "Maintenance Section Head", "p": "Metro Line 4", "m": "01016441216", "e": "mohamed.babdelazim@hassanallam.com"}, {"n": "Fathy Khattab", "t": "Maintenance Section Head", "p": "HAC - HARD 350 Feddan", "m": "01091975720", "e": "fathy.khattab@hassanallam.com"}, {"n": "Hany Serag", "t": "Maintenance Section Head", "p": "R05 / Kayan", "m": "01201985979", "e": "hany.sirag@hassanallam.com"}, {"n": "Shady Abdel Naeem", "t": "Sr. Maintenance Engineer", "p": "Nasser Institute", "m": "01206615175", "e": "shady.abdelnaeem@hassanallam.com"}, {"n": "Hamdy Bahloul", "t": "Maintenance Section Head", "p": "Mavida", "m": "01064305085", "e": "hamdy.mohamed@hassanallam.com"}, {"n": "Ahmed Ezzat", "t": "Equipment Manager", "p": "Afrexim Bank", "m": "01040996669", "e": "ahmed.eali@hassanallam.com"}, {"n": "Hazem Khalil", "t": "Maintenance Section Head", "p": "Afrexim Bank", "m": "01111746787", "e": "hazem.khalil@hassanallam.com"}, {"n": "Taha Abdel Mawgood", "t": "Lifting Section Head", "p": "Sofitel", "m": "01017788005", "e": "taha.soliman@hassanallam.com"}, {"n": "Ashraf Mansour", "t": "Equipment Manager", "p": "Mansour Factory(mac)", "m": "01025450223", "e": "ashraf.mansour@hassanallam.com"}, {"n": "Maher Mady", "t": "Sr. Maintenance Engineer", "p": "10th Of Ramadan Sector", "m": "01272751014", "e": "Maher.Mady@hassanallam.com"}, {"n": "Ahmed Saber", "t": "Sr. Maintenance Engineer", "p": "Luxor Warehouse", "m": "01015834609", "e": "ahmed.selsaied@hassanallam.com"}, {"n": "Ahmed Selmy", "t": "Maintenance Engineer", "p": "Benban", "m": "01221518888", "e": "ahmed.salma@hassanallam.com"}, {"n": "Robeir Eskander", "t": "Maintenance Section Head - Mech", "p": "H.S-Train Depots-Minia", "m": "01200377857", "e": ""}, {"n": "Ismail Mostafa", "t": "Maintenance Section Head - Elec", "p": "H.S-Train Depots-Minia", "m": "01005562622", "e": ""}, {"n": "Mohamed Tarek", "t": "Senior Maintenance Engineer -Mech", "p": "H.S-Train Depots-Minia", "m": "01155390387", "e": ""}, {"n": "Tarek Saleh", "t": "Senior Maintenance Engineer -Elec", "p": "H.S-Train Depots-Minia", "m": "01019853525", "e": ""}, {"n": "Ibrahim El Belsha", "t": "Maintenance Section Head", "p": "Foundition", "m": "01066211803", "e": "ibrahem.elbalsha@hassanallam.com"}, {"n": "Saber El Beshlawy", "t": "Maintenance Section Head", "p": "NCRTL - WTP JV", "m": "01095096487", "e": "saber.abdelrahman@hassanallam.com"}, {"n": "Morshed El Sayed", "t": "Sr. Maintenance Engineer", "p": "Safaga Port", "m": "01091397690", "e": "morshed.elsayed@hassanallam.com"}, {"n": "Reda Ahmed", "t": "Maintenance Section Head", "p": "Fairmont Hotel Sharm El Sheikh", "m": "01014360802", "e": "reda.ahmed@hassanallam.com"}];
+var FU_ENG = FU_ENG_DEFAULT.slice(), FU_ENG_C = {}, FU_ENG_LOADED = false;
+function fuEngRank(t){ t = String(t || '').toLowerCase(); if(/equipment manager|maintenance manager/.test(t)) return 1; if(/section head/.test(t)) return 2; if(/\bsr\b|senior/.test(t)) return 3; return 4; }
+function fuEngKey(x){ return String(x == null ? '' : x).toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ').replace(/\b(project|projects|hac|the|site)\b/g, ' ').replace(/\s+/g, ' ').trim(); }
+function fuEngKeys(p){ var raw = String(p || ''), parts = [raw].concat(raw.split(/[\/()]|\s-\s|,/)), seen = {}, out = []; parts.forEach(function(q){ var k = fuEngKey(q); if(k.length >= 3 && !seen[k]){ seen[k] = 1; out.push(k); } }); return out; }
+function fuLev(a, b){ var m = a.length, n = b.length, d = [], i, j; for(i = 0; i <= m; i++){ d[i] = [i]; } for(j = 1; j <= n; j++) d[0][j] = j; for(i = 1; i <= m; i++) for(j = 1; j <= n; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[m][n]; }
+function fuEngScore(ka, kb){
+  if(ka === kb) return 1;
+  var pa = ' ' + ka + ' ', pb = ' ' + kb + ' ', best = 0;
+  if((kb.length >= 4 && pa.indexOf(pb) >= 0) || (ka.length >= 4 && pb.indexOf(pa) >= 0)) best = 0.88;
+  var ta = ka.split(' ').filter(function(w){ return w.length >= 2 && w !== 'and'; }), tb = kb.split(' ').filter(function(w){ return w.length >= 2 && w !== 'and'; });
+  var com = ta.filter(function(w){ return tb.indexOf(w) >= 0; }).length, mn = Math.min(ta.length, tb.length), un = ta.length + tb.length - com;
+  if(mn >= 2 && com === mn) best = Math.max(best, 0.85);
+  if(un && com / un >= 0.78) best = Math.max(best, com / un);
+  var mx = Math.max(ka.length, kb.length), sim = mx ? 1 - fuLev(ka, kb) / mx : 0;
+  if(mx >= 5 && sim >= 0.82) best = Math.max(best, sim * 0.95);
+  /* "Locanda L1H1-Phase1" vs "Lokanda": the leading word is the project name, the rest is phase / building */
+  if(ta.length && tb.length && ta.length !== tb.length && (ta.length === 1 || tb.length === 1)){
+    var one = ta.length === 1 ? ta[0] : tb[0], many = ta.length === 1 ? tb[0] : ta[0];
+    if(one.length >= 5 && many.length >= 5 && 1 - fuLev(one, many) / Math.max(one.length, many.length) >= 0.82) best = Math.max(best, 0.8);
+  }
+  return best;
+}
+function fuEngFor(project){
+  var key = fuEngKey(project); if(!key) return [];
+  if(FU_ENG_C[key]) return FU_ENG_C[key];
+  var ke = fuEngKeys(project), scores = {}, best = 0;
+  FU_ENG.forEach(function(g){
+    if(scores[g.p] != null) return;
+    var sc = 0; fuEngKeys(g.p).forEach(function(kg){ ke.forEach(function(k){ sc = Math.max(sc, fuEngScore(k, kg)); }); });
+    scores[g.p] = sc; if(sc > best) best = sc;
+  });
+  var out = [];
+  if(best >= 0.78) FU_ENG.forEach(function(g){ if(scores[g.p] >= best - 0.0001) out.push(g); });
+  out.sort(function(a, b){ return fuEngRank(a.t) - fuEngRank(b.t) || String(a.n).localeCompare(String(b.n)); });
+  return (FU_ENG_C[key] = out);
+}
+function fuWaLink(m){ var d = String(m || '').replace(/\D/g, ''); return /^01\d{9}$/.test(d) ? 'https://wa.me/20' + d.slice(1) : ''; }
+function fuEngHtml(project){
+  var E = fuEngFor(project);
+  if(!E.length) return '<span style="color:var(--text-muted);font-size:11px;" title="No engineer found for this project name in the contact list">\u2014</span>';
+  var p = E[0], wa = fuWaLink(p.m);
+  var h = '<div style="font-weight:600;">' + fuEsc(p.n) + '</div><div style="font-size:10.5px;color:var(--text-muted);">' + fuEsc(p.t) + '</div><div style="font-size:11px;font-family:monospace;">' + fuEsc(p.m) + (wa ? ' <a href="' + wa + '" target="_blank" rel="noopener" title="WhatsApp">\ud83d\udcac</a>' : '') + '</div>';
+  if(E.length > 1) h += '<div style="font-size:10.5px;color:var(--accent);cursor:help;" title="' + fuEsc(E.slice(1).map(function(x){ return x.n + ' (' + x.t + ') ' + x.m; }).join(' | ')) + '">+' + (E.length - 1) + ' more</div>';
+  return h;
+}
+function fuEngLine(project){ var E = fuEngFor(project); return E.length ? E.slice(0, 3).map(function(x){ return x.n + ' (' + x.t + ') ' + x.m; }).join(' ; ') : '\u2014'; }
+function fuEngRefresh(){
+  var o = document.getElementById('fu-owned-modal'), b = document.getElementById('fu-bulk-modal');
+  if(o && o.classList.contains('open') && window.__fuOwnedReq) fuSearchOwned(window.__fuOwnedReq);
+  if(b && b.classList.contains('open')) fuRenderBulk();
+}
+function fuEngEnsure(){
+  if(FU_ENG_LOADED) return; FU_ENG_LOADED = true;
+  try{ var ls = JSON.parse(localStorage.getItem('fuEngList') || 'null'); if(ls && ls.length){ FU_ENG = ls; FU_ENG_C = {}; } }catch(e){}
+  try{ db.collection('settings').doc('engineers').get().then(function(d){
+    var l = d && d.exists ? d.data().list : null;
+    if(Array.isArray(l) && l.length){ FU_ENG = l; FU_ENG_C = {}; try{ localStorage.setItem('fuEngList', JSON.stringify(l)); }catch(e){} fuEngRefresh(); }
+  }).catch(function(){}); }catch(e){}
+}
+function fuEngImport(input){
+  var f = input.files && input.files[0]; if(!f) return;
+  if(!(typeof isAdmin !== 'undefined' && isAdmin)){ toast('Only admins can replace the engineers list', 'error'); input.value = ''; return; }
+  var fr = new FileReader();
+  fr.onload = function(ev){
+    try{
+      var wb = XLSX.read(ev.target.result, {type:'array'}), ws = wb.Sheets['Engineers'] || wb.Sheets[wb.SheetNames[0]];
+      var M = XLSX.utils.sheet_to_json(ws, {header:1, defval:''}), hi = -1, ix = {};
+      for(var i = 0; i < Math.min(M.length, 15) && hi < 0; i++){
+        var low = M[i].map(function(c){ return String(c).toLowerCase(); });
+        var pj = low.findIndex(function(c){ return /project/.test(c); }), nm = low.findIndex(function(c){ return /name/.test(c); });
+        if(pj >= 0 && nm >= 0){ hi = i; ix = {n:nm, p:pj, t:low.findIndex(function(c){ return /title/.test(c); }), m:low.findIndex(function(c){ return /mobile|phone/.test(c); }), e:low.findIndex(function(c){ return /mail/.test(c); })}; }
+      }
+      if(hi < 0) throw new Error('header row (Engineers Name / Project) not found');
+      var list = [];
+      for(var r = hi + 1; r < M.length; r++){
+        var row = M[r], n = String(row[ix.n] || '').trim().replace(/\s+/g, ' '), p = String(row[ix.p] || '').trim(); if(!n || !p) continue;
+        var m = ix.m >= 0 ? String(row[ix.m] || '').replace(/\D/g, '') : ''; if(m.length === 10 && m.charAt(0) === '1') m = '0' + m;
+        list.push({n:n, t:ix.t >= 0 ? String(row[ix.t] || '').trim() : '', p:p, m:m, e:ix.e >= 0 ? String(row[ix.e] || '').trim() : ''});
+      }
+      if(!list.length) throw new Error('no engineers found');
+      if(!confirm('Replace the engineers list with ' + list.length + ' engineers from this file?')){ input.value = ''; return; }
+      FU_ENG = list; FU_ENG_C = {}; try{ localStorage.setItem('fuEngList', JSON.stringify(list)); }catch(x){}
+      db.collection('settings').doc('engineers').set({list:list, at:new Date().toISOString(), by:(auth.currentUser && auth.currentUser.email) || ''}).then(function(){ toast('\u2713 Engineers list saved (' + list.length + ')'); }).catch(function(){ toast('Saved on this device only \u2014 check permissions', 'error'); });
+      fuEngRefresh();
+    }catch(err){ toast('Engineers file: ' + err.message, 'error'); }
+    input.value = '';
+  };
+  fr.readAsArrayBuffer(f);
+}
+function fuUnitBox(){
+  var admin = (typeof isAdmin !== 'undefined' && isAdmin);
+  return '<span style="display:flex;gap:4px;align-items:center;">\ud83d\udd0e <input placeholder="Unit code\u2026" onkeydown="if(event.key===\'Enter\')fuUnitLookup(this.value)" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:6px;font-size:12px;width:110px;"><button class="btn-sm" onclick="fuUnitLookup(this.previousElementSibling.value)">Find unit</button></span>'
+    + (admin ? '<label class="btn-sm" style="cursor:pointer;" title="Upload the engineers contact list (Excel) \u2014 replaces the current one">\ud83d\udc77 Engineers list<input type="file" accept=".xlsx,.xls" style="display:none" onchange="fuEngImport(this)"></label>' : '');
+}
+/* last reading helpers */
+function fuLastOf(e){ return (typeof window.hmLastRead === 'function' && e && e.code) ? window.hmLastRead(e.code) : null; }
+function fuMonthsBehind(a, b){ var p = String(a || '').split('-'), q = String(b || '').split('-'); if(p.length < 2 || q.length < 2) return 0; return (+q[0] - +p[0]) * 12 + (+q[1] - +p[1]); }
+function fuMLab(m){ return (typeof window.hmLowLabel === 'function') ? window.hmLowLabel(m) : m; }
+function fuLastHtml(L){
+  if(!L) return '<span style="color:var(--text-muted);font-size:11px;">no reading</span>';
+  var bh = fuMonthsBehind(L.m, L.latest);
+  return '<b>' + fuEsc(fuMLab(L.m)) + '</b><div style="font-size:10.5px;color:' + (bh > 0 ? 'var(--accent)' : 'var(--text-muted)') + ';">' + (bh > 0 ? bh + ' month' + (bh > 1 ? 's' : '') + ' behind' : 'latest month') + '</div>';
+}
+function fuDiffHtml(x){
+  var src = x.low || x.last; if(!src) return '<span style="color:var(--text-muted);font-size:11px;">\u2014</span>';
+  if(src.d == null) return '<span style="color:var(--text-muted);font-size:11px;">no start reading</span>';
+  var low = src.d < src.lim, same = x.last && src.ym ? (src.ym === x.last.m) : true;
+  return '<b style="color:' + (low ? 'var(--red)' : 'var(--text)') + ';font-family:monospace;">' + fuEsc(Math.round(src.d * 10) / 10) + '</b> <span style="color:var(--text-muted);font-size:10.5px;">/ &lt; ' + fuEsc(src.lim) + ' h' + (!same ? ' \u00b7 ' + fuEsc(fuMLab(src.ym)) : '') + '</span>' + (src.ur ? '<div>' + window.hmLowBadge(src.ur) + '</div>' : '');
+}
+/* the table used by the Search-Owned window and by the expanded rows of Bulk search */
+function fuCandTable(list, r, o){
+  o = o || {};
+  var td = 'style="padding:5px 8px;border-bottom:1px solid var(--border);font-size:12px;vertical-align:top;"', max = o.max || 60, rid = fuEsc(r.id), admin = (typeof isAdmin !== 'undefined' && isAdmin);
+  var h = '<div style="max-height:' + (o.maxH || 380) + 'px;overflow:auto;border:1px solid var(--border);border-radius:8px;"><table style="width:100%;border-collapse:collapse;"><tr style="position:sticky;top:0;background:var(--surface);z-index:1;">'
+    + ['Code', 'Equipment', 'Current project', 'Engineer', 'Last reading', 'H/M diff', 'Availability', 'Actions'].map(function(t){ return '<th style="text-align:left;padding:5px 8px;font-size:11px;color:var(--text-muted);white-space:nowrap;">' + t + '</th>'; }).join('') + '</tr>';
+  list.slice(0, max).forEach(function(x){
+    var e = x.e, enc = encodeURIComponent(e.code || ''), ws = x.workshop || isCentralWorkshop(e.project), cap = fuCapOf(e), av = '', al = x.alloc, act = '';
+    if(al) av += '<div style="color:var(--green);font-size:11px;font-weight:700;white-space:nowrap;">\ud83d\udccc Allocated</div>';
+    if(x.rep) av += '<div style="color:var(--red);font-size:11px;white-space:nowrap;">\ud83d\udd27 Under repair</div>';
+    (x.busy || []).forEach(function(c){ av += '<div style="color:var(--red);font-size:11px;white-space:nowrap;">\u26d4 ' + fuEsc(c.text) + '</div>'; });
+    if(!av) av = '<span style="color:var(--green);">\u2713 Free</span>';
+    if(admin && e.code) act += '<button class="btn-edit" style="padding:1px 7px;font-size:10px;" onclick="fuAllocToggle(\'' + rid + '\',\'' + enc + '\')">' + (al ? 'Release' : 'Allocate') + '</button> ';
+    if(e.code) act += '<button class="btn-edit" style="padding:1px 7px;font-size:10px;" title="Copy a ready transfer request message" onclick="fuTransferMsg(\'' + rid + '\',\'' + enc + '\')">\u2709</button>';
+    h += '<tr><td ' + td + '><a style="cursor:pointer;font-weight:700;color:var(--blue);" title="Unit card: last reading, project, engineer" onclick="fuUnitLookup(decodeURIComponent(\'' + enc + '\'))">' + fuEsc(e.code || '\u2014') + '</a></td>'
+      + '<td ' + td + '>' + fuEsc(e.equipment) + (cap ? ' <span style="color:var(--text-muted);font-size:11px;">' + fuEsc(cap) + '</span>' : '') + '<div style="font-size:10.5px;color:var(--text-muted);">' + fuEsc([e.brand, e.year].filter(Boolean).join(' \u00b7 ')) + '</div>' + (x.note ? '<div style="font-size:10.5px;color:var(--accent);">' + fuEsc(x.note) + '</div>' : '') + '</td>'
+      + '<td ' + td + '>' + (ws ? '<span style="color:var(--green)">\ud83c\udfed Central Workshop</span>' : fuEsc(e.project || '\u2014')) + (e.fleet && e.fleet !== 'egypt' ? ' <span style="font-size:10.5px;color:var(--text-muted);">' + fuEsc(e.fleet) + '</span>' : '') + '</td>'
+      + '<td ' + td + '>' + (ws ? '<span style="color:var(--text-muted);font-size:11px;">\u2014</span>' : fuEngHtml(e.project)) + '</td><td ' + td + '>' + fuLastHtml(x.last) + '</td><td ' + td + '>' + fuDiffHtml(x) + '</td><td ' + td + '>' + av + '</td><td ' + td + '>' + act + '</td></tr>';
+  });
+  return h + '</table></div>' + (list.length > max ? '<div style="font-size:11px;color:var(--text-muted);margin-top:6px;">\u2026 and ' + (list.length - max) + ' more (use Excel export for the full list)</div>' : '');
+}
+/* \ud83d\udd0e one unit: where it is, who is responsible, and its LAST hour-meter reading */
+function fuUnitLookup(q){
+  q = String(q || '').trim(); if(!q){ toast('Type a unit code', 'error'); return; }
+  var k = fuNormCode(q), all = (typeof allEquipment !== 'undefined' ? allEquipment : []);
+  var hit = all.filter(function(e){ return fuNormCode(e.code) === k; });
+  if(!hit.length) hit = all.filter(function(e){ return e.code && fuNormCode(e.code).indexOf(k) >= 0; });
+  if(!hit.length){ toast('No unit with code "' + q + '"', 'error'); return; }
+  fuEngEnsure();
+  var m = document.getElementById('fu-unit-modal');
+  if(!m){ m = document.createElement('div'); m.className = 'modal-overlay'; m.id = 'fu-unit-modal'; document.body.appendChild(m); }
+  if(hit.length > 1){
+    m.innerHTML = '<div class="modal" style="width:520px;max-width:96vw;"><div class="modal-title">\ud83d\udd0e ' + hit.length + ' units match "' + fuEsc(q) + '"</div><div style="max-height:360px;overflow:auto;">' + hit.slice(0, 40).map(function(e){ return '<div style="padding:6px 4px;border-bottom:1px solid var(--border);font-size:12.5px;"><a style="cursor:pointer;font-weight:700;color:var(--blue);" onclick="fuUnitLookup(decodeURIComponent(\'' + encodeURIComponent(e.code) + '\'))">' + fuEsc(e.code) + '</a> \u2014 ' + fuEsc(e.equipment || '') + ' <span style="color:var(--text-muted);">' + fuEsc(e.project || '') + '</span></div>'; }).join('') + '</div><div class="modal-actions"><button class="btn-cancel" onclick="closeModal(\'fu-unit-modal\')">Close</button></div></div>';
+    m.classList.add('open'); return;
+  }
+  var e = hit[0], L = fuLastOf(e), ws = isCentralWorkshop(e.project), cap = fuCapOf(e), S = (typeof window.hmSeries === 'function') ? window.hmSeries(e.code, 6) : [];
+  var lim = L ? L.lim : null, code = fuNormCode(e.code);
+  var wsList = (typeof wsEquipment !== 'undefined' ? wsEquipment : []).filter(function(w){ return fuNormCode(w.code) === code && w.status !== 'Dispatched'; });
+  var allocs = (typeof FU_DATA !== 'undefined' ? FU_DATA : []).filter(function(o){ return Array.isArray(o.allocated) && o.allocated.map(fuNormCode).indexOf(code) >= 0; });
+  var trs = (typeof allTransfers !== 'undefined' ? allTransfers : []).filter(function(t){ return fuNormCode(t.code) === code || (t.equipmentId && t.equipmentId === e.id); }).sort(function(a, b){ return String(fuIsoOf(b.date)).localeCompare(String(fuIsoOf(a.date))); }).slice(0, 3);
+  var row = function(a, b){ return '<div style="display:flex;gap:10px;padding:4px 0;border-bottom:1px solid var(--border);font-size:12.5px;"><div style="width:130px;color:var(--text-muted);">' + a + '</div><div style="flex:1;">' + b + '</div></div>'; };
+  var badge = !L ? '<span style="color:var(--text-muted);">no reading on file</span>' : (L.d == null ? '<span style="color:var(--text-muted);">no start reading</span>' : (L.low ? '<b style="color:var(--red);">LOW usage</b> \u2014 ' + Math.round(L.d * 10) / 10 + ' h (limit ' + L.lim + ' h)' : '<b style="color:var(--green);">OK</b> \u2014 ' + Math.round(L.d * 10) / 10 + ' h (limit ' + L.lim + ' h)'));
+  var bh = L ? fuMonthsBehind(L.m, L.latest) : 0;
+  var h = '<div class="modal" style="width:640px;max-width:96vw;max-height:92vh;overflow:auto;"><div class="modal-title">\ud83d\udd0e ' + fuEsc(e.code) + ' \u2014 ' + fuEsc(e.equipment || '') + '</div>'
+    + row('Unit', fuEsc([e.brand, e.model, e.year, cap].filter(Boolean).join(' \u00b7 ') || '\u2014') + (e.fleet && e.fleet !== 'egypt' ? ' <span style="color:var(--text-muted);">(' + fuEsc(e.fleet) + ')</span>' : ''))
+    + row('Current project', ws ? '<span style="color:var(--green)">\ud83c\udfed Central Workshop</span>' : fuEsc(e.project || '\u2014'))
+    + row('Engineer', ws ? '\u2014' : (fuEngFor(e.project).length ? fuEngFor(e.project).map(function(g){ var wa = fuWaLink(g.m); return '<div><b>' + fuEsc(g.n) + '</b> <span style="color:var(--text-muted);font-size:11px;">' + fuEsc(g.t) + '</span><br><span style="font-family:monospace;font-size:11.5px;">' + fuEsc(g.m) + '</span>' + (wa ? ' <a href="' + wa + '" target="_blank" rel="noopener">\ud83d\udcac</a>' : '') + (g.e ? ' <span style="font-size:11px;color:var(--text-muted);">' + fuEsc(g.e) + '</span>' : '') + '</div>'; }).join('') : '<span style="color:var(--text-muted);">no engineer matched to this project name</span>'))
+    + row('Last reading', L ? '<b style="font-size:14px;">' + fuEsc(fuMLab(L.m)) + '</b> <span style="color:' + (bh > 0 ? 'var(--accent)' : 'var(--text-muted)') + ';font-size:11px;">' + (bh > 0 ? bh + ' month(s) behind the latest data month (' + fuEsc(fuMLab(L.latest)) + ')' : 'latest data month') + '</span><br>Start ' + (L.s != null ? fuEsc(L.s.toLocaleString('en-US')) : '\u2014') + ' \u2192 End ' + fuEsc(L.e.toLocaleString('en-US')) + ' h<br>' + badge + (L.ur ? '<div>' + window.hmLowBadge(L.ur) + '</div>' : '') : badge)
+    + (S.length ? row('Recent months', S.map(function(q){ var low = q.d != null && lim != null && q.d < lim; return '<span style="display:inline-block;margin:0 10px 2px 0;font-size:11.5px;"><span style="color:var(--text-muted);">' + fuEsc(fuMLab(q.m)) + '</span> <b style="font-family:monospace;color:' + (low ? 'var(--red)' : 'var(--text)') + ';">' + (q.d != null ? Math.round(q.d * 10) / 10 : '\u2014') + '</b></span>'; }).join('')) : '')
+    + (wsList.length ? row('Workshop', wsList.map(function(w){ return fuEsc((w.status || 'In workshop') + (w.entryDate ? ' since ' + fuIsoOf(w.entryDate) : '') + (w.exitDate ? ' \u00b7 exit ' + fuIsoOf(w.exitDate) : '')); }).join('<br>')) : '')
+    + (allocs.length ? row('Allocated to', allocs.map(function(o){ var w = fuReqWindow(o); return fuEsc((o.project || '\u2014') + (w ? ' (' + w.from + ' \u2192 ' + w.to + ')' : '')); }).join('<br>')) : '')
+    + (trs.length ? row('Last transfers', trs.map(function(t){ return fuEsc(fuIsoOf(t.date) + ' \u00b7 ' + (t.from || '\u2014') + ' \u2192 ' + (t.to || '\u2014')); }).join('<br>')) : '')
+    + '<div class="modal-actions"><button class="btn-cancel" onclick="closeModal(\'fu-unit-modal\')">Close</button><button class="btn-sm" onclick="fuCopyText(this.getAttribute(\'data-t\'))" data-t="' + fuEsc([e.code + ' \u2014 ' + (e.equipment || ''), 'Project: ' + (ws ? 'Central Workshop' : (e.project || '\u2014')), 'Engineer: ' + (ws ? '\u2014' : fuEngLine(e.project)), 'Last reading: ' + (L ? fuMLab(L.m) + (L.d != null ? ' \u2014 ' + Math.round(L.d * 10) / 10 + ' h' + (L.low ? ' (LOW, limit ' + L.lim + ' h)' : '') : '') : 'none')].join('\n')) + '">Copy summary</button></div></div>';
+  m.innerHTML = h; m.classList.add('open');
 }
 document.addEventListener('hm-loaded', function(){ var m = document.getElementById('fu-owned-modal'); if(m && m.classList.contains('open') && window.__fuOwnedReq && window.__fuOwnLow !== false) fuSearchOwned(window.__fuOwnedReq); });
 function fuSearchOwned(id){
@@ -5920,7 +6292,8 @@ function fuSearchOwned(id){
   var fleets = !!(document.getElementById('fu-own-fleets') || {}).checked;
   var lowEl = document.getElementById('fu-own-low'), lowOn = lowEl ? lowEl.checked : (window.__fuOwnLow !== false);
   window.__fuOwnLow = lowOn;
-  var lmEl = document.getElementById('fu-own-lowm'), lowYm = lmEl ? lmEl.value : '';
+  fuEngEnsure();
+  var lmEl = document.getElementById('fu-own-lowm'), lowYm = lmEl ? lmEl.value : (window.__fuLowYm || 'last'); window.__fuLowYm = lowYm;
   var LM = (typeof window.hmLowMap === 'function') ? window.hmLowMap(lowYm) : {map:{}, loaded:false, months:[], ym:''};
   if(lowOn && !LM.loaded && typeof hmReload === 'function'){ try{ hmReload(); }catch(x){} }
   var useLow = lowOn && LM.loaded;
@@ -5932,7 +6305,7 @@ function fuSearchOwned(id){
   var rEl = document.getElementById('fu-own-rep'), hideRep = rEl ? rEl.checked : (window.__fuOwnRep !== false);
   window.__fuOwnRep = hideRep;
   var refYm = fuRepairRefYm(LM), busyHidden = 0, repHidden = 0;
-  res.forEach(function(x){ x.busy = reqWin ? fuConflicts(x.e, r, reqWin) : []; x.rep = fuUnderRepair(x.e, refYm); x.alloc = fuIsAllocated(r, x.e); });
+  res.forEach(function(x){ x.busy = reqWin ? fuConflicts(x.e, r, reqWin) : []; x.rep = fuUnderRepair(x.e, refYm); x.alloc = fuIsAllocated(r, x.e); x.last = fuLastOf(x.e); });
   res = res.filter(function(x){
     if(x.alloc) return true;
     if(hideRep && x.rep){ repHidden++; return false; }
@@ -5946,11 +6319,12 @@ function fuSearchOwned(id){
   var h = '<div class="modal" style="width:1080px;max-width:96vw;"><div class="modal-title">🔍 Owned equipment — ' + fuEsc(r.equipment) + (r.capacity ? ' · ' + fuEsc(r.capacity) : '') + '</div>';
   h += '<div style="font-size:12px;color:var(--text-muted);margin:-8px 0 12px;">Request: <b style="color:var(--text)">' + fuEsc(r.project) + '</b> · Qty ' + (r.qty || 1) + ' · ' + fuEsc(formatExcelDate(r.date_from)) + ' → ' + fuEsc(formatExcelDate(r.date_to)) + ' · currently <b style="color:var(--text)">' + fuEsc(r.provision || '—') + '</b></div>';
   h += '<div style="display:flex;gap:10px;flex-wrap:wrap;">' + chip(useLow ? 'Low H/M units \u00b7 same capacity' : 'Owned units of this type', res.length, 'var(--blue)') + (useLow ? chip('All owned of this type', resAll.length, 'var(--text-muted)') : '') + chip('In Central Workshop', ws, 'var(--green)') + chip('Capacity matches', cm, 'var(--accent)') + (hideRep && repHidden ? chip('Hidden \u2014 under repair', repHidden, 'var(--red)') : '') + (reqWin ? chip(hideBusy ? 'Hidden \u2014 busy in period' : 'Busy in period', hideBusy ? busyHidden : res.filter(function(x){ return x.busy && x.busy.length; }).length, 'var(--red)') : '') + '</div>';
-  var lowOpts = '<option value="">' + (LM.loaded ? fuEsc(window.hmLowLabel(LM.months.indexOf(lowYm) >= 0 ? lowYm : (LM.ym && LM.ym !== 'all' ? LM.ym : ''))) : 'latest month') + '</option>';
-  if(LM.loaded){ lowOpts = '<option value="all"' + (lowYm === 'all' ? ' selected' : '') + '>All months</option>' + LM.months.slice().reverse().map(function(m){ return '<option value="' + m + '"' + ((lowYm || LM.ym) === m && lowYm !== 'all' ? ' selected' : '') + '>' + fuEsc(window.hmLowLabel(m)) + '</option>'; }).join(''); }
+  var lowOpts = '';
+  if(LM.loaded){ lowOpts = '<option value="last"' + (lowYm === 'last' ? ' selected' : '') + '>Last reading of each unit</option><option value="all"' + (lowYm === 'all' ? ' selected' : '') + '>Any month (lowest)</option>' + LM.months.slice().reverse().map(function(m){ return '<option value="' + m + '"' + (lowYm === m ? ' selected' : '') + '>' + fuEsc(window.hmLowLabel(m)) + '</option>'; }).join(''); }
   h += '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:10px 0 2px;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-size:12px;">'
      + '<label style="color:var(--text);"><input type="checkbox" id="fu-own-low" ' + (lowOn ? 'checked' : '') + ' onchange="fuSearchOwned(window.__fuOwnedReq)"> <b>Only Low H/M usage units</b> (same capacity as the request)</label>'
-     + (lowOn ? '<label style="color:var(--text-muted);">Month <select id="fu-own-lowm" onchange="fuSearchOwned(window.__fuOwnedReq)" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:3px 6px;border-radius:6px;font-size:12px;">' + lowOpts + '</select></label>' : '')
+     + (lowOn ? '<label style="color:var(--text-muted);">H/M basis <select id="fu-own-lowm" onchange="fuSearchOwned(window.__fuOwnedReq)" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:3px 6px;border-radius:6px;font-size:12px;">' + lowOpts + '</select></label>' : '')
+     + fuUnitBox()
      + '<label style="color:var(--text);"><input type="checkbox" id="fu-own-rep" ' + (hideRep ? 'checked' : '') + ' onchange="fuSearchOwned(window.__fuOwnedReq)"> <b>Hide units under repair</b></label>'
      + (reqWin ? '<label style="color:var(--text);"><input type="checkbox" id="fu-own-busy" ' + (hideBusy ? 'checked' : '') + ' onchange="fuSearchOwned(window.__fuOwnedReq)"> <b>Hide units busy in the request period</b> <span style="color:var(--text-muted);">(' + fuEsc(reqWin.from) + ' \u2192 ' + fuEsc(reqWin.to) + ')</span></label>' : '')
      + (capIgnored ? '<span style="color:var(--text-muted);">Capacity "' + fuEsc(r.capacity) + '" is not a rating (kW / ton ...), so all Low H/M units of this type are listed.</span>' : '')
@@ -5962,23 +6336,7 @@ function fuSearchOwned(id){
   if(!res.length){
     h += '<div style="padding:14px;border:1px dashed var(--border);border-radius:8px;font-size:13px;">' + (useLow ? 'No <b>Low H/M usage</b> unit of <b>' + fuEsc(r.equipment) + '</b>' + (r.capacity ? ' with capacity <b>' + fuEsc(r.capacity) + '</b>' : '') + ' (' + resAll.length + ' owned of this type in total — untick the Low H/M box to see them).' : 'No owned equipment matches <b>' + fuEsc(r.equipment) + '</b> in the Equipment List — an external rental looks justified for this request.') + '</div>';
   } else {
-    h += '<div style="max-height:360px;overflow:auto;border:1px solid var(--border);border-radius:8px;"><table style="width:100%;border-collapse:collapse;"><tr style="position:sticky;top:0;background:var(--surface);">'
-       + ['Code','Equipment','Brand','Year','Location','Capacity','Fleet'].concat(useLow ? ['H/M diff','Repair'] : []).concat(['Availability', 'Actions']).map(function(x){ return '<th style="text-align:left;padding:5px 8px;font-size:11px;color:var(--text-muted);">' + x + '</th>'; }).join('') + '</tr>'
-       + res.slice(0, 60).map(function(x){
-           var e = x.e, capBadge = x.cap === 'match' ? '<span style="color:var(--green)">✓ matches</span>' : (x.cap === 'unknown' ? '<span style="color:var(--text-muted)">not stated</span>' : '—');
-           return '<tr><td ' + td + '><b>' + fuEsc(e.code || '—') + '</b></td><td ' + td + '>' + fuEsc(e.equipment) + (x.note ? '<div style="font-size:10.5px;color:var(--accent);">' + fuEsc(x.note) + '</div>' : '') + '</td><td ' + td + '>' + fuEsc(e.brand || '') + '</td><td ' + td + '>' + fuEsc(e.year || '') + '</td>'
-             + '<td ' + td + '>' + (x.workshop ? '<span style="color:var(--green)">🏭 Central Workshop</span>' : fuEsc(e.project || '—')) + '</td><td ' + td + '>' + capBadge + '</td><td ' + td + '>' + fuEsc(e.fleet || 'egypt') + '</td>' + (useLow ? '<td ' + td + '><b style="color:var(--red);font-family:monospace;">' + fuEsc(x.low ? x.low.d : '') + '</b> <span style="color:var(--text-muted);font-size:10.5px;">/ &lt; ' + fuEsc(x.low ? x.low.lim : '') + ' h' + (LM.ym === 'all' && x.low ? ' \u00b7 ' + fuEsc(window.hmLowLabel(x.low.ym)) : '') + '</span></td><td ' + td + '>' + ((x.low && x.low.ur) ? window.hmLowBadge(x.low.ur) : '\u2014') + '</td>' : '') + (function(){
-                var av = '', al = x.alloc, enc = encodeURIComponent(e.code || '');
-                if(al) av += '<div style="color:var(--green);font-size:11px;font-weight:700;white-space:nowrap;">\ud83d\udccc Allocated</div>';
-                if(x.rep) av += '<div style="color:var(--red);font-size:11px;white-space:nowrap;">\ud83d\udd27 Under repair</div>';
-                (x.busy || []).forEach(function(c){ av += '<div style="color:var(--red);font-size:11px;white-space:nowrap;">\u26d4 ' + fuEsc(c.text) + '</div>'; });
-                if(!av) av = '<span style="color:var(--green);">\u2713 Free</span>';
-                var act = '';
-                if(typeof isAdmin !== 'undefined' && isAdmin && e.code) act += '<button class="btn-edit" style="padding:1px 7px;font-size:10px;" onclick="fuAllocToggle(window.__fuOwnedReq,\'' + enc + '\')">' + (al ? 'Release' : 'Allocate') + '</button> ';
-                if(e.code) act += '<button class="btn-edit" style="padding:1px 7px;font-size:10px;" title="Copy a ready transfer request message" onclick="fuTransferMsg(window.__fuOwnedReq,\'' + enc + '\')">\u2709</button>';
-                return '<td ' + td + '>' + av + '</td><td ' + td + '>' + act + '</td>';
-              })() + '</tr>';
-         }).join('') + '</table></div>' + (res.length > 60 ? '<div style="font-size:11px;color:var(--text-muted);margin-top:6px;">… and ' + (res.length - 60) + ' more</div>' : '');
+    h += fuCandTable(res, r, {max:60});
     h += '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;">Units in Central Workshop are the easiest to allocate; units at a project need that project\'s agreement. Matching is by equipment name and the numbers in the capacity — always confirm technically.</div>';
   }
   if(res.length) h += '<div id="fu-own-sav" style="margin-top:10px;padding:10px 12px;border:1px solid var(--border);border-left:3px solid var(--green);border-radius:8px;font-size:12px;background:var(--bg);color:var(--text-muted);">\ud83d\udcb2 Estimating the saving vs. an external rental\u2026</div>';
@@ -14289,6 +14647,7 @@ function capDist(r,tt){
    fuzzily, since names typed in Follow-Up rarely match Rental Database
    character-for-character. Once the Plant is resolved, the equipment search
    spans the WHOLE Plant (every project under it), not just the one project. ─── */
+window.rdAllRows=function(){ return load().then(function(){ return rows||[]; }).catch(function(){ return []; }); };
 window.rdLastPrice=function(equipmentName,projectName,cb,capacityText){
   var done=false;
   var timer=setTimeout(function(){
@@ -16197,11 +16556,35 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
     on('hml-q','input',function(){ ST.q=this.value; draw(); });
   }
   /* Used by Follow-Up > Search Owned: code -> {d,lim,ym,ur} for units below the limit (same limits as the Low H/M list) */
+  /* Last H/M reading of a unit = the latest month that has a reading (end > 0). Low H/M for the unit is judged on THAT month. */
+  window.hmLastRead=function(code){
+    var H=HMS(); if(!(H.months&&H.months.length)) return null;
+    var ms=H.months.slice().sort(), latest=ms[ms.length-1];
+    for(var i=ms.length-1;i>=0;i--){
+      var r=reading(code,ms[i]); if(!r) continue;
+      var d=(r.s!=null)?(r.e-r.s):null, lim=limitFor(code);
+      return {m:ms[i],s:r.s,e:r.e,d:d,lim:lim,low:(d!=null&&d<lim),ur:repairInfo(code,ms[i]),latest:latest};
+    }
+    return null;
+  };
+  window.hmSeries=function(code,n){
+    var H=HMS(), out=[]; (H.months||[]).slice().sort().forEach(function(m){ var r=reading(code,m); if(r) out.push({m:m,s:r.s,e:r.e,d:(r.s!=null?r.e-r.s:null)}); });
+    return n?out.slice(-n):out;
+  };
+  /* Used by Follow-Up > Search Owned: code -> {d,lim,ym,ur}. ym = 'last' (default: each unit's own last reading) | 'all' | 'YYYY-MM' */
   window.hmLowMap=function(ym){
     var H=HMS(), map={}, loaded=!!(H.months&&H.months.length);
     if(!loaded) return {map:map,loaded:false,months:[],ym:''};
-    var sel=(ym&&ym!=='all')?ym:(H.sel||H.latest), months=(ym==='all')?H.months:[sel];
-    (typeof allEquipment!=='undefined'?allEquipment:[]).forEach(function(e){
+    var eqs=(typeof allEquipment!=='undefined'?allEquipment:[]);
+    if(!ym||ym==='last'){
+      eqs.forEach(function(e){
+        if((e.fleet||'egypt')==='archive'||!e.code) return;
+        var L=window.hmLastRead(e.code); if(L&&L.low) map[norm(e.code)]={d:L.d,lim:L.lim,ym:L.m,ur:L.ur};
+      });
+      return {map:map,loaded:true,months:H.months,ym:'last'};
+    }
+    var sel=(ym!=='all')?ym:(H.sel||H.latest), months=(ym==='all')?H.months:[sel];
+    eqs.forEach(function(e){
       if((e.fleet||'egypt')==='archive'||!e.code) return;
       var lim=isGen(e)?thr.gen:thr.eq;
       months.forEach(function(m){
