@@ -5954,6 +5954,7 @@ function fuBulkToggle(i, forceOpen){
 function fuBulkAll(on){ (window.__fuBulkRows || []).forEach(function(x, i){ if(!x.o.free.length) return; var tr = document.getElementById('fu-bd-' + i); if(!tr) return; var isOpen = tr.style.display !== 'none'; if(on !== isOpen) fuBulkToggle(i, on); }); }
 function fuBulkExport(kind){
   var rows = window.__fuBulkRows || []; if(!rows.length){ toast('Nothing to export', 'error'); return; }
+  if(kind === 'xlsx'){ try{ fuBulkXlsxPro(rows); }catch(err){ console.error(err); toast('Excel export failed: ' + (err && err.message || err), 'error'); } return; }
   var data = rows.map(function(x){
     var r = x.r, w = x.o.win, give = x.o.free.filter(function(u){ return u.alloc || u.proposed; }).map(fuFlatUnit);
     return {req:r.equipment || '', rcap:r.capacity || '', rproj:r.project || '', qty:x.qty, from:w ? w.from : '', to:w ? w.to : '', st:r.provision || '',
@@ -5966,6 +5967,100 @@ function fuBulkExport(kind){
     {h:'Available from Owned', g:f('avail'), t:'t'}, {h:'Owned of this type (all)', g:f('tot'), t:'t'}, {h:'Result', g:f('cov'), t:'t'}, {h:'Proposed units (project \u00b7 engineer \u00b7 last reading)', g:f('units'), t:'t'}, {h:'Note', g:f('more'), t:'t'}, {h:'Est. saving (EGP)', g:f('sav'), t:'t'}];
   var nFull = rows.filter(function(x){ return x.cover >= x.qty; }).length, nPart = rows.filter(function(x){ return x.cover > 0 && x.cover < x.qty; }).length;
   window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 Requested equipment vs. what Owned can give', cols:cols, rows:data, kpis:[{label:'Requests', value:rows.length}, {label:'Covered by Owned', value:nFull}, {label:'Partly covered', value:nPart}, {label:'External', value:rows.length - nFull - nPart}]}, kind);
+}
+/* ── Bulk owned search → Excel: Summary sheet (1 row per request) + "Matching Units" sheet (ALL free units of each request,
+      grouped under a request header; engineer / mobile / last reading each in its OWN column) ── */
+function fuBulkXlsxPro(rows){
+  var EJ = window.ExcelJS; if(!EJ){ toast('Excel library did not load \u2014 check the internet connection', 'error'); return; }
+  var NAVY='FF0D1B2E', AMBER='FFF0A500', thin={style:'thin',color:{argb:'FFE3E7ED'}};
+  var fill=function(c){ return {type:'pattern',pattern:'solid',fgColor:{argb:c}}; };
+  var nFull = rows.filter(function(x){ return x.cover >= x.qty; }).length, nPart = rows.filter(function(x){ return x.cover > 0 && x.cover < x.qty; }).length;
+  var kpis = [{label:'Requests', value:rows.length}, {label:'Covered by Owned', value:nFull}, {label:'Partly covered', value:nPart}, {label:'External', value:rows.length - nFull - nPart}];
+  var wb = new EJ.Workbook(); wb.creator = 'HAC PMV'; wb.created = new Date();
+  function covTxt(x){ return x.cover >= x.qty ? 'Covered' : (x.cover > 0 ? x.cover + ' of ' + x.qty : 'External'); }
+  /* ---------- sheet 1: summary (one row per request) ---------- */
+  var data = rows.map(function(x, i){
+    var r = x.r, w = x.o.win, give = x.o.free.filter(function(u){ return u.alloc || u.proposed; });
+    return {n:i + 1, req:r.equipment || '', rcap:r.capacity || '', rproj:r.project || '', qty:x.qty, from:w ? w.from : '', to:w ? w.to : '', st:r.provision || '',
+            avail:x.nFree, tot:x.o.resAll.length, cov:covTxt(x), prop:give.map(function(u){ return u.e.code || ''; }).join(' , '),
+            more:x.takenN ? x.takenN + ' more fit but go to earlier request(s)' : '', sav:x.saving != null ? Math.round(x.saving) : ''};
+  });
+  function f(k){ return function(o){ return o[k]; }; }
+  var sumCols = [{h:'#', g:f('n'), t:'t'}, {h:'Requested equipment', g:f('req'), t:'t'}, {h:'Capacity', g:f('rcap'), t:'t'}, {h:'For project', g:f('rproj'), t:'t'}, {h:'Qty', g:f('qty'), t:'t'}, {h:'From', g:f('from'), t:'t'}, {h:'To', g:f('to'), t:'t'}, {h:'Status', g:f('st'), t:'t'},
+    {h:'Available from Owned (click \u2192 units)', g:f('avail'), t:'i'}, {h:'Owned of this type (all)', g:f('tot'), t:'i'}, {h:'Result', g:f('cov'), t:'t'}, {h:'Proposed unit(s)', g:f('prop'), t:'t'}, {h:'Note', g:f('more'), t:'t'}, {h:'Est. saving (EGP)', g:f('sav'), t:'z', s:true}];
+  var wsS = window.hacBuildXlsx({title:'HAC \u00b7 PMV \u2014 Requested equipment vs. what Owned can give', sheetName:'Summary', cols:sumCols, rows:data, kpis:kpis, wb:wb}, EJ).getWorksheet('Summary');
+  /* ---------- sheet 2: matching units ---------- */
+  var ws = wb.addWorksheet('Matching Units', {views:[{state:'frozen', ySplit:3, activeCell:'A4'}], properties:{tabColor:{argb:'FF3FB950'}}});
+  var maxEng = 1;
+  rows.forEach(function(x){ x.o.free.forEach(function(u){ if(!(u.workshop || isCentralWorkshop(u.e.project))) maxEng = Math.max(maxEng, fuEngFor(u.e.project).length); }); });
+  maxEng = Math.min(maxEng, 3);
+  var H = ['Request #', 'Requested equipment', 'Req. capacity', 'For project', 'Unit code', 'Unit equipment', 'Unit capacity', 'Current project'];
+  for(var k = 1; k <= maxEng; k++){ H.push(maxEng > 1 ? 'Engineer ' + k : 'Engineer', maxEng > 1 ? 'Mobile ' + k : 'Mobile'); }
+  H = H.concat(['Last reading (month)', 'Hours (H/M diff)', 'Limit (h)', 'Reading age (months behind)', 'Availability / decision']);
+  var nC = H.length;
+  function colL(n){ var s = '', m; while(n > 0){ m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; }
+  ws.mergeCells('A1:' + colL(nC) + '1');
+  var t1 = ws.getCell('A1'); t1.value = 'Owned units that fit each request \u2014 all available units, with project \u00b7 engineer \u00b7 last reading';
+  t1.font = {name:'Calibri', size:15, bold:true, color:{argb:NAVY}}; t1.alignment = {horizontal:'center', vertical:'middle'}; ws.getRow(1).height = 26;
+  ws.mergeCells('A2:' + colL(nC) + '2');
+  var t2 = ws.getCell('A2'); t2.value = kpis.map(function(k){ return k.label + ': ' + k.value; }).join('   \u00b7   ') + '   \u00b7   \u2b50 = proposed for this request   \u00b7   red = negative / old reading';
+  t2.font = {name:'Calibri', size:10.5, bold:true, color:{argb:NAVY}}; t2.fill = fill('FFFFF6DA'); t2.alignment = {horizontal:'center', vertical:'middle'}; t2.border = {bottom:{style:'medium', color:{argb:AMBER}}};
+  var hr = ws.getRow(3); hr.height = 32;
+  H.forEach(function(h, j){ var c = hr.getCell(j + 1); c.value = h; c.font = {name:'Calibri', size:10, bold:true, color:{argb:'FFFFFFFF'}}; c.fill = fill(NAVY); c.alignment = {vertical:'middle', horizontal:'left', wrapText:true}; c.border = {bottom:{style:'medium', color:{argb:AMBER}}}; });
+  var widths = H.map(function(h){ return Math.max(10, h.length * 1.1 + 2); });
+  var rowNo = 4, groupRow = {};
+  rows.forEach(function(x, i){
+    var r = x.r, w = x.o.win;
+    groupRow[i] = rowNo;
+    /* request header row */
+    var g = ws.getRow(rowNo++);
+    ws.mergeCells(g.number, 1, g.number, nC);
+    var gc = g.getCell(1);
+    gc.value = '#' + (i + 1) + '  \u00b7  ' + (r.equipment || '') + (r.capacity ? ' ' + r.capacity : '') + '  \u00b7  for ' + (r.project || '\u2014') + '  \u00b7  ' + (w ? w.from + ' \u2192 ' + w.to : 'no dates') + '  \u00b7  Qty ' + x.qty
+      + '   |   Available: ' + x.nFree + ' of ' + x.o.resAll.length + ' owned   |   ' + covTxt(x) + (x.takenN ? '   |   ' + x.takenN + ' more fit but go to earlier request(s)' : '');
+    gc.font = {name:'Calibri', size:11, bold:true, color:{argb:NAVY}}; gc.alignment = {vertical:'middle', horizontal:'left'};
+    gc.fill = fill(x.cover >= x.qty ? 'FFDFF3E3' : (x.cover > 0 ? 'FFFFF0CC' : 'FFFBE3E1')); gc.border = {top:{style:'medium', color:{argb:AMBER}}, bottom:thin}; g.height = 22;
+    if(!x.o.free.length){
+      var er = ws.getRow(rowNo++); er.getCell(5).value = '\u2014 no owned unit available \u2192 external rental'; er.getCell(5).font = {name:'Calibri', size:10, italic:true, color:{argb:'FF888888'}}; er.outlineLevel = 1; return;
+    }
+    /* proposed / allocated first, then the lowest hours first (unknown last) */
+    var list = x.o.free.slice().sort(function(a, b){
+      var pa = (a.alloc || a.proposed) ? 0 : 1, pb = (b.alloc || b.proposed) ? 0 : 1; if(pa !== pb) return pa - pb;
+      var da = fuFlatUnit(a).d, db = fuFlatUnit(b).d; da = da === '' ? 1e9 : da; db = db === '' ? 1e9 : db; return da - db;
+    });
+    list.forEach(function(u, k2){
+      var e = u.e, ws0 = u.workshop || isCentralWorkshop(e.project), fl = fuFlatUnit(u), E = ws0 ? [] : fuEngFor(e.project);
+      var vals = [i + 1, r.equipment || '', r.capacity || '', r.project || '', (u.alloc || u.proposed ? '\u2b50 ' : '') + (e.code || ''), e.equipment || '', fl.cap || '', fl.proj || ''];
+      for(var q = 0; q < maxEng; q++){ vals.push(E[q] ? E[q].n : '', E[q] ? E[q].m : ''); }
+      var dec = u.alloc ? 'Allocated' : (u.proposed ? 'Proposed for this request' : (u.takenBy ? 'Fits but goes to request #' + u.takenBy : 'Free'));
+      if(u.rep) dec += ' | Under repair'; (u.busy || []).forEach(function(c){ dec += ' | ' + c.text; });
+      vals = vals.concat([fl.lm || '', fl.d === '' ? '' : fl.d, fl.lim === '' ? '' : fl.lim, fl.behind === '' ? '' : fl.behind, dec]);
+      var row = ws.getRow(rowNo++); row.outlineLevel = 1;
+      vals.forEach(function(v, j){
+        var c = row.getCell(j + 1); c.value = v; c.font = {name:'Calibri', size:10}; c.border = {bottom:thin}; c.alignment = {vertical:'middle', horizontal:(typeof v === 'number') ? 'right' : 'left'};
+        if(k2 % 2) c.fill = fill('FFF8FAFC');
+        var L = String(v == null ? '' : v).length + 2; if(L > widths[j]) widths[j] = Math.min(44, L);
+      });
+      var iHours = 8 + maxEng * 2 + 2, iBehind = iHours + 2, iDec = iHours + 3, iCode = 5;
+      if(u.alloc || u.proposed){ row.getCell(iCode).font = {name:'Calibri', size:10, bold:true, color:{argb:'FF1B7F3B'}}; row.getCell(iDec).font = {name:'Calibri', size:10, bold:true, color:{argb:'FF1B7F3B'}}; }
+      else row.getCell(iCode).font = {name:'Calibri', size:10, bold:true};
+      if(typeof fl.d === 'number' && fl.d < 0) row.getCell(iHours).font = {name:'Calibri', size:10, bold:true, color:{argb:'FFD93025'}};
+      if(typeof fl.behind === 'number' && fl.behind >= 2){ row.getCell(iBehind).font = {name:'Calibri', size:10, bold:true, color:{argb:'FFD93025'}}; row.getCell(iBehind - 3).font = {name:'Calibri', size:10, color:{argb:'FFD93025'}}; }
+    });
+  });
+  ws.columns = widths.map(function(w){ return {width:Math.min(44, w)}; });
+  ws.properties.outlineProperties = {summaryBelow:false};
+  ws.autoFilter = {from:{row:3, column:1}, to:{row:3, column:nC}};
+  ws.pageSetup = {paperSize:9, orientation:'landscape', fitToPage:true, fitToWidth:1, fitToHeight:0, margins:{left:.3, right:.3, top:.4, bottom:.5, header:.2, footer:.2}, printTitlesRow:'3:3'};
+  /* summary: the "Available" number jumps to that request's units */
+  rows.forEach(function(x, i){ if(!x.o.free.length) return; var c = wsS.getCell(5 + i, 9); c.value = {text:String(x.nFree), hyperlink:"#'Matching Units'!A" + groupRow[i]}; c.font = {name:'Calibri', size:10, bold:true, underline:true, color:{argb:'FF1F6FEB'}}; });
+  var d = new Date(), two = function(n){ return (n < 10 ? '0' : '') + n; };
+  var fname = 'Requested_equipment_vs_Owned_' + d.getFullYear() + '-' + two(d.getMonth() + 1) + '-' + two(d.getDate()) + '.xlsx';
+  wb.xlsx.writeBuffer().then(function(buf){
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})); a.download = fname;
+    document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+    toast('Excel exported \u2014 Summary + Matching Units', 'success');
+  }).catch(function(err){ toast('Excel export failed: ' + (err && err.message || err), 'error'); });
 }
 function fuBulkExportUnits(kind){
   var rows = window.__fuBulkRows || []; if(!rows.length){ toast('Nothing to export', 'error'); return; }
