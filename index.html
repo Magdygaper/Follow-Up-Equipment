@@ -6103,7 +6103,8 @@ function rwCompute(mr, rd, o){
     var u = U[key] || (U[key] = {key:key, by:{}});
     u.sap = r.sap; u.plant = r.plant; u.equipment = r.equipment; u.model = r.model || r.maincap || ''; u.project = r.project; u.od = r.od; u.subcon = r.subcon; u.category = r.category;
     var b = u.by[r.month] || (u.by[r.month] = {days:0, qty:0, total:0, unit:0});
-    b.days += Number(r.days) || 0; b.qty += qty; b.total += Number(r.totalPrice) || 0; b.unit = Number(r.unitPrice) || b.unit;
+    var rawD = Number(r.days) || 0, isMon = r.uom === 'month' || (!r.uom && rawD > 0 && rawD < 1.5 && rawD !== Math.round(rawD));   /* month fraction (0.7 = 70% of the month) -> days */
+    b.days += isMon ? rawD * 30 : rawD; if(isMon) b.mon = true; b.qty += qty; b.total += Number(r.totalPrice) || 0; b.unit = Number(r.unitPrice) || b.unit;
   });
   var X = rd.map(function(r){ return {r:r, v:rwNorm(r.vendor), p:rwNorm(r.project), i:rwNorm(r.item), m:rwNorm(r.model)}; });
   Object.keys(U).forEach(function(k){
@@ -10234,6 +10235,18 @@ function readWB(file,cb){
   fr.readAsBinaryString(file);
 }
 
+/* rate basis of a Master Rental row: some sheets have a cell that just says Month / Day / Hour next to the unit. For "Month" rows the
+   "Actual working hr/days/month" value is a FRACTION OF A MONTH (1 = full month, 0.7 = 70%), not a number of days. */
+function mrUomOf(row){
+  for(var i = 0; i < (row || []).length; i++){
+    var t = String(row[i] == null ? '' : row[i]).trim().toLowerCase();
+    if(!t || t.length > 9) continue;
+    if(/^(month|months|monthly|mon|\u0634\u0647\u0631|\u0634\u0647\u0631\u064a)$/.test(t)) return 'month';
+    if(/^(day|days|daily|\u064a\u0648\u0645|\u064a\u0648\u0645\u064a)$/.test(t)) return 'day';
+    if(/^(hour|hours|hourly|hr|hrs)$/.test(t)) return 'hour';
+  }
+  return '';
+}
 function buildRecFromRow(row, ix, sheetLabel, seen){
   if(!row || !row.join('').trim()) return null;
 
@@ -10250,6 +10263,7 @@ function buildRecFromRow(row, ix, sheetLabel, seen){
     hourMeter:N(row[ix.hourmeter]), fuelPerHour:N(row[ix.fuelperhour]), fuel:N(row[ix.fuel]),
     hiringRaw:S(row[ix.hiring]), hiringDate:'', month:''
   };
+  r.uom=mrUomOf(row);
   r.hiringDate=dateISO(row[ix.hiring]);
   r.month=monthKey(row[ix.hiring]);
   if(!r.month && sheetLabel) r.month=monthKey(sheetLabel);
