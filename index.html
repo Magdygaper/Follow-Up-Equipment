@@ -407,6 +407,8 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
 .rd-chk-n{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--red);min-width:36px;text-align:right;}
 .rd-chk-h{color:var(--text-muted);font-size:11px;}
 .rd-terms .rd-lbl{white-space:normal;line-height:1.3;}
+/* cleanup: duplicate buttons kept in the DOM (other code still looks them up) but hidden */
+#btn-clear-import,#btn-hm-import,#fu-btn-upload,#mo-btn-import{display:none!important;}
 </style>
 <style id="no-descriptions">
 /* explanatory captions removed — layout kept */
@@ -1819,9 +1821,7 @@ function syncOdVisibility() {
   }
 }
 
-function jumpFleet(f) {
-  switchFleet(f, document.getElementById('fleet-btn-' + f) || null);
-}
+
 
 
 function updateFleetCounts() {
@@ -3730,7 +3730,7 @@ function saveFuEquipment() {
 
 /* ─── Last price lookup: pull from Rental Database, resolving Plant via the
    project's history there, so the follow-up screen can negotiate on the spot. ─── */
-function fuEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
 /* Used only for the Follow-Up export (PDF/Excel): reformats a date into month/day/year,
    e.g. '2026-01-14' -> '01/14/2026'. Reuses formatExcelDate to normalize Excel serials
    or odd strings into 'YYYY-MM-DD' first. */
@@ -4815,86 +4815,7 @@ function addFuMonthProjectPivot(wb, scoped) {
    a Month × Project cross-tab, and a Deduction Breakdown sheet — always covering the
    full scoped data (equip/project/month filters), regardless of which card is toggled,
    so the export gives the full picture every time. */
-function exportFuXlsxWithDeduction(o, scoped) {
-  if(!o.rows.length) { if(typeof toast==='function') toast('Nothing to export','error'); return; }
-  const EJ = window.ExcelJS;
-  if(!EJ) { if(typeof toast==='function') toast('Excel library did not load \u2014 check the internet connection','error'); return; }
-  const wb = window.hacBuildXlsx(o, EJ);
 
-  const PROV_COLORS = {Rental:'FF3FB950', Transfer:'FF58A6FF', Hold:'FFF0A500', Pending:'FF8B949E', Cancel:'FFF85149'};
-  if(scoped.length) addFuDataSheet(wb, 'All Requests', 'HAC \u00b7 PMV \u2014 All Requests', scoped, o.cols, 'FFF0A500', buildFuProvDash(scoped, 'All'));
-  ['Rental','Transfer','Hold','Pending','Cancel'].forEach(function(p){
-    const rowsP = scoped.filter(function(r){ return r.provision === p; });
-    if(rowsP.length) addFuDataSheet(wb, p, 'HAC \u00b7 PMV \u2014 ' + p + ' Requests', rowsP, o.cols, PROV_COLORS[p], buildFuProvDash(rowsP, p));
-  });
-
-  addFuMonthProjectPivot(wb, scoped);
-
-  const dedRows = scoped.filter(fuIsDeduction);
-  if(dedRows.length) {
-    const NAVY = 'FF0D1B2E', AMBER = 'FFF0A500', PURPLE = 'FFBC8CFF';
-    const byMonth = {};
-    dedRows.forEach(function(r){ const k = fuMonthKey(r.submission_date) || '\u2014'; byMonth[k] = (byMonth[k]||0)+1; });
-    const byProject = {};
-    dedRows.forEach(function(r){ const p = (r.project||'\u2014').trim() || '\u2014'; byProject[p] = (byProject[p]||0)+1; });
-    const monthSorted = Object.entries(byMonth).sort(function(a,b){ return b[1]-a[1]; })
-      .map(function(pair){ return [pair[0]==='\u2014' ? '\u2014' : fuMonthLabel(pair[0]), pair[1]]; });
-    const projSorted = Object.entries(byProject).sort(function(a,b){ return b[1]-a[1]; });
-
-    const ws2 = wb.addWorksheet('Deduction Breakdown', {properties:{tabColor:{argb:PURPLE}}});
-    ws2.mergeCells('A1:E1');
-    const t1 = ws2.getCell('A1');
-    t1.value = '\u062e\u0635\u0645 \u0639 \u0627\u0644\u0645\u0642\u0627\u0648\u0644 \u2014 Deduction Breakdown';
-    t1.font = {name:'Calibri', size:14, bold:true, color:{argb:NAVY}};
-    ws2.getRow(1).height = 24;
-
-    function header(addr, text) {
-      const c = ws2.getCell(addr);
-      c.value = text;
-      c.font = {name:'Calibri', size:10, bold:true, color:{argb:'FFFFFFFF'}};
-      c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:NAVY}};
-    }
-    header('A3', 'Month'); header('B3', 'Deduction Count');
-    header('D3', 'Project'); header('E3', 'Deduction Count');
-
-    monthSorted.forEach(function(pair, i) {
-      const r = 4 + i;
-      ws2.getCell('A'+r).value = pair[0];
-      ws2.getCell('B'+r).value = pair[1];
-      if(i === 0) { ws2.getCell('A'+r).font = {bold:true, color:{argb:AMBER}}; ws2.getCell('B'+r).font = {bold:true, color:{argb:AMBER}}; }
-    });
-    projSorted.forEach(function(pair, i) {
-      const r = 4 + i;
-      ws2.getCell('D'+r).value = pair[0];
-      ws2.getCell('E'+r).value = pair[1];
-      if(i === 0) { ws2.getCell('D'+r).font = {bold:true, color:{argb:AMBER}}; ws2.getCell('E'+r).font = {bold:true, color:{argb:AMBER}}; }
-    });
-
-    if(monthSorted.length) {
-      ws2.addConditionalFormatting({
-        ref: 'B4:B' + (3+monthSorted.length),
-        rules: [{type:'dataBar', cfvo:[{type:'min'},{type:'max'}], color:{argb:PURPLE}, priority:1}]
-      });
-    }
-    if(projSorted.length) {
-      ws2.addConditionalFormatting({
-        ref: 'E4:E' + (3+projSorted.length),
-        rules: [{type:'dataBar', cfvo:[{type:'min'},{type:'max'}], color:{argb:PURPLE}, priority:1}]
-      });
-    }
-    ws2.columns = [{width:16},{width:18},{width:2},{width:24},{width:18}];
-  }
-
-  function two(n){ return n<10 ? '0'+n : ''+n; }
-  const d = new Date(), stamp = d.getFullYear()+'-'+two(d.getMonth()+1)+'-'+two(d.getDate());
-  const fname = String(o.title||'Export').replace(/[\\\/:*?"<>|\u00b7\u2014]+/g,' ').replace(/\s+/g,'_').replace(/^_+|_+$/g,'')+'_'+stamp+'.xlsx';
-  wb.xlsx.writeBuffer().then(function(buf) {
-    const blob = new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fname;
-    document.body.appendChild(a); a.click();
-    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
-  }).catch(function(err) { if(typeof toast==='function') toast('Excel export failed: '+(err&&err.message||err), 'error'); });
-}
 
 
 /* ═══════ Follow-Up import: preview (dry run) · Smart Sync by Rec ID · automatic backup & restore ═══════ */
@@ -7081,11 +7002,7 @@ function showEquipHistory(id){
 let _pendingImportInput = null;
 let _pendingImportMode  = 'add'; // 'add' | 'clear'
 
-function importExcel(input) {
-  _pendingImportInput = input;
-  _pendingImportMode  = 'add';
-  openFleetImportModal();
-}
+
 
 function addNewEquipFromExcel(input) {
   _pendingImportInput = input;
@@ -8931,7 +8848,7 @@ function moRenderDrill(){
     var notAv=base.filter(function(r){ return toNum(r.avail)!==1; });
     title='Availability — Breakdown';
     tiles=tile('Availability %',pct(av,u),'#3fb950')+tile('Available Units',full(av),'#3fb950')+tile('Not Available',full(uSum(notAv)),'#f85149')
-      +tile('Money Made',abbr(money)+' EGP','#58a6ff')+tile('Standby Cost',abbr(lostAll)+' EGP','#f85149',full(lostAll))+tile('Idle Days',full(idleDays(idleRows)),'#ffa657');
+      +tile('Money Made',abbr(money)+' EGP','#58a6ff')+tile('Standby Cost',abbr(lostAll)+' EGP','#f85149',full(lostAll))+tile('Idle Days',full(lostDays(idleRows)),'#ffa657');
     cols=col('Available by O.D',bars(grp(avRows,'od'),{metric:'units',attr:'data-od2',color:'#3fb950',isOn:function(k){return moFilter.od===k;}}))
       +col('Available by Project',bars(grp(avRows,'project'),{metric:'units',attr:'data-proj2',color:'#58a6ff',isOn:function(k){return moFilter.proj===k;}}))
       +col('Not Available by Category',bars(grp(notAv,'cat'),{metric:'units',attr:'data-cat2',color:'#f85149',label:function(k){return k.replace(' Equipment','');},isOn:function(k){return moFilter.cat===k;}}));
@@ -10174,6 +10091,15 @@ function mrBumpVersion(){
   return MR_META.set({v:firebase.firestore.FieldValue.increment(1),updatedAtMs:Date.now()},{merge:true}).catch(function(){});
 }
 var DATA=[], EXIST={}, AUDIT=null, FILE_IN=null, SMART_FILE_IN=null, SMART_MODE=null, CLEAR_FILE_IN=null;
+/* import report: what was read / skipped (the old audit panel is gone, this is the short version) */
+function showAudit(){
+  var a = AUDIT; if(!a) return;
+  var L = ['Rows read: ' + a.rows + '  |  accepted: ' + a.accepted];
+  (a.skipped || []).slice(0, 6).forEach(function(x){ L.push('Skipped sheet "' + x.sheet + '": ' + x.why + (x.sample ? '  [' + x.sample + ']' : '')); });
+  if((a.blank || []).length) L.push('Rows with blank quantity/equipment: ' + a.blank.length);
+  if((a.unparsed || []).length) L.push('Rows with unreadable date: ' + a.unparsed.length);
+  alert(L.join('\n'));
+}
 var F={cat:null,od:null,month:null,proj:null,q:''};
 
 function $(id){ return document.getElementById(id); }
@@ -10759,10 +10685,8 @@ function render(){
   var body=$('mr-body'); if(!body) return;
   var rows=view(), m=metrics(rows), h='';
   h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">';
-  if(isAdminNow()) h+='<button class="btn-sm" style="background:var(--accent);color:#000;font-weight:700;" data-act="import">📥 Import Rental Excel</button>';
   if(isAdminNow()) h+='<button class="btn-sm" style="border-color:rgba(63,185,80,.4);color:#3fb950;" data-act="smart-pick" data-v="add">➕ Add New Only</button>';
   if(isAdminNow()) h+='<button class="btn-sm" style="border-color:rgba(240,165,0,.5);color:var(--accent);" data-act="combined-import" title="يرفع صفوف Rent بس من الشيت الموحّد (عمود Owned/Rent) بنفس رولز الرفع العادي">🔗 Import Combined Sheet</button>';
-  if(isAdminNow()) h+='<button class="btn-sm" style="border-color:rgba(248,81,73,.4);color:#f85149;" data-act="clear-import" title="Deletes ALL existing Master Rental data and replaces it with exactly what is in the uploaded sheet">🗑️ Clear & Import</button>';
   h+='<button class="btn-sm" data-act="refresh">⟳ Refresh</button>';
   h+='<button class="btn-sm accent" data-act="director">📄 Director Report</button>';
   h+='<button class="btn-sm" data-act="exportpdf">📄 Export PDF</button>';
@@ -17097,5 +17021,48 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
 })();
 </script>
 
+<script>
+/* ── One "Export" button per toolbar: merges the separate PDF / Excel / Excel-by-O.D buttons into a single dropdown.
+      The original buttons stay in the DOM (hidden) and are clicked by the menu, so every existing export keeps working. ── */
+(function(){
+  var OK = /^(export )?(pdf|excel|xlsx|excel by o d|excel per unit|pdf per unit)$/;
+  function norm(t){ return String(t || '').toLowerCase().replace(/[^a-z\s]/g, ' ').replace(/\s+/g, ' ').trim(); }
+  function isExp(el){ return !el.getAttribute('data-xm') && !el.querySelector('input') && OK.test(norm(el.textContent)); }
+  var openMenu = null;
+  function closeMenu(){ if(openMenu){ openMenu.style.display = 'none'; openMenu = null; } }
+  document.addEventListener('click', function(e){ if(openMenu && !openMenu.parentNode.contains(e.target)) closeMenu(); });
+  function merge(){
+    var seen = [];
+    var all = document.querySelectorAll('button,label');
+    for(var i = 0; i < all.length; i++){
+      var b = all[i], p = b.parentNode;
+      if(!p || seen.indexOf(p) >= 0 || !isExp(b)) continue;
+      seen.push(p);
+      var grp = [], kids = p.children;
+      for(var k = 0; k < kids.length; k++){ if(isExp(kids[k])) grp.push(kids[k]); }
+      if(grp.length < 2) continue;
+      var first = grp[0], wrap = document.createElement('span');
+      wrap.setAttribute('data-xm', '1'); wrap.style.cssText = 'position:relative;display:inline-block;' + (first.style.marginLeft ? 'margin-left:' + first.style.marginLeft + ';' : '');
+      var btn = document.createElement('button'); btn.type = 'button'; btn.className = first.className || 'btn-sm'; btn.textContent = '\ud83d\udce4 Export \u25be';
+      var menu = document.createElement('div');
+      menu.style.cssText = 'display:none;position:absolute;right:0;top:100%;margin-top:4px;min-width:150px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:4px;z-index:9000;box-shadow:0 8px 24px rgba(0,0,0,.35);';
+      grp.forEach(function(o){
+        var it = document.createElement('div'); it.textContent = o.textContent.replace(/\s+/g, ' ').trim();
+        it.style.cssText = 'padding:7px 12px;cursor:pointer;border-radius:6px;font-size:12.5px;white-space:nowrap;color:var(--text);';
+        it.onmouseenter = function(){ it.style.background = 'var(--surface3)'; }; it.onmouseleave = function(){ it.style.background = ''; };
+        it.onclick = function(ev){ ev.stopPropagation(); closeMenu(); o.click(); };
+        menu.appendChild(it);
+      });
+      btn.onclick = function(ev){ ev.stopPropagation(); var was = (menu.style.display === 'block'); closeMenu(); if(!was){ menu.style.display = 'block'; openMenu = menu; } };
+      wrap.appendChild(btn); wrap.appendChild(menu);
+      p.insertBefore(wrap, first);
+      grp.forEach(function(o){ o.setAttribute('data-xm', 'hidden'); o.style.display = 'none'; });
+    }
+  }
+  var t = null; function sched(){ if(t) return; t = setTimeout(function(){ t = null; try{ merge(); }catch(e){} }, 120); }
+  new MutationObserver(sched).observe(document.body, {childList:true, subtree:true});
+  document.addEventListener('DOMContentLoaded', sched); sched();
+})();
+</script>
 </body>
 </html>
