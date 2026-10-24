@@ -5680,24 +5680,31 @@ function fuEquipByCode(code){ var k = fuNormCode(code), f = null; (typeof allEqu
 /* one request -> owned candidates (same filters as the Search Owned window): resAll · res · free (not busy / not under repair, allocated kept) */
 /* ── project stock: for every candidate unit, how many units of the SAME type + capacity sit in its project, how many of them are Low H/M, and is it safe to pull one ── */
 function fuPjKey(e){ return String(e && e.project || '').trim().toLowerCase(); }
+function fuHrsOf(code, LM){
+  try{
+    if(LM && LM.ym && LM.ym !== 'last' && LM.ym !== 'all'){ var S = (typeof window.hmSeries === 'function') ? window.hmSeries(code) : [], q = S.filter(function(z){ return z.m === LM.ym; })[0]; return (q && q.d != null) ? q.d : null; }
+    var L = fuLastOf({code:code}); return (L && L.d != null) ? L.d : null;
+  }catch(x){ return null; }
+}
 function fuAttachPj(r, all, fleets, LM, list){
   var pjAll = fuOwnedMatches(r, all, {allFleets:!!fleets, sameCap:true}), pj = {}, known = !!(LM && LM.loaded);
   pjAll.forEach(function(x){
-    var k = fuPjKey(x.e), s = pj[k] || (pj[k] = {total:0, low:0, lowKnown:known, codes:{}});
+    var k = fuPjKey(x.e), s = pj[k] || (pj[k] = {total:0, low:0, lowKnown:known, codes:{}, hi:[]});
     s.total++; s.codes[fuNormCode(x.e.code)] = 1;
     if(known && LM.map[fuNormCode(x.e.code)]) s.low++;
+    else if(known){ var h = fuHrsOf(x.e.code, LM); if(h != null) s.hi.push(h); }
   });
   (list || []).forEach(function(x){ var s = pj[fuPjKey(x.e)]; x.pj = (s && s.codes[fuNormCode(x.e.code)]) ? s : null; });
 }
 function fuPjFields(x){
-  var p = x && x.pj; if(!p) return {tot:'', low:'', work:'', chk:''};
-  var tot = p.total, low = p.lowKnown ? p.low : '', work = p.lowKnown ? tot - p.low : '';
+  var p = x && x.pj; if(!p) return {tot:'', low:'', work:'', chk:'', havg:'', hmin:'', hmax:'', hn:0};
+  var tot = p.total, low = p.lowKnown ? p.low : '', work = p.lowKnown ? tot - p.low : '', H = p.hi || [], hs = H.reduce(function(a, b){ return a + b; }, 0);
   var remain = tot - Math.max(1, x.pjPull || 0), chk;
   if(x.workshop || isCentralWorkshop(x.e && x.e.project)) chk = 'Central Workshop \u2014 free to take';
   else if(tot <= 1) chk = '\u26a0 Only unit in project \u2014 keep';
   else if(remain < 1) chk = '\u26a0 Leaves 0 in project';
   else chk = '\u2705 OK \u2014 ' + remain + ' stay in project' + (p.lowKnown && work === 0 ? ' (all low)' : '');
-  return {tot:tot, low:low, work:work, chk:chk};
+  return {tot:tot, low:low, work:work, chk:chk, havg:H.length ? Math.round(hs / H.length) : '', hmin:H.length ? Math.round(Math.min.apply(null, H)) : '', hmax:H.length ? Math.round(Math.max.apply(null, H)) : '', hn:H.length};
 }
 function fuOwnedFor(r, o){
   var all = (typeof allEquipment !== 'undefined' ? allEquipment : []);
@@ -5778,13 +5785,13 @@ function fuFlatUnit(x){
   return {code:e.code || '', eq:e.equipment || '', cap:fuCapOf(e), brand:e.brand || '', year:e.year || '', proj:ws ? 'Central Workshop' : (e.project || ''),
           eng:E.map(function(g){ return g.n; }).join(' / '), title:E.map(function(g){ return g.t; }).join(' / '), mob:E.map(function(g){ return g.m; }).join(' / '), mail:E.map(function(g){ return g.e; }).filter(Boolean).join(' / '),
           lm:L ? fuMLab(L.m) : '', behind:L ? fuMonthsBehind(L.m, L.latest) : '', d:(src && src.d != null) ? Math.round(src.d * 10) / 10 : '', lim:src ? src.lim : '', low:(src && src.d != null) ? (src.d < src.lim ? 'Low' : 'OK') : '',
-          av:av.length ? av.join(' | ') : 'Free', alloc:x.alloc ? 'Yes' : '', ptot:pf.tot, plow:pf.low, pwork:pf.work, pchk:pf.chk};
+          av:av.length ? av.join(' | ') : 'Free', alloc:x.alloc ? 'Yes' : '', ptot:pf.tot, plow:pf.low, pwork:pf.work, pchk:pf.chk, phavg:pf.havg};
 }
 function fuOwnExport(kind){
   var L = window.__fuOwnLast; if(!L || !L.res.length){ toast('Nothing to export', 'error'); return; }
   var r = L.r, rows = L.res.map(function(x){ return fuFlatUnit(x); });
   function f(k){ return function(o){ return o[k]; }; }
-  var cols = [{h:'#', g:function(o, i){ return i + 1; }, t:'t'}, {h:'Code', g:f('code'), t:'t'}, {h:'Equipment', g:f('eq'), t:'t'}, {h:'Capacity', g:f('cap'), t:'t'}, {h:'Brand', g:f('brand'), t:'t'}, {h:'Year', g:f('year'), t:'t'}, {h:'Current project', g:f('proj'), t:'t'}, {h:'Same type in project', g:f('ptot'), t:'t'}, {h:'Low H/M in project', g:f('plow'), t:'t'}, {h:'Working (not low)', g:f('pwork'), t:'t'}, {h:'Pull check', g:f('pchk'), t:'t'},
+  var cols = [{h:'#', g:function(o, i){ return i + 1; }, t:'t'}, {h:'Code', g:f('code'), t:'t'}, {h:'Equipment', g:f('eq'), t:'t'}, {h:'Capacity', g:f('cap'), t:'t'}, {h:'Brand', g:f('brand'), t:'t'}, {h:'Year', g:f('year'), t:'t'}, {h:'Current project', g:f('proj'), t:'t'}, {h:'Same type in project', g:f('ptot'), t:'t'}, {h:'Low H/M in project', g:f('plow'), t:'t'}, {h:'High usage in project', g:f('pwork'), t:'t'}, {h:'High usage avg (h)', g:f('phavg'), t:'t'},
     {h:'Engineer', g:f('eng'), t:'t'}, {h:'Title', g:f('title'), t:'t'}, {h:'Mobile', g:f('mob'), t:'t'}, {h:'Last reading', g:f('lm'), t:'t'}, {h:'H/M diff (h)', g:f('d'), t:'t'}, {h:'Limit (h)', g:f('lim'), t:'t'}, {h:'Availability', g:f('av'), t:'t'}];
   var title = 'HAC \u00b7 PMV \u2014 Owned equipment for ' + (r.project || '') + ' \u00b7 ' + (r.equipment || '') + (r.capacity ? ' ' + r.capacity : '');
   window.hacPdfTable({title:title, cols:cols, rows:rows, kpis:[{label:'Units listed', value:rows.length}, {label:'Qty requested', value:Number(r.qty) || 1}, {label:'Days', value:fuReqDays(r) || 0}]}, kind);
@@ -5990,7 +5997,7 @@ function fuBulkXlsxPro(rows){
   var maxEng = 1;
   rows.forEach(function(x){ x.o.free.forEach(function(u){ if(!(u.workshop || isCentralWorkshop(u.e.project))) maxEng = Math.max(maxEng, fuEngFor(u.e.project).length); }); });
   maxEng = Math.min(maxEng, 3);
-  var H = ['Request #', 'Requested equipment', 'Req. capacity', 'For project', 'Unit code', 'Unit equipment', 'Unit capacity', 'Current project', 'Same type in project', 'Low H/M in project', 'Working (not low)', 'Pull check'];
+  var H = ['Request #', 'Requested equipment', 'Req. capacity', 'For project', 'Unit code', 'Unit equipment', 'Unit capacity', 'Current project'];
   for(var k = 1; k <= maxEng; k++){ H.push(maxEng > 1 ? 'Engineer ' + k : 'Engineer', maxEng > 1 ? 'Mobile ' + k : 'Mobile'); }
   H = H.concat(['Last reading (month)', 'Hours (H/M diff)', 'Limit (h)', 'Reading age (months behind)', 'Availability / decision']);
   var nC = H.length;
@@ -6021,14 +6028,32 @@ function fuBulkXlsxPro(rows){
     if(!freeNR.length){
       var er = ws.getRow(rowNo++); er.getCell(5).value = '\u2014 no owned unit available \u2192 external rental'; er.getCell(5).font = {name:'Calibri', size:10, italic:true, color:{argb:'FF888888'}}; er.outlineLevel = 1; return;
     }
-    /* proposed / allocated first, then the lowest hours first (unknown last) */
-    var list = freeNR.slice().sort(function(a, b){
-      var pa = (a.alloc || a.proposed) ? 0 : 1, pb = (b.alloc || b.proposed) ? 0 : 1; if(pa !== pb) return pa - pb;
-      var da = fuFlatUnit(a).d, db = fuFlatUnit(b).d; da = da === '' ? 1e9 : da; db = db === '' ? 1e9 : db; return da - db;
+    /* units of the same project sit together; inside a project: proposed / allocated first, then the lowest hours first (unknown last) */
+    var byP = {}; freeNR.forEach(function(u){ var k = fuPjKey(u.e) || '~'; (byP[k] = byP[k] || []).push(u); });
+    var pOrder = Object.keys(byP).sort(function(a, b){
+      var pa = byP[a].some(function(u){ return u.alloc || u.proposed; }) ? 0 : 1, pb = byP[b].some(function(u){ return u.alloc || u.proposed; }) ? 0 : 1;
+      return pa - pb || byP[b].length - byP[a].length || (a < b ? -1 : 1);
     });
+    var list = [], projHead = {};
+    pOrder.forEach(function(k){
+      var g2 = byP[k].slice().sort(function(a, b){
+        var pa = (a.alloc || a.proposed) ? 0 : 1, pb = (b.alloc || b.proposed) ? 0 : 1; if(pa !== pb) return pa - pb;
+        var da = fuFlatUnit(a).d, db = fuFlatUnit(b).d; da = da === '' ? 1e9 : da; db = db === '' ? 1e9 : db; return da - db;
+      });
+      projHead[list.length] = {u:g2[0], n:g2.length}; list = list.concat(g2);
+    });
+    var kk = 0;
     list.forEach(function(u, k2){
+      if(projHead[k2]){
+        kk = 0; var ph = projHead[k2], pf0 = fuPjFields(ph.u), pe = ph.u.e, pw = ph.u.workshop || isCentralWorkshop(pe.project);
+        var pr = ws.getRow(rowNo++); pr.outlineLevel = 1; ws.mergeCells(pr.number, 1, pr.number, nC);
+        var pcell = pr.getCell(1);
+        pcell.value = clean('\ud83d\udccd ' + (pw ? 'Central Workshop' : (pe.project || '\u2014')) + '   |   ' + ph.n + ' listed'
+          + (pf0.tot !== '' ? '   |   Same type in project: ' + pf0.tot + (pf0.low !== '' ? '   \u00b7   Low H/M: ' + pf0.low + '   \u00b7   High usage: ' + pf0.work + (pf0.hn ? '  (avg ' + pf0.havg + ' h  \u00b7  ' + pf0.hmin + ' \u2192 ' + pf0.hmax + ' h)' : '') : '') : ''));
+        pcell.font = {name:'Calibri', size:10.5, bold:true, color:{argb:'FF1F3A5F'}}; pcell.fill = fill('FFE8EEF7'); pcell.alignment = {vertical:'middle', horizontal:'left'}; pcell.border = {top:thin, bottom:thin}; pr.height = 20;
+      }
       var e = u.e, ws0 = u.workshop || isCentralWorkshop(e.project), fl = fuFlatUnit(u), E = ws0 ? [] : fuEngFor(e.project);
-      var vals = [i + 1, r.equipment || '', r.capacity || '', r.project || '', (u.alloc || u.proposed ? '\u2b50 ' : '') + (e.code || ''), e.equipment || '', fl.cap || '', fl.proj || '', fl.ptot, fl.plow, fl.pwork, fl.pchk];
+      var vals = [i + 1, r.equipment || '', r.capacity || '', r.project || '', (u.alloc || u.proposed ? '\u2b50 ' : '') + (e.code || ''), e.equipment || '', fl.cap || '', fl.proj || ''];
       for(var q = 0; q < maxEng; q++){ vals.push(E[q] ? E[q].n : '', E[q] ? E[q].m : ''); }
       var dec = u.alloc ? 'Allocated' : (u.proposed ? 'Proposed for this request' : (u.takenBy ? 'Fits but goes to request #' + u.takenBy : 'Free'));
       if(u.rep) dec += ' | Under repair'; (u.busy || []).forEach(function(c){ dec += ' | ' + c.text; });
@@ -6036,14 +6061,13 @@ function fuBulkXlsxPro(rows){
       var row = ws.getRow(rowNo++); row.outlineLevel = 1;
       vals.forEach(function(v, j){
         var c = row.getCell(j + 1); c.value = clean(v); c.font = {name:'Calibri', size:10}; c.border = {bottom:thin}; c.alignment = {vertical:'middle', horizontal:(typeof v === 'number') ? 'right' : 'left'};
-        if(k2 % 2) c.fill = fill('FFF8FAFC');
+        if(kk % 2) c.fill = fill('FFF8FAFC');
         var L = String(v == null ? '' : v).length + 2; if(L > widths[j]) widths[j] = Math.min(44, L);
       });
-      var iHours = 12 + maxEng * 2 + 2, iBehind = iHours + 2, iDec = iHours + 3, iCode = 5;
+      kk++;
+      var iHours = 8 + maxEng * 2 + 2, iBehind = iHours + 2, iDec = iHours + 3, iCode = 5;
       if(u.alloc || u.proposed){ row.getCell(iCode).font = {name:'Calibri', size:10, bold:true, color:{argb:'FF1B7F3B'}}; row.getCell(iDec).font = {name:'Calibri', size:10, bold:true, color:{argb:'FF1B7F3B'}}; }
       else row.getCell(iCode).font = {name:'Calibri', size:10, bold:true};
-      var pc = row.getCell(12); if(String(fl.pchk).indexOf('\u26a0') === 0) pc.font = {name:'Calibri', size:10, bold:true, color:{argb:'FFD93025'}}; else if(String(fl.pchk).indexOf('\u2705') === 0) pc.font = {name:'Calibri', size:10, bold:true, color:{argb:'FF1B7F3B'}};
-      if(fl.plow !== '' && fl.plow !== undefined) row.getCell(10).font = {name:'Calibri', size:10, bold:true, color:{argb:'FFD93025'}};
       if(typeof fl.d === 'number' && fl.d < 0) row.getCell(iHours).font = {name:'Calibri', size:10, bold:true, color:{argb:'FFD93025'}};
       if(typeof fl.behind === 'number' && fl.behind >= 2){ row.getCell(iBehind).font = {name:'Calibri', size:10, bold:true, color:{argb:'FFD93025'}}; row.getCell(iBehind - 3).font = {name:'Calibri', size:10, color:{argb:'FFD93025'}}; }
     });
@@ -6071,7 +6095,7 @@ function fuBulkExportUnits(kind){
   if(!data.length){ toast('No unit to list', 'error'); return; }
   function f(k){ return function(o){ return o[k]; }; }
   var cols = [{h:'Request #', g:f('n'), t:'t'}, {h:'Requested equipment', g:f('req'), t:'t'}, {h:'Req. capacity', g:f('rcap'), t:'t'}, {h:'For project', g:f('rproj'), t:'t'}, {h:'Qty', g:f('qty'), t:'t'}, {h:'From', g:f('from'), t:'t'}, {h:'To', g:f('to'), t:'t'},
-    {h:'Unit code', g:f('code'), t:'t'}, {h:'Unit equipment', g:f('eq'), t:'t'}, {h:'Unit capacity', g:f('cap'), t:'t'}, {h:'Current project', g:f('proj'), t:'t'}, {h:'Same type in project', g:f('ptot'), t:'t'}, {h:'Low H/M in project', g:f('plow'), t:'t'}, {h:'Working (not low)', g:f('pwork'), t:'t'}, {h:'Pull check', g:f('pchk'), t:'t'}, {h:'Engineer', g:f('eng'), t:'t'}, {h:'Mobile', g:f('mob'), t:'t'},
+    {h:'Unit code', g:f('code'), t:'t'}, {h:'Unit equipment', g:f('eq'), t:'t'}, {h:'Unit capacity', g:f('cap'), t:'t'}, {h:'Current project', g:f('proj'), t:'t'}, {h:'Same type in project', g:f('ptot'), t:'t'}, {h:'Low H/M in project', g:f('plow'), t:'t'}, {h:'High usage in project', g:f('pwork'), t:'t'}, {h:'High usage avg (h)', g:f('phavg'), t:'t'}, {h:'Engineer', g:f('eng'), t:'t'}, {h:'Mobile', g:f('mob'), t:'t'},
     {h:'Last reading', g:f('lm'), t:'t'}, {h:'H/M diff (h)', g:f('d'), t:'t'}, {h:'Limit (h)', g:f('lim'), t:'t'}, {h:'Availability', g:f('av'), t:'t'}];
   window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 Owned units that fit each request (one row per request + unit pair, so a unit can appear under several requests)', cols:cols, rows:data, kpis:[{label:'Requests', value:rows.length}, {label:'Request + unit pairs', value:data.length}]}, kind);
 }
