@@ -1098,6 +1098,8 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
           </div>
           <div class="rd-head-r">
             <span id="rd-status"></span>
+            <button class="btn-sm" onclick="rdExport('pdf')">📄 PDF</button>
+            <button class="btn-sm" onclick="rdExport('xlsx')">📊 Excel</button>
             <label class="btn-sm rd-admin" style="background:rgba(88,166,255,.15);border-color:rgba(88,166,255,.4);color:var(--blue);cursor:pointer;align-items:center;">
               ⬆ Upload Excel
               <input type="file" accept=".xlsx,.xlsm,.xls" style="display:none" onchange="rdImport(this)">
@@ -5947,7 +5949,7 @@ function fuBulkXlsxPro(rows){
   function covTxt(x){ return x.cover >= x.qty ? 'Covered' : (x.cover > 0 ? x.cover + ' of ' + x.qty : 'External'); }
   /* ---------- sheet 1: summary (one row per request) ---------- */
   var data = rows.map(function(x, i){
-    var r = x.r, w = x.o.win, give = x.o.free.filter(function(u){ return u.alloc || u.proposed; });
+    var r = x.r, w = x.o.win, give = x.o.free.filter(function(u){ return (u.alloc || u.proposed) && !u.rep; });
     return {n:i + 1, req:r.equipment || '', rcap:r.capacity || '', rproj:r.project || '', qty:x.qty, from:w ? w.from : '', to:w ? w.to : '', st:r.provision || '',
             avail:x.nFree, tot:x.o.resAll.length, cov:covTxt(x), prop:give.map(function(u){ return u.e.code || ''; }).join('\n'),
             pproj:give.map(function(u){ return fuFlatUnit(u).proj || '\u2014'; }).join('\n'),
@@ -5983,6 +5985,7 @@ function fuBulkXlsxPro(rows){
   rows.forEach(function(x, i){
     var r = x.r, w = x.o.win;
     if(covTxt(x) === 'External') return;   /* external requests are not listed in this sheet */
+    var freeNR = x.o.free.filter(function(u){ return !u.rep; });   /* units under repair are not listed */
     groupRow[i] = rowNo;
     /* request header row */
     var g = ws.getRow(rowNo++);
@@ -5992,11 +5995,11 @@ function fuBulkXlsxPro(rows){
       + '   |   Available: ' + x.nFree + ' of ' + x.o.resAll.length + ' owned   |   ' + covTxt(x) + (x.takenN ? '   |   ' + x.takenN + ' more fit but go to earlier request(s)' : ''));
     gc.font = {name:'Calibri', size:11, bold:true, color:{argb:NAVY}}; gc.alignment = {vertical:'middle', horizontal:'left'};
     gc.fill = fill(x.cover >= x.qty ? 'FFDFF3E3' : (x.cover > 0 ? 'FFFFF0CC' : 'FFFBE3E1')); gc.border = {top:{style:'medium', color:{argb:AMBER}}, bottom:thin}; g.height = 22;
-    if(!x.o.free.length){
+    if(!freeNR.length){
       var er = ws.getRow(rowNo++); er.getCell(5).value = '\u2014 no owned unit available \u2192 external rental'; er.getCell(5).font = {name:'Calibri', size:10, italic:true, color:{argb:'FF888888'}}; er.outlineLevel = 1; return;
     }
     /* proposed / allocated first, then the lowest hours first (unknown last) */
-    var list = x.o.free.slice().sort(function(a, b){
+    var list = freeNR.slice().sort(function(a, b){
       var pa = (a.alloc || a.proposed) ? 0 : 1, pb = (b.alloc || b.proposed) ? 0 : 1; if(pa !== pb) return pa - pb;
       var da = fuFlatUnit(a).d, db = fuFlatUnit(b).d; da = da === '' ? 1e9 : da; db = db === '' ? 1e9 : db; return da - db;
     });
@@ -6024,7 +6027,7 @@ function fuBulkXlsxPro(rows){
   ws.autoFilter = {from:{row:3, column:1}, to:{row:Math.max(4, rowNo - 1), column:nC}};
   ws.pageSetup = {paperSize:9, orientation:'landscape', fitToPage:true, fitToWidth:1, fitToHeight:0, margins:{left:.3, right:.3, top:.4, bottom:.5, header:.2, footer:.2}, printTitlesRow:'3:3'};
   /* summary: the "Available" number jumps to that request's units */
-  rows.forEach(function(x, i){ if(groupRow[i] == null || !x.o.free.length) return; var c = wsS.getCell(5 + i, 9); c.value = {formula:'HYPERLINK("#\'Matching Units\'!A' + groupRow[i] + '","' + x.nFree + '")', result:x.nFree}; c.font = {name:'Calibri', size:10, bold:true, underline:true, color:{argb:'FF1F6FEB'}}; });
+  rows.forEach(function(x, i){ if(groupRow[i] == null || !x.o.free.some(function(u){ return !u.rep; })) return; var c = wsS.getCell(5 + i, 9); c.value = {formula:'HYPERLINK("#\'Matching Units\'!A' + groupRow[i] + '","' + x.nFree + '")', result:x.nFree}; c.font = {name:'Calibri', size:10, bold:true, underline:true, color:{argb:'FF1F6FEB'}}; });
   var d = new Date(), two = function(n){ return (n < 10 ? '0' : '') + n; };
   var fname = 'Requested_equipment_vs_Owned_' + d.getFullYear() + '-' + two(d.getMonth() + 1) + '-' + two(d.getDate()) + '.xlsx';
   wb.xlsx.writeBuffer().then(function(buf){
@@ -6038,7 +6041,7 @@ function fuBulkExportUnits(kind){
   var data = [];
   rows.forEach(function(x, i){
     var r = x.r, w = x.o.win, base = {n:i + 1, req:r.equipment || '', rcap:r.capacity || '', rproj:r.project || '', qty:x.qty, from:w ? w.from : '', to:w ? w.to : ''};
-    x.o.free.forEach(function(u){ data.push(Object.assign({}, base, fuFlatUnit(u))); });
+    x.o.free.forEach(function(u){ if(!u.rep) data.push(Object.assign({}, base, fuFlatUnit(u))); });
   });
   if(!data.length){ toast('No unit to list', 'error'); return; }
   function f(k){ return function(o){ return o[k]; }; }
@@ -14606,6 +14609,17 @@ function renderPanels(){
 var COLF={item:'item',modelL:'model',catL:'cat',rateL:'rate',cost:'dif',sb:'sb',vendor:'vendor',project:'project',plant:'plant',date:'month',fuelL:'fuel',transL:'trans'};
 var COLS=[['contract','Contract'],['item','Equipment'],['modelL','Model / Capacity'],['catL','Category'],['rateL','Rate'],['cost','Unit cost'],['sb','S.B'],['vendor','Vendor'],
           ['project','Project'],['plant','Plant'],['date','Date'],['fuelL','Fuel'],['transL','Transport'],['contact','Contact'],['note','Note']];
+/* export of the filtered Rental Database table (all matching rows, not just the ones currently shown) */
+window.rdExport=function(kind){
+  var L=list(); if(!L.length){ if(typeof toast==='function') toast('Nothing to export','error'); return; }
+  L.sort(function(a,b){ var x=a[sortKey], y=b[sortKey]; if(x==null||x==='') return 1; if(y==null||y==='') return -1; if(typeof x==='number'&&typeof y==='number') return (x-y)*sortDir; return String(x).localeCompare(String(y))*sortDir; });
+  var cols=[{h:'#',g:function(o,i){ return i+1; },t:'t'}].concat(COLS.map(function(c){
+    var k=c[0];
+    return {h:c[1], t:(k==='cost'?'f':'t'), g:function(r){ if(k==='date') return dateLabel(r.date); if(k==='contract') return r.contract||''; return r[k]==null?'':r[k]; }};
+  }));
+  if(!window.hacPdfTable){ if(typeof toast==='function') toast('Export module not loaded','error'); return; }
+  window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 Rental Database', cols:cols, rows:L, kpis:[{label:'Records',value:L.length}]}, kind);
+};
 function difBadge(r){
   if(!r.dif) return '';
   var tip='Usual price for this equipment: '+fmt(r.difBase,2)+(r.dif===2?' \u00b7 under repair'+(r.note?' \u2014 '+r.note:''):'');
@@ -17031,16 +17045,7 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
   var openMenu = null;
   function closeMenu(){ if(openMenu){ openMenu.style.display = 'none'; openMenu = null; } }
   document.addEventListener('click', function(e){ if(openMenu && !openMenu.parentNode.contains(e.target)) closeMenu(); });
-  function merge(){
-    var seen = [];
-    var all = document.querySelectorAll('button,label');
-    for(var i = 0; i < all.length; i++){
-      var b = all[i], p = b.parentNode;
-      if(!p || seen.indexOf(p) >= 0 || !isExp(b)) continue;
-      seen.push(p);
-      var grp = [], kids = p.children;
-      for(var k = 0; k < kids.length; k++){ if(isExp(kids[k])) grp.push(kids[k]); }
-      if(grp.length < 2) continue;
+  function build(p, grp){
       var first = grp[0], wrap = document.createElement('span');
       wrap.setAttribute('data-xm', '1'); wrap.style.cssText = 'position:relative;display:inline-block;' + (first.style.marginLeft ? 'margin-left:' + first.style.marginLeft + ';' : '');
       var btn = document.createElement('button'); btn.type = 'button'; btn.className = first.className || 'btn-sm'; btn.textContent = '\ud83d\udce4 Export \u25be';
@@ -17056,7 +17061,19 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
       btn.onclick = function(ev){ ev.stopPropagation(); var was = (menu.style.display === 'block'); closeMenu(); if(!was){ menu.style.display = 'block'; openMenu = menu; } };
       wrap.appendChild(btn); wrap.appendChild(menu);
       p.insertBefore(wrap, first);
-      grp.forEach(function(o){ o.setAttribute('data-xm', 'hidden'); o.style.display = 'none'; });
+    grp.forEach(function(o){ o.setAttribute('data-xm', 'hidden'); o.style.display = 'none'; });
+  }
+  function merge(){
+    var seen = [];
+    var all = document.querySelectorAll('button,label');
+    for(var i = 0; i < all.length; i++){
+      var b = all[i], p = b.parentNode;
+      if(!p || seen.indexOf(p) >= 0 || !isExp(b)) continue;
+      seen.push(p);
+      var grp = [], kids = p.children;
+      for(var k = 0; k < kids.length; k++){ if(isExp(kids[k])) grp.push(kids[k]); }
+      if(grp.length < 2) continue;
+      build(p, grp);
     }
   }
   var t = null; function sched(){ if(t) return; t = setTimeout(function(){ t = null; try{ merge(); }catch(e){} }, 120); }
