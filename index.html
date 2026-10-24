@@ -5902,7 +5902,7 @@ function fuRenderBulk(){
     + (low && LM.loaded ? '<label>H/M basis <select id="fu-bulk-lowm" onchange="fuRenderBulk()" style="' + inp + '">' + basis + '</select></label>' : '')
     + '<label><input type="checkbox" id="fu-bulk-fleets" ' + (fleets ? 'checked' : '') + ' onchange="fuRenderBulk()"> include other countries\' fleets</label>'
     + fuUnitBox()
-    + '<span style="margin-left:auto;display:flex;gap:6px;"><button class="btn-sm" onclick="fuBulkAll(true)">\u25be Expand all</button><button class="btn-sm" onclick="fuBulkAll(false)">\u25b8 Collapse</button><button class="btn-sm" onclick="fuBulkExport(\'xlsx\')" title="One row per request">\ud83d\udcca Excel</button><button class="btn-sm" onclick="fuBulkExport(\'pdf\')">\ud83d\udcc4 PDF</button><button class="btn-sm" onclick="fuBulkExportUnits(\'xlsx\')" title="One row per request + unit pair">\ud83d\udcca Excel (per unit)</button></span></div>'
+    + '<span style="margin-left:auto;display:flex;gap:6px;"><button class="btn-sm" onclick="fuBulkAll(true)">\u25be Expand all</button><button class="btn-sm" onclick="fuBulkAll(false)">\u25b8 Collapse</button><button class="btn-sm" onclick="fuBulkExport(\'xlsx\')" title="One row per request">\ud83d\udcca Excel</button><button class="btn-sm" onclick="fuBulkExport(\'pdf\')">\ud83d\udcc4 PDF</button><button class="btn-sm" onclick="fuBulkExportUnits(\'xlsx\')" title="One row per request + unit pair">\ud83d\udcca Excel (per unit)</button><button class="btn-sm" onclick="fuBulkMsgOpen()" title="One ready message per engineer, for the proposed units">\ud83d\udcac Engineer messages</button></span></div>'
     + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">' + chip('Requests checked', rows.length, 'var(--blue)') + chip('Covered by Owned', nFull, 'var(--green)') + chip('Partly covered', nPart, 'var(--accent)') + chip('Nothing available \u2192 external', nNone, 'var(--red)') + '<div id="fu-bulk-total" style="flex:1.4;min-width:200px;background:var(--bg);border:1px solid var(--border);border-top:3px solid var(--green);border-radius:8px;padding:8px 12px;font-size:11px;color:var(--text-muted);">\ud83d\udcb2 Estimating total saving\u2026</div></div>'
     + (low && !LM.loaded ? '<div style="font-size:12px;color:var(--accent);margin-bottom:8px;">H/M data is not loaded yet \u2014 showing all owned units until it loads.</div>' : '')
     + '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:6px;line-height:1.7;">Each row is one request. <b>Available from Owned</b> = owned units of the same type (and capacity) that are in Low H/M, free in the request\'s dates and not under repair. A unit is given to <b>one request only</b> \u2014 the one that starts first \u2014 so it is never counted twice. Click \u25b8 to see the units, their project, engineer and last reading.'
@@ -5967,6 +5967,51 @@ function fuBulkExport(kind){
     {h:'Available from Owned', g:f('avail'), t:'t'}, {h:'Owned of this type (all)', g:f('tot'), t:'t'}, {h:'Result', g:f('cov'), t:'t'}, {h:'Proposed units (project \u00b7 engineer \u00b7 last reading)', g:f('units'), t:'t'}, {h:'Note', g:f('more'), t:'t'}, {h:'Est. saving (EGP)', g:f('sav'), t:'t'}];
   var nFull = rows.filter(function(x){ return x.cover >= x.qty; }).length, nPart = rows.filter(function(x){ return x.cover > 0 && x.cover < x.qty; }).length;
   window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 Requested equipment vs. what Owned can give', cols:cols, rows:data, kpis:[{label:'Requests', value:rows.length}, {label:'Covered by Owned', value:nFull}, {label:'Partly covered', value:nPart}, {label:'External', value:rows.length - nFull - nPart}]}, kind);
+}
+/* ── Bulk owned search → one ready message per engineer (copy / WhatsApp) ── */
+function fuEscH(v){ return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function fuBulkMsgBuild(rows){
+  var G = {}, order = [];
+  rows.forEach(function(x, i){
+    var w = x.o.win, give = x.o.free.filter(function(u){ return u.alloc || u.proposed; });
+    give.forEach(function(u){
+      if(u.workshop || isCentralWorkshop(u.e.project)) return;
+      var E = fuEngFor(u.e.project); if(!E.length) return;
+      var g = E[0], key = (g.n || '') + '|' + (g.m || '');
+      if(!G[key]){ G[key] = {eng:g, others:E.slice(1), items:[]}; order.push(key); }
+      var fl = fuFlatUnit(u);
+      G[key].items.push({n:i + 1, code:u.e.code || '', eq:(u.e.equipment || '') + (fl.cap ? ' ' + fl.cap : ''), at:u.e.project || '', req:x.r.project || '', from:w ? w.from : '', to:w ? w.to : ''});
+    });
+  });
+  return order.map(function(k){
+    var g = G[k], first = String(g.eng.n || '').split(' ')[0];
+    var t = 'Dear Eng. ' + first + ',\n\nPlease confirm if the following unit(s) at your site are available for transfer:\n\n'
+      + g.items.map(function(it, j){ return (j + 1) + '. ' + it.code + ' \u2014 ' + it.eq + (it.at ? ' (currently at ' + it.at + ')' : '') + '\n    needed at ' + (it.req || '\u2014') + (it.from ? ', ' + it.from + ' \u2192 ' + it.to : '') + ' (request #' + it.n + ')'; }).join('\n')
+      + '\n\nKindly confirm availability and the earliest release date.\n\nBest regards';
+    return {eng:g.eng, others:g.others, n:g.items.length, text:t};
+  });
+}
+function fuBulkMsgOpen(){
+  var rows = window.__fuBulkRows || []; if(!rows.length){ toast('Run a bulk search first', 'error'); return; }
+  var L = fuBulkMsgBuild(rows); window.__fuBulkMsgs = L;
+  var old = document.getElementById('fuBulkMsgBox'); if(old) old.remove();
+  var h = '<div id="fuBulkMsgBox" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;" onclick="if(event.target===this)this.remove()">'
+    + '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);width:min(760px,100%);max-height:90vh;display:flex;flex-direction:column;">'
+    + '<div style="display:flex;align-items:center;padding:14px 16px;border-bottom:1px solid var(--border);"><b style="font-size:15px;">\ud83d\udcac Messages to engineers</b><span style="margin-left:10px;color:var(--text-muted);font-size:12px;">' + L.length + ' engineer(s) \u00b7 proposed units only</span>'
+    + '<button class="btn-sm" style="margin-left:auto;" onclick="document.getElementById(\'fuBulkMsgBox\').remove()">\u2715</button></div>'
+    + '<div style="overflow:auto;padding:12px 16px;display:flex;flex-direction:column;gap:14px;">';
+  if(!L.length) h += '<div style="color:var(--text-muted);padding:20px;text-align:center;">No proposed units with a known engineer.</div>';
+  L.forEach(function(m, i){
+    var num = String(m.eng.m || '').replace(/\D/g, ''); if(num.indexOf('0') === 0) num = '20' + num.slice(1);
+    h += '<div style="border:1px solid var(--border);border-radius:var(--radius);background:var(--surface2);padding:10px;">'
+      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;"><b>' + fuEscH(m.eng.n || '') + '</b><span style="color:var(--text-muted);font-size:12px;">' + fuEscH(m.eng.t || '') + ' \u00b7 ' + fuEscH(m.eng.m || '') + ' \u00b7 ' + m.n + ' unit(s)</span>'
+      + '<span style="margin-left:auto;display:flex;gap:6px;"><button class="btn-sm" onclick="fuCopyText(document.getElementById(\'fuBM' + i + '\').value)">Copy</button>'
+      + (num ? '<button class="btn-sm" onclick="window.open(\'https://wa.me/' + num + '?text=\'+encodeURIComponent(document.getElementById(\'fuBM' + i + '\').value),\'_blank\')">WhatsApp</button>' : '') + '</span></div>'
+      + (m.others.length ? '<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Also responsible: ' + m.others.map(function(o){ return fuEscH(o.n || ''); }).join(', ') + '</div>' : '')
+      + '<textarea id="fuBM' + i + '" style="width:100%;height:170px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px;font:12.5px/1.5 Inter,sans-serif;resize:vertical;">' + fuEscH(m.text) + '</textarea></div>';
+  });
+  h += '</div></div></div>';
+  document.body.insertAdjacentHTML('beforeend', h);
 }
 /* ── Bulk owned search → Excel: Summary sheet (1 row per request) + "Matching Units" sheet (ALL free units of each request,
       grouped under a request header; engineer / mobile / last reading each in its OWN column) ── */
@@ -6104,7 +6149,7 @@ function rwCompute(mr, rd, o){
     u.sap = r.sap; u.plant = r.plant; u.equipment = r.equipment; u.model = r.model || r.maincap || ''; u.project = r.project; u.od = r.od; u.subcon = r.subcon; u.category = r.category;
     var b = u.by[r.month] || (u.by[r.month] = {days:0, qty:0, total:0, unit:0});
     var rawD = Number(r.days) || 0, isMon = r.uom === 'month' || (!r.uom && rawD > 0 && rawD < 1.5 && rawD !== Math.round(rawD));   /* month fraction (0.7 = 70% of the month) -> days */
-    b.days += isMon ? rawD * 30 : rawD; if(isMon) b.mon = true; b.qty += qty; b.total += Number(r.totalPrice) || 0; b.unit = Number(r.unitPrice) || b.unit;
+    b.days += isMon ? rawD * 30 : rawD; if(isMon) b.mon = true; if(r.uom === 'hour') u.hr = true; b.qty += qty; b.total += Number(r.totalPrice) || 0; b.unit = Number(r.unitPrice) || b.unit;
   });
   var X = rd.map(function(r){ return {r:r, v:rwNorm(r.vendor), p:rwNorm(r.project), i:rwNorm(r.item), m:rwNorm(r.model)}; });
   Object.keys(U).forEach(function(k){
@@ -6122,9 +6167,9 @@ function rwCompute(mr, rd, o){
     c.forEach(function(x){ if(x.r.rate) rates[x.r.rate] = 1; if(x.r.note) notes.push(x.r.note); if(x.r.contract) contracts[x.r.contract] = 1; });
     var joined = notes.join(' \u2022 '), lower = joined.toLowerCase();
     var inter = kw.some(function(w){ return lower.indexOf(w) >= 0; });
-    var hourly = Object.keys(rates).indexOf('hour') >= 0;
+    var hourly = Object.keys(rates).indexOf('hour') >= 0 || !!u.hr;
     var row = {key:k, sap:u.sap, equipment:u.equipment, model:u.model, project:u.project, od:u.od, subcon:u.subcon, qty:cur.qty, days:cur.days, total:cur.total, unit:cur.unit,
-               hist:win.map(function(m){ return {m:m, days:u.by[m].days}; }), matched:c.length > 0, loose:loose, contract:Object.keys(contracts).join(', '), note:joined, basis:Object.keys(rates).join('/'), inter:inter, hourly:hourly};
+               mon:!!cur.mon, hist:win.map(function(m){ return {m:m, days:u.by[m].days}; }), matched:c.length > 0, loose:loose, contract:Object.keys(contracts).join(', '), note:joined, basis:Object.keys(rates).join('/'), inter:inter, hourly:hourly};
     if(hourly){ out.stats.hourly++; return; }
     row.verdict = !row.matched ? 'verify' : (inter ? 'keep' : 'pull');
     if(inter) out.stats.keepNote++;
@@ -6198,7 +6243,7 @@ function rwRender(){
     h += '<tr><td ' + td + '><input type="checkbox" class="rw-chk" data-i="' + i + '"></td>'
       + '<td ' + td + '><b>' + fuEsc(x.equipment) + '</b>' + (x.model ? '<div style="color:var(--text-muted);font-size:11px;">' + fuEsc(x.model) + '</div>' : '') + (x.sap ? '<div style="font-family:monospace;font-size:10.5px;color:var(--text-muted);">' + fuEsc(x.sap) + '</div>' : '') + '</td>'
       + '<td ' + td + '>' + fuEsc(x.project || '\u2014') + (x.od ? '<div style="color:var(--text-muted);font-size:11px;">' + fuEsc(x.od) + '</div>' : '') + '</td><td ' + td + '>' + fuEsc(x.subcon || '\u2014') + '</td><td ' + td + '>' + x.qty + '</td>'
-      + '<td ' + td + '><b style="color:var(--red);font-family:monospace;">' + (Math.round(x.days * 10) / 10) + '</b>' + (x.hist.length > 1 ? '<div style="font-size:10.5px;color:var(--text-muted);white-space:nowrap;">' + x.hist.map(function(q){ return rwMonthLabel(q.m).slice(0, 3) + ': ' + Math.round(q.days * 10) / 10; }).join(' \u00b7 ') + '</div>' : '') + '</td>'
+      + '<td ' + td + '><b style="color:var(--red);font-family:monospace;">' + (Math.round(x.days * 10) / 10) + '</b>' + (x.mon ? '<div style="font-size:10.5px;color:var(--text-muted);">month basis (\u00d730)</div>' : '') + (x.hist.length > 1 ? '<div style="font-size:10.5px;color:var(--text-muted);white-space:nowrap;">' + x.hist.map(function(q){ return rwMonthLabel(q.m).slice(0, 3) + ': ' + Math.round(q.days * 10) / 10; }).join(' \u00b7 ') + '</div>' : '') + '</td>'
       + '<td ' + td + '><b>' + f0(x.total) + '</b></td>'
       + '<td ' + td + '>' + (x.matched ? '<div style="font-size:11px;">' + fuEsc(x.contract || '\u2014') + (x.basis ? ' <span style="color:var(--text-muted);">(' + fuEsc(x.basis) + ')</span>' : '') + '</div><div style="font-size:11px;color:var(--text-muted);max-width:260px;">' + (x.note ? fuEsc(x.note.length > 140 ? x.note.slice(0, 140) + '\u2026' : x.note) : '<i>no note</i>') + '</div>' : '<span style="color:var(--text-muted);font-size:11px;">not in Rental Database</span>') + '</td>'
       + '<td ' + td + '>' + vd + '</td><td ' + td + '>' + decHtml + (admin ? btn('pull', 'Pull back') + btn('keep', 'Keep') + btn('review', 'Review') + (d ? btn('reset', '\u21ba') : '') : '') + '</td></tr>';
