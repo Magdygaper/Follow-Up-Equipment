@@ -5971,44 +5971,44 @@ function fuBulkExport(kind){
 /* ── Bulk owned search → one ready message per engineer (copy / WhatsApp) ── */
 function fuEscH(v){ return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 function fuBulkMsgBuild(rows){
-  var G = {}, order = [];
+  var hr = new Date().getHours(), greet = hr < 12 ? '\u0635\u0628\u0627\u062d \u0627\u0644\u062e\u064a\u0631' : '\u0645\u0633\u0627\u0621 \u0627\u0644\u062e\u064a\u0631', out = [];
   rows.forEach(function(x, i){
-    var w = x.o.win, give = x.o.free.filter(function(u){ return u.alloc || u.proposed; });
-    give.forEach(function(u){
-      if(u.workshop || isCentralWorkshop(u.e.project)) return;
-      var E = fuEngFor(u.e.project); if(!E.length) return;
-      var g = E[0], key = (g.n || '') + '|' + (g.m || '');
-      if(!G[key]){ G[key] = {eng:g, others:E.slice(1), items:[]}; order.push(key); }
-      var fl = fuFlatUnit(u);
-      G[key].items.push({n:i + 1, code:u.e.code || '', eq:(u.e.equipment || '') + (fl.cap ? ' ' + fl.cap : ''), at:u.e.project || '', req:x.r.project || '', from:w ? w.from : '', to:w ? w.to : ''});
+    var list = x.o.free.filter(function(u){ return !u.takenBy; }); if(!list.length) return;
+    var grp = {n:i + 1, title:(x.r.equipment || '') + (x.r.capacity ? ' ' + x.r.capacity : ''), proj:x.r.project || '', units:[]};
+    list.sort(function(a, b2){ return ((a.alloc || a.proposed) ? 0 : 1) - ((b2.alloc || b2.proposed) ? 0 : 1); }).forEach(function(u){
+      var ws0 = u.workshop || isCentralWorkshop(u.e.project), E = ws0 ? [] : fuEngFor(u.e.project), g = E[0] || null, fl = fuFlatUnit(u);
+      var first = g ? String(g.n || '').trim().split(/\s+/)[0] : '';
+      var text = greet + ' \u0645/' + (first || '(\u0627\u0633\u0645 \u0627\u0644\u0645\u0647\u0646\u062f\u0633)') + '\n\u0643\u0646\u062a \u0645\u062d\u062a\u0627\u062c ' + (u.e.equipment || x.r.equipment || '') + ' \u0627\u0644\u0644\u064a \u0643\u0648\u062f\u0647 ' + (u.e.code || '')
+        + ' \u0623\u0639\u0645\u0644\u0647 \u062a\u0631\u0627\u0646\u0633\u0641\u064a\u0631 \u0641\u064a \u0645\u0634\u0631\u0648\u0639 ' + (x.r.project || '') + ' \u0641\u0642\u0644\u062a \u0623\u0631\u062c\u0639\u0644\u0643 \u062a\u0642\u0648\u0644\u064a \u0645\u062d\u062a\u0627\u062c\u0647 \u0648\u0644\u0627 \u0623\u0639\u0645\u0644 \u0637\u0644\u0628 \u0627\u0644\u0646\u0642\u0644\u061f';
+      grp.units.push({code:u.e.code || '', eq:(u.e.equipment || '') + (fl.cap ? ' ' + fl.cap : ''), at:fl.proj || '', star:!!(u.alloc || u.proposed), eng:g, others:E.slice(1), text:text});
     });
+    out.push(grp);
   });
-  return order.map(function(k){
-    var g = G[k], first = String(g.eng.n || '').split(' ')[0];
-    var t = 'Dear Eng. ' + first + ',\n\nPlease confirm if the following unit(s) at your site are available for transfer:\n\n'
-      + g.items.map(function(it, j){ return (j + 1) + '. ' + it.code + ' \u2014 ' + it.eq + (it.at ? ' (currently at ' + it.at + ')' : '') + '\n    needed at ' + (it.req || '\u2014') + (it.from ? ', ' + it.from + ' \u2192 ' + it.to : '') + ' (request #' + it.n + ')'; }).join('\n')
-      + '\n\nKindly confirm availability and the earliest release date.\n\nBest regards';
-    return {eng:g.eng, others:g.others, n:g.items.length, text:t};
-  });
+  return out;
 }
 function fuBulkMsgOpen(){
   var rows = window.__fuBulkRows || []; if(!rows.length){ toast('Run a bulk search first', 'error'); return; }
-  var L = fuBulkMsgBuild(rows); window.__fuBulkMsgs = L;
+  var L = fuBulkMsgBuild(rows), cnt = 0; L.forEach(function(g){ cnt += g.units.length; });
   var old = document.getElementById('fuBulkMsgBox'); if(old) old.remove();
   var h = '<div id="fuBulkMsgBox" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;" onclick="if(event.target===this)this.remove()">'
-    + '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);width:min(760px,100%);max-height:90vh;display:flex;flex-direction:column;">'
-    + '<div style="display:flex;align-items:center;padding:14px 16px;border-bottom:1px solid var(--border);"><b style="font-size:15px;">\ud83d\udcac Messages to engineers</b><span style="margin-left:10px;color:var(--text-muted);font-size:12px;">' + L.length + ' engineer(s) \u00b7 proposed units only</span>'
+    + '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);width:min(780px,100%);max-height:90vh;display:flex;flex-direction:column;">'
+    + '<div style="display:flex;align-items:center;padding:14px 16px;border-bottom:1px solid var(--border);"><b style="font-size:15px;">\ud83d\udcac Messages to engineers</b><span style="margin-left:10px;color:var(--text-muted);font-size:12px;">' + cnt + ' unit(s) in ' + L.length + ' request(s)</span>'
     + '<button class="btn-sm" style="margin-left:auto;" onclick="document.getElementById(\'fuBulkMsgBox\').remove()">\u2715</button></div>'
-    + '<div style="overflow:auto;padding:12px 16px;display:flex;flex-direction:column;gap:14px;">';
-  if(!L.length) h += '<div style="color:var(--text-muted);padding:20px;text-align:center;">No proposed units with a known engineer.</div>';
-  L.forEach(function(m, i){
-    var num = String(m.eng.m || '').replace(/\D/g, ''); if(num.indexOf('0') === 0) num = '20' + num.slice(1);
-    h += '<div style="border:1px solid var(--border);border-radius:var(--radius);background:var(--surface2);padding:10px;">'
-      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;"><b>' + fuEscH(m.eng.n || '') + '</b><span style="color:var(--text-muted);font-size:12px;">' + fuEscH(m.eng.t || '') + ' \u00b7 ' + fuEscH(m.eng.m || '') + ' \u00b7 ' + m.n + ' unit(s)</span>'
-      + '<span style="margin-left:auto;display:flex;gap:6px;"><button class="btn-sm" onclick="fuCopyText(document.getElementById(\'fuBM' + i + '\').value)">Copy</button>'
-      + (num ? '<button class="btn-sm" onclick="window.open(\'https://wa.me/' + num + '?text=\'+encodeURIComponent(document.getElementById(\'fuBM' + i + '\').value),\'_blank\')">WhatsApp</button>' : '') + '</span></div>'
-      + (m.others.length ? '<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Also responsible: ' + m.others.map(function(o){ return fuEscH(o.n || ''); }).join(', ') + '</div>' : '')
-      + '<textarea id="fuBM' + i + '" style="width:100%;height:170px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px;font:12.5px/1.5 Inter,sans-serif;resize:vertical;">' + fuEscH(m.text) + '</textarea></div>';
+    + '<div style="overflow:auto;padding:12px 16px;display:flex;flex-direction:column;gap:10px;">';
+  if(!L.length) h += '<div style="color:var(--text-muted);padding:20px;text-align:center;">No available units.</div>';
+  var id = 0;
+  L.forEach(function(g){
+    h += '<div style="font-weight:700;color:var(--accent);margin-top:6px;">#' + g.n + ' \u00b7 ' + fuEscH(g.title) + ' \u2192 ' + fuEscH(g.proj) + '</div>';
+    g.units.forEach(function(m){
+      var k = id++, num = m.eng ? String(m.eng.m || '').replace(/\D/g, '') : ''; if(num.indexOf('0') === 0) num = '20' + num.slice(1);
+      h += '<div style="border:1px solid var(--border);border-radius:var(--radius);background:var(--surface2);padding:10px;">'
+        + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;"><b>' + (m.star ? '\u2b50 ' : '') + fuEscH(m.code) + '</b><span style="color:var(--text-muted);font-size:12px;">' + fuEscH(m.eq) + ' \u00b7 ' + fuEscH(m.at || '\u2014') + ' \u00b7 '
+        + (m.eng ? fuEscH(m.eng.n || '') + ' \u00b7 ' + fuEscH(m.eng.m || '') : '<span style="color:var(--red);">no engineer found</span>') + '</span>'
+        + '<span style="margin-left:auto;display:flex;gap:6px;"><button class="btn-sm" onclick="fuCopyText(document.getElementById(\'fuBM' + k + '\').value)">Copy</button>'
+        + (num ? '<button class="btn-sm" onclick="window.open(\'https://web.whatsapp.com/send?phone=' + num + '&text=\'+encodeURIComponent(document.getElementById(\'fuBM' + k + '\').value),\'_blank\')">WhatsApp Web</button>' : '') + '</span></div>'
+        + (m.others.length ? '<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Also responsible: ' + m.others.map(function(o){ return fuEscH(o.n || ''); }).join(', ') + '</div>' : '')
+        + '<textarea id="fuBM' + k + '" dir="rtl" style="width:100%;height:84px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px;font:13px/1.6 Inter,sans-serif;resize:vertical;">' + fuEscH(m.text) + '</textarea></div>';
+    });
   });
   h += '</div></div></div>';
   document.body.insertAdjacentHTML('beforeend', h);
