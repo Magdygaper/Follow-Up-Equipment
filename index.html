@@ -6028,6 +6028,7 @@ function fuBulkXlsxPro(rows){
     if(!freeNR.length){
       var er = ws.getRow(rowNo++); er.getCell(5).value = '\u2014 no owned unit available \u2192 external rental'; er.getCell(5).font = {name:'Calibri', size:10, italic:true, color:{argb:'FF888888'}}; er.outlineLevel = 1; return;
     }
+    var nmSet = {}; freeNR.forEach(function(u){ nmSet[String(u.e.equipment || '').trim().toLowerCase()] = 1; }); var nmVaries = Object.keys(nmSet).length > 1;
     /* units of the same project sit together; inside a project: proposed / allocated first, then the lowest hours first (unknown last) */
     var byP = {}; freeNR.forEach(function(u){ var k = fuPjKey(u.e) || '~'; (byP[k] = byP[k] || []).push(u); });
     var pOrder = Object.keys(byP).sort(function(a, b){
@@ -6075,6 +6076,73 @@ function fuBulkXlsxPro(rows){
   ws.columns = widths.map(function(w){ return {width:Math.min(44, w)}; });
   ws.autoFilter = {from:{row:3, column:1}, to:{row:Math.max(4, rowNo - 1), column:nC}};
   ws.pageSetup = {paperSize:9, orientation:'landscape', fitToPage:true, fitToWidth:1, fitToHeight:0, margins:{left:.3, right:.3, top:.4, bottom:.5, header:.2, footer:.2}, printTitlesRow:'3:3'};
+
+  /* ---------- sheet 3: Units List — FLAT: one row per unit (no repeats, no merged rows) so it can be filtered (e.g. generators only) and copied as is ---------- */
+  var UL = {}, ulOrder = [];
+  rows.forEach(function(x, i){
+    if(covTxt(x) === 'External') return;
+    x.o.free.forEach(function(u){
+      if(u.rep) return;
+      var k = fuNormCode(u.e.code) || ('row' + i + '_' + ulOrder.length), cur = UL[k];
+      if(!cur){ cur = UL[k] = {u:u, fl:fuFlatUnit(u), fits:[], prop:[], notes:[]}; ulOrder.push(k); }
+      cur.fits.push(i + 1); if(u.alloc || u.proposed) cur.prop.push(i + 1);
+      (u.busy || []).forEach(function(c){ if(cur.notes.indexOf(c.text) < 0) cur.notes.push(c.text); });
+    });
+  });
+  if(ulOrder.length){
+    var ulRows = ulOrder.map(function(k){ return UL[k]; }).sort(function(a, b){
+      var ea = String(a.fl.eq).toLowerCase(), eb = String(b.fl.eq).toLowerCase(); if(ea !== eb) return ea < eb ? -1 : 1;
+      var pa = String(a.fl.proj).toLowerCase(), pb = String(b.fl.proj).toLowerCase(); if(pa !== pb) return pa < pb ? -1 : 1;
+      var da = a.fl.d === '' ? 1e9 : a.fl.d, db = b.fl.d === '' ? 1e9 : b.fl.d; return da - db;
+    });
+    var wsU = wb.addWorksheet('Units List', {views:[{state:'frozen', ySplit:1, activeCell:'A2'}], properties:{tabColor:{argb:'FF1F6FEB'}}});
+    var UH = ['#', 'Unit code', 'Equipment', 'Category', 'Capacity', 'Brand', 'Year', 'Current project', 'Project stock (same type)', 'Engineer', 'Mobile', 'Last reading (month)', 'Hours (H/M diff)', 'Limit (h)', 'Reading age (months behind)', 'Fits request #', 'Proposed for request #', 'Note'];
+    var uw = UH.map(function(h){ return Math.max(9, h.length * 1.05 + 2); });
+    var uhr = wsU.getRow(1); uhr.height = 30;
+    UH.forEach(function(h, j){ var c = uhr.getCell(j + 1); c.value = h; c.font = {name:'Calibri', size:10, bold:true, color:{argb:'FFFFFFFF'}}; c.fill = fill(NAVY); c.alignment = {vertical:'middle', horizontal:'left', wrapText:true}; c.border = {bottom:{style:'medium', color:{argb:AMBER}}}; });
+    ulRows.forEach(function(it, n){
+      var u = it.u, e = u.e, fl = it.fl, pf = fuPjFields(u);
+      var stock = pf.tot === '' ? '' : (pf.low !== '' ? pf.low + ' low \u00b7 ' + pf.work + ' high of ' + pf.tot : pf.tot + ' total');
+      var vals = [n + 1, e.code || '', fl.eq, e.category || '', fl.cap || '', fl.brand || '', fl.year || '', fl.proj || '', stock, fl.eng || '', fl.mob || '', fl.lm || '', fl.d === '' ? '' : fl.d, fl.lim === '' ? '' : fl.lim, fl.behind === '' ? '' : fl.behind, it.fits.join(', '), it.prop.join(', '), it.notes.join(' | ')];
+      var row = wsU.getRow(n + 2);
+      vals.forEach(function(v, j){
+        var c = row.getCell(j + 1); c.value = clean(v); c.font = {name:'Calibri', size:10}; c.border = {bottom:thin}; c.alignment = {vertical:'middle', horizontal:(typeof v === 'number') ? 'right' : 'left'};
+        if(n % 2) c.fill = fill('FFF8FAFC');
+        var L = String(v == null ? '' : v).length + 2; if(L > uw[j]) uw[j] = Math.min(44, L);
+      });
+      row.getCell(2).font = {name:'Calibri', size:10, bold:true};
+      if(typeof fl.d === 'number' && fl.d < 0) row.getCell(13).font = {name:'Calibri', size:10, bold:true, color:{argb:'FFD93025'}};
+      if(typeof fl.behind === 'number' && fl.behind >= 2){ row.getCell(15).font = {name:'Calibri', size:10, bold:true, color:{argb:'FFD93025'}}; row.getCell(12).font = {name:'Calibri', size:10, color:{argb:'FFD93025'}}; }
+    });
+    wsU.columns = uw.map(function(w){ return {width:Math.min(44, w)}; });
+    wsU.autoFilter = {from:{row:1, column:1}, to:{row:ulRows.length + 1, column:UH.length}};
+    wsU.pageSetup = {paperSize:9, orientation:'landscape', fitToPage:true, fitToWidth:1, fitToHeight:0};
+  }
+  /* ---------- sheet 4: Project Stock — one row per project x equipment type ---------- */
+  var PS = {}, psOrder = [];
+  rows.forEach(function(x){
+    if(covTxt(x) === 'External') return;
+    x.o.free.forEach(function(u){
+      if(u.rep || !u.pj) return;
+      var k = fuPjKey(u.e) + '|' + String(x.r.equipment || '').toLowerCase() + '|' + String(x.r.capacity || '').toLowerCase(), cur = PS[k];
+      if(!cur){ cur = PS[k] = {proj:(u.workshop || isCentralWorkshop(u.e.project)) ? 'Central Workshop' : (u.e.project || ''), eq:x.r.equipment || '', cap:x.r.capacity || '', pf:fuPjFields(u), codes:{}}; psOrder.push(k); }
+      cur.codes[fuNormCode(u.e.code)] = 1;
+    });
+  });
+  if(psOrder.length){
+    var psRows = psOrder.map(function(k){ return PS[k]; }).sort(function(a, b){ var x1 = (a.eq + '|' + a.proj).toLowerCase(), x2 = (b.eq + '|' + b.proj).toLowerCase(); return x1 < x2 ? -1 : (x1 > x2 ? 1 : 0); });
+    var wsP = wb.addWorksheet('Project Stock', {views:[{state:'frozen', ySplit:1, activeCell:'A2'}], properties:{tabColor:{argb:'FFF0A500'}}});
+    var PH = ['Equipment (requested type)', 'Capacity', 'Project', 'Same type in project', 'Low H/M', 'High usage', 'High usage avg (h)', 'High usage min (h)', 'High usage max (h)', 'Low units listed'];
+    var phr = wsP.getRow(1); phr.height = 30;
+    PH.forEach(function(h, j){ var c = phr.getCell(j + 1); c.value = h; c.font = {name:'Calibri', size:10, bold:true, color:{argb:'FFFFFFFF'}}; c.fill = fill(NAVY); c.alignment = {vertical:'middle', horizontal:'left', wrapText:true}; c.border = {bottom:{style:'medium', color:{argb:AMBER}}}; });
+    psRows.forEach(function(it, n){
+      var pf = it.pf, vals = [it.eq, it.cap, it.proj, pf.tot, pf.low, pf.work, pf.havg, pf.hmin, pf.hmax, Object.keys(it.codes).length], row = wsP.getRow(n + 2);
+      vals.forEach(function(v, j){ var c = row.getCell(j + 1); c.value = clean(v); c.font = {name:'Calibri', size:10}; c.border = {bottom:thin}; c.alignment = {vertical:'middle', horizontal:(typeof v === 'number') ? 'right' : 'left'}; if(n % 2) c.fill = fill('FFF8FAFC'); });
+      if(pf.low !== '') row.getCell(5).font = {name:'Calibri', size:10, bold:true, color:{argb:'FFD93025'}};
+    });
+    wsP.columns = [30, 12, 28, 14, 11, 11, 14, 14, 14, 13].map(function(w){ return {width:w}; });
+    wsP.autoFilter = {from:{row:1, column:1}, to:{row:psRows.length + 1, column:PH.length}};
+  }
   /* summary: the "Available" number jumps to that request's units */
   rows.forEach(function(x, i){ if(groupRow[i] == null || !x.o.free.some(function(u){ return !u.rep; })) return; var c = wsS.getCell(5 + i, 9); c.value = {formula:'HYPERLINK("#\'Matching Units\'!A' + groupRow[i] + '","' + x.nFree + '")', result:x.nFree}; c.font = {name:'Calibri', size:10, bold:true, underline:true, color:{argb:'FF1F6FEB'}}; });
   var d = new Date(), two = function(n){ return (n < 10 ? '0' : '') + n; };
@@ -6082,7 +6150,7 @@ function fuBulkXlsxPro(rows){
   wb.xlsx.writeBuffer().then(function(buf){
     var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})); a.download = fname;
     document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
-    toast('Excel exported \u2014 Summary + Matching Units', 'success');
+    toast('Excel exported \u2014 Summary + Matching Units + Units List + Project Stock', 'success');
   }).catch(function(err){ toast('Excel export failed: ' + (err && err.message || err), 'error'); });
 }
 function fuBulkExportUnits(kind){
