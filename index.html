@@ -5989,168 +5989,87 @@ function fuBulkXlsxPro(rows){
   });
   function f(k){ return function(o){ return clean(o[k]); }; }
   var sumCols = [{h:'#', g:f('n'), t:'t'}, {h:'Requested equipment', g:f('req'), t:'t'}, {h:'Capacity', g:f('rcap'), t:'t'}, {h:'For project', g:f('rproj'), t:'t'}, {h:'Qty', g:f('qty'), t:'t'}, {h:'From', g:f('from'), t:'t'}, {h:'To', g:f('to'), t:'t'}, {h:'Status', g:f('st'), t:'t'},
-    {h:'Available from Owned (click \u2192 units)', g:f('avail'), t:'i'}, {h:'Owned of this type (all)', g:f('tot'), t:'i'}, {h:'Result', g:f('cov'), t:'t'}, {h:'Proposed unit(s)', g:f('prop'), t:'t'}, {h:'Current project', g:f('pproj'), t:'t'}, {h:'Engineer', g:f('peng'), t:'t'}, {h:'Mobile', g:f('pmob'), t:'t'}, {h:'Note', g:f('more'), t:'t'}, {h:'Est. saving (EGP)', g:f('sav'), t:'z', s:true}];
+    {h:'Available from Owned', g:f('avail'), t:'i'}, {h:'Owned of this type (all)', g:f('tot'), t:'i'}, {h:'Result', g:f('cov'), t:'t'}, {h:'Proposed unit(s)', g:f('prop'), t:'t'}, {h:'Current project', g:f('pproj'), t:'t'}, {h:'Engineer', g:f('peng'), t:'t'}, {h:'Mobile', g:f('pmob'), t:'t'}, {h:'Note', g:f('more'), t:'t'}, {h:'Est. saving (EGP)', g:f('sav'), t:'z', s:true}];
   var wsS = window.hacBuildXlsx({title:'HAC \u00b7 PMV \u2014 Requested equipment vs. what Owned can give', sheetName:'Summary', cols:sumCols, rows:data, kpis:kpis, wb:wb}, EJ).getWorksheet('Summary');
   for(var rr = 0; rr < rows.length; rr++){ for(var cc = 12; cc <= 15; cc++){ var wc = wsS.getCell(5 + rr, cc); wc.alignment = {vertical:'top', horizontal:'left', wrapText:true}; } }
-  /* ---------- sheet 2: matching units ---------- */
-  var ws = wb.addWorksheet('Matching Units', {views:[{state:'frozen', ySplit:3, activeCell:'A4'}], properties:{tabColor:{argb:'FF3FB950'}}});
-  var maxEng = 1;
-  rows.forEach(function(x){ x.o.free.forEach(function(u){ if(!(u.workshop || isCentralWorkshop(u.e.project))) maxEng = Math.max(maxEng, fuEngFor(u.e.project).length); }); });
-  maxEng = Math.min(maxEng, 3);
-  var H = ['Request #', 'Requested equipment', 'Req. capacity', 'For project', 'Unit code', 'Unit equipment', 'Unit capacity', 'Current project'];
-  for(var k = 1; k <= maxEng; k++){ H.push(maxEng > 1 ? 'Engineer ' + k : 'Engineer', maxEng > 1 ? 'Mobile ' + k : 'Mobile'); }
-  H = H.concat(['Last reading (month)', 'Hours (H/M diff)', 'Limit (h)', 'Reading age (months behind)', 'Availability / decision']);
-  var nC = H.length;
-  function colL(n){ var s = '', m; while(n > 0){ m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; }
-  ws.mergeCells('A1:' + colL(nC) + '1');
-  var t1 = ws.getCell('A1'); t1.value = 'Owned units that fit each request \u2014 all available units, with project \u00b7 engineer \u00b7 last reading';
-  t1.font = {name:'Calibri', size:15, bold:true, color:{argb:NAVY}}; t1.alignment = {horizontal:'center', vertical:'middle'}; ws.getRow(1).height = 26;
-  ws.mergeCells('A2:' + colL(nC) + '2');
-  var t2 = ws.getCell('A2'); t2.value = kpis.map(function(k){ return k.label + ': ' + k.value; }).join('   \u00b7   ') + '   \u00b7   \u2b50 = proposed for this request   \u00b7   red = negative / old reading';
-  t2.font = {name:'Calibri', size:10.5, bold:true, color:{argb:NAVY}}; t2.fill = fill('FFFFF6DA'); t2.alignment = {horizontal:'center', vertical:'middle'}; t2.border = {bottom:{style:'medium', color:{argb:AMBER}}};
-  var hr = ws.getRow(3); hr.height = 32;
-  H.forEach(function(h, j){ var c = hr.getCell(j + 1); c.value = h; c.font = {name:'Calibri', size:10, bold:true, color:{argb:'FFFFFFFF'}}; c.fill = fill(NAVY); c.alignment = {vertical:'middle', horizontal:'left', wrapText:true}; c.border = {bottom:{style:'medium', color:{argb:AMBER}}}; });
-  var widths = H.map(function(h){ return Math.max(10, h.length * 1.1 + 2); });
-  var rowNo = 4, groupRow = {};
+  /* ---------- units: ONE row per unit, grouped Equipment -> Project; the project counts are written once on the first line of each project ---------- */
+  var UN = {}, unOrder = [];
   rows.forEach(function(x, i){
-    var r = x.r, w = x.o.win;
-    if(covTxt(x) === 'External') return;   /* external requests are not listed in this sheet */
-    var freeNR = x.o.free.filter(function(u){ return !u.rep; });   /* units under repair are not listed */
-    groupRow[i] = rowNo;
-    /* request header row */
-    var g = ws.getRow(rowNo++);
-    ws.mergeCells(g.number, 1, g.number, nC);
-    var gc = g.getCell(1);
-    gc.value = clean('#' + (i + 1) + '  \u00b7  ' + (r.equipment || '') + (r.capacity ? ' ' + r.capacity : '') + '  \u00b7  for ' + (r.project || '\u2014') + '  \u00b7  ' + (w ? w.from + ' \u2192 ' + w.to : 'no dates') + '  \u00b7  Qty ' + x.qty
-      + '   |   Available: ' + x.nFree + ' of ' + x.o.resAll.length + ' owned   |   ' + covTxt(x) + (x.takenN ? '   |   ' + x.takenN + ' more fit but go to earlier request(s)' : ''));
-    gc.font = {name:'Calibri', size:11, bold:true, color:{argb:NAVY}}; gc.alignment = {vertical:'middle', horizontal:'left'};
-    gc.fill = fill(x.cover >= x.qty ? 'FFDFF3E3' : (x.cover > 0 ? 'FFFFF0CC' : 'FFFBE3E1')); gc.border = {top:{style:'medium', color:{argb:AMBER}}, bottom:thin}; g.height = 22;
-    if(!freeNR.length){
-      var er = ws.getRow(rowNo++); er.getCell(5).value = '\u2014 no owned unit available \u2192 external rental'; er.getCell(5).font = {name:'Calibri', size:10, italic:true, color:{argb:'FF888888'}}; er.outlineLevel = 1; return;
-    }
-    var nmSet = {}; freeNR.forEach(function(u){ nmSet[String(u.e.equipment || '').trim().toLowerCase()] = 1; }); var nmVaries = Object.keys(nmSet).length > 1;
-    /* units of the same project sit together; inside a project: proposed / allocated first, then the lowest hours first (unknown last) */
-    var byP = {}; freeNR.forEach(function(u){ var k = fuPjKey(u.e) || '~'; (byP[k] = byP[k] || []).push(u); });
-    var pOrder = Object.keys(byP).sort(function(a, b){
-      var pa = byP[a].some(function(u){ return u.alloc || u.proposed; }) ? 0 : 1, pb = byP[b].some(function(u){ return u.alloc || u.proposed; }) ? 0 : 1;
-      return pa - pb || byP[b].length - byP[a].length || (a < b ? -1 : 1);
-    });
-    var list = [], projHead = {};
-    pOrder.forEach(function(k){
-      var g2 = byP[k].slice().sort(function(a, b){
-        var pa = (a.alloc || a.proposed) ? 0 : 1, pb = (b.alloc || b.proposed) ? 0 : 1; if(pa !== pb) return pa - pb;
-        var da = fuFlatUnit(a).d, db = fuFlatUnit(b).d; da = da === '' ? 1e9 : da; db = db === '' ? 1e9 : db; return da - db;
-      });
-      projHead[list.length] = {u:g2[0], n:g2.length}; list = list.concat(g2);
-    });
-    var kk = 0;
-    list.forEach(function(u, k2){
-      if(projHead[k2]){
-        kk = 0; var ph = projHead[k2], pf0 = fuPjFields(ph.u), pe = ph.u.e, pw = ph.u.workshop || isCentralWorkshop(pe.project);
-        var pr = ws.getRow(rowNo++); pr.outlineLevel = 1; ws.mergeCells(pr.number, 1, pr.number, nC);
-        var pcell = pr.getCell(1);
-        pcell.value = clean('\ud83d\udccd ' + (pw ? 'Central Workshop' : (pe.project || '\u2014')) + '   |   ' + ph.n + ' listed'
-          + (pf0.tot !== '' ? '   |   Same type in project: ' + pf0.tot + (pf0.low !== '' ? '   \u00b7   Low H/M: ' + pf0.low + '   \u00b7   High usage: ' + pf0.work + (pf0.hn ? '  (avg ' + pf0.havg + ' h  \u00b7  ' + pf0.hmin + ' \u2192 ' + pf0.hmax + ' h)' : '') : '') : ''));
-        pcell.font = {name:'Calibri', size:10.5, bold:true, color:{argb:'FF1F3A5F'}}; pcell.fill = fill('FFE8EEF7'); pcell.alignment = {vertical:'middle', horizontal:'left'}; pcell.border = {top:thin, bottom:thin}; pr.height = 20;
-      }
-      var e = u.e, ws0 = u.workshop || isCentralWorkshop(e.project), fl = fuFlatUnit(u), E = ws0 ? [] : fuEngFor(e.project);
-      var vals = [i + 1, r.equipment || '', r.capacity || '', r.project || '', (u.alloc || u.proposed ? '\u2b50 ' : '') + (e.code || ''), e.equipment || '', fl.cap || '', fl.proj || ''];
-      for(var q = 0; q < maxEng; q++){ vals.push(E[q] ? E[q].n : '', E[q] ? E[q].m : ''); }
-      var dec = u.alloc ? 'Allocated' : (u.proposed ? 'Proposed for this request' : (u.takenBy ? 'Fits but goes to request #' + u.takenBy : 'Free'));
-      if(u.rep) dec += ' | Under repair'; (u.busy || []).forEach(function(c){ dec += ' | ' + c.text; });
-      vals = vals.concat([fl.lm || '', fl.d === '' ? '' : fl.d, fl.lim === '' ? '' : fl.lim, fl.behind === '' ? '' : fl.behind, dec]);
-      var row = ws.getRow(rowNo++); row.outlineLevel = 1;
-      vals.forEach(function(v, j){
-        var c = row.getCell(j + 1); c.value = clean(v); c.font = {name:'Calibri', size:10}; c.border = {bottom:thin}; c.alignment = {vertical:'middle', horizontal:(typeof v === 'number') ? 'right' : 'left'};
-        if(kk % 2) c.fill = fill('FFF8FAFC');
-        var L = String(v == null ? '' : v).length + 2; if(L > widths[j]) widths[j] = Math.min(44, L);
-      });
-      kk++;
-      var iHours = 8 + maxEng * 2 + 2, iBehind = iHours + 2, iDec = iHours + 3, iCode = 5;
-      if(u.alloc || u.proposed){ row.getCell(iCode).font = {name:'Calibri', size:10, bold:true, color:{argb:'FF1B7F3B'}}; row.getCell(iDec).font = {name:'Calibri', size:10, bold:true, color:{argb:'FF1B7F3B'}}; }
-      else row.getCell(iCode).font = {name:'Calibri', size:10, bold:true};
-      if(typeof fl.d === 'number' && fl.d < 0) row.getCell(iHours).font = {name:'Calibri', size:10, bold:true, color:{argb:'FFD93025'}};
-      if(typeof fl.behind === 'number' && fl.behind >= 2){ row.getCell(iBehind).font = {name:'Calibri', size:10, bold:true, color:{argb:'FFD93025'}}; row.getCell(iBehind - 3).font = {name:'Calibri', size:10, color:{argb:'FFD93025'}}; }
-    });
-  });
-  ws.columns = widths.map(function(w){ return {width:Math.min(44, w)}; });
-  ws.autoFilter = {from:{row:3, column:1}, to:{row:Math.max(4, rowNo - 1), column:nC}};
-  ws.pageSetup = {paperSize:9, orientation:'landscape', fitToPage:true, fitToWidth:1, fitToHeight:0, margins:{left:.3, right:.3, top:.4, bottom:.5, header:.2, footer:.2}, printTitlesRow:'3:3'};
-
-  /* ---------- sheet 3: Units List — FLAT: one row per unit (no repeats, no merged rows) so it can be filtered (e.g. generators only) and copied as is ---------- */
-  var UL = {}, ulOrder = [];
-  rows.forEach(function(x, i){
-    if(covTxt(x) === 'External') return;
     x.o.free.forEach(function(u){
       if(u.rep) return;
-      var k = fuNormCode(u.e.code) || ('row' + i + '_' + ulOrder.length), cur = UL[k];
-      if(!cur){ cur = UL[k] = {u:u, fl:fuFlatUnit(u), fits:[], prop:[], notes:[]}; ulOrder.push(k); }
+      var k = fuNormCode(u.e.code) || ('r' + i + '_' + unOrder.length), cur = UN[k];
+      if(!cur){ cur = UN[k] = {u:u, eq:String(x.r.equipment || u.e.equipment || '').trim(), fl:fuFlatUnit(u), fits:[], prop:[]}; unOrder.push(k); }
       cur.fits.push(i + 1); if(u.alloc || u.proposed) cur.prop.push(i + 1);
-      (u.busy || []).forEach(function(c){ if(cur.notes.indexOf(c.text) < 0) cur.notes.push(c.text); });
     });
   });
-  if(ulOrder.length){
-    var ulRows = ulOrder.map(function(k){ return UL[k]; }).sort(function(a, b){
-      var ea = String(a.fl.eq).toLowerCase(), eb = String(b.fl.eq).toLowerCase(); if(ea !== eb) return ea < eb ? -1 : 1;
-      var pa = String(a.fl.proj).toLowerCase(), pb = String(b.fl.proj).toLowerCase(); if(pa !== pb) return pa < pb ? -1 : 1;
-      var da = a.fl.d === '' ? 1e9 : a.fl.d, db = b.fl.d === '' ? 1e9 : b.fl.d; return da - db;
+  var G = {}, gOrder = [];
+  unOrder.forEach(function(k){
+    var it = UN[k], gk = it.eq.toLowerCase() + '|' + (fuPjKey(it.u.e) || '~'), g = G[gk];
+    if(!g){ g = G[gk] = {eq:it.eq, proj:(it.u.workshop || isCentralWorkshop(it.u.e.project)) ? 'Central Workshop' : (it.u.e.project || '\u2014'), items:[], pf:fuPjFields(it.u)}; gOrder.push(gk); }
+    g.items.push(it);
+  });
+  var gList = gOrder.map(function(k){ var g = G[k];
+    g.items.sort(function(a, b){ var pa = a.prop.length ? 0 : 1, pb = b.prop.length ? 0 : 1; if(pa !== pb) return pa - pb; var da = a.fl.d === '' ? 1e9 : a.fl.d, db = b.fl.d === '' ? 1e9 : b.fl.d; return da - db; });
+    g.nProp = g.items.filter(function(it){ return it.prop.length; }).length; return g; })
+    .sort(function(a, b){ var ea = a.eq.toLowerCase(), eb = b.eq.toLowerCase(); if(ea !== eb) return ea < eb ? -1 : 1; if((a.nProp ? 0 : 1) !== (b.nProp ? 0 : 1)) return (a.nProp ? 0 : 1) - (b.nProp ? 0 : 1); if(a.items.length !== b.items.length) return b.items.length - a.items.length; return a.proj.toLowerCase() < b.proj.toLowerCase() ? -1 : 1; });
+  function hdrRow(wsX, H){ var hr = wsX.getRow(1); hr.height = 30; H.forEach(function(h, j){ var c = hr.getCell(j + 1); c.value = h; c.font = {name:'Calibri', size:10, bold:true, color:{argb:'FFFFFFFF'}}; c.fill = fill(NAVY); c.alignment = {vertical:'middle', horizontal:'left', wrapText:true}; c.border = {bottom:{style:'medium', color:{argb:AMBER}}}; }); }
+  function stockTxt(pf, n){ return pf.tot === '' ? n + ' listed' : pf.tot + ' total' + (pf.low !== '' ? '  \u00b7  ' + pf.low + ' low  \u00b7  ' + pf.work + ' high usage' + (pf.hn ? ' (avg ' + pf.havg + ' h)' : '') : '') + '  \u00b7  ' + n + ' listed'; }
+
+  /* ---------- sheet 2: Project Summary ---------- */
+  if(gList.length){
+    var wsP = wb.addWorksheet('Project Summary', {views:[{state:'frozen', ySplit:1, activeCell:'A2', showGridLines:false}], properties:{tabColor:{argb:'FFF0A500'}}});
+    var PH = ['Project', 'Same type in project', 'Low H/M', 'High usage', 'High usage avg (h)', 'High usage min \u2192 max (h)', 'Low units listed', 'Proposed unit(s)'];
+    hdrRow(wsP, PH); var pr = 2, eqSeen = {};
+    gList.forEach(function(g){
+      var ek = g.eq.toLowerCase();
+      if(!eqSeen[ek]){
+        eqSeen[ek] = 1;
+        var gs = gList.filter(function(z){ return z.eq.toLowerCase() === ek; }), tt = 0, tl = 0, th = 0, tn = 0, tp = 0;
+        gs.forEach(function(z){ tt += z.pf.tot === '' ? 0 : z.pf.tot; tl += z.pf.low === '' ? 0 : z.pf.low; th += z.pf.work === '' ? 0 : z.pf.work; tn += z.items.length; tp += z.nProp; });
+        var br = wsP.getRow(pr++); br.height = 22; wsP.mergeCells(br.number, 1, br.number, PH.length);
+        var bc = br.getCell(1); bc.value = clean(g.eq + '   |   ' + gs.length + ' project(s)   \u00b7   ' + tt + ' same type   \u00b7   ' + tl + ' low H/M   \u00b7   ' + th + ' high usage   \u00b7   ' + tn + ' low units listed   \u00b7   ' + tp + ' proposed');
+        bc.font = {name:'Calibri', size:11, bold:true, color:{argb:'FFFFFFFF'}}; bc.fill = fill('FF1F3A5F'); bc.alignment = {vertical:'middle', horizontal:'left', indent:1};
+      }
+      var pf = g.pf, prop = [];
+      g.items.forEach(function(it){ if(it.prop.length) prop.push((it.u.e.code || '') + ' (#' + it.prop.join(', #') + ')'); });
+      var vals = [g.proj, pf.tot, pf.low, pf.work, pf.havg, pf.hn ? pf.hmin + ' \u2192 ' + pf.hmax : '', g.items.length, prop.join(' \u00b7 ')], row = wsP.getRow(pr++);
+      vals.forEach(function(v, j){ var c = row.getCell(j + 1); c.value = clean(v); c.font = {name:'Calibri', size:10, bold:j === 0}; c.border = {bottom:thin}; c.alignment = {vertical:'middle', horizontal:(typeof v === 'number') ? 'center' : 'left', wrapText:j === 7}; });
+      if(pf.low !== '') row.getCell(3).font = {name:'Calibri', size:10, bold:true, color:{argb:'FFD93025'}};
+      if(pf.work !== '') row.getCell(4).font = {name:'Calibri', size:10, bold:true, color:{argb:'FF1B7F3B'}};
     });
-    var wsU = wb.addWorksheet('Units List', {views:[{state:'frozen', ySplit:1, activeCell:'A2'}], properties:{tabColor:{argb:'FF1F6FEB'}}});
-    var UH = ['#', 'Unit code', 'Equipment', 'Category', 'Capacity', 'Brand', 'Year', 'Current project', 'Project stock (same type)', 'Engineer', 'Mobile', 'Last reading (month)', 'Hours (H/M diff)', 'Limit (h)', 'Reading age (months behind)', 'Fits request #', 'Proposed for request #', 'Note'];
-    var uw = UH.map(function(h){ return Math.max(9, h.length * 1.05 + 2); });
-    var uhr = wsU.getRow(1); uhr.height = 30;
-    UH.forEach(function(h, j){ var c = uhr.getCell(j + 1); c.value = h; c.font = {name:'Calibri', size:10, bold:true, color:{argb:'FFFFFFFF'}}; c.fill = fill(NAVY); c.alignment = {vertical:'middle', horizontal:'left', wrapText:true}; c.border = {bottom:{style:'medium', color:{argb:AMBER}}}; });
-    ulRows.forEach(function(it, n){
-      var u = it.u, e = u.e, fl = it.fl, pf = fuPjFields(u);
-      var stock = pf.tot === '' ? '' : (pf.low !== '' ? pf.low + ' low \u00b7 ' + pf.work + ' high of ' + pf.tot : pf.tot + ' total');
-      var vals = [n + 1, e.code || '', fl.eq, e.category || '', fl.cap || '', fl.brand || '', fl.year || '', fl.proj || '', stock, fl.eng || '', fl.mob || '', fl.lm || '', fl.d === '' ? '' : fl.d, fl.lim === '' ? '' : fl.lim, fl.behind === '' ? '' : fl.behind, it.fits.join(', '), it.prop.join(', '), it.notes.join(' | ')];
-      var row = wsU.getRow(n + 2);
-      vals.forEach(function(v, j){
-        var c = row.getCell(j + 1); c.value = clean(v); c.font = {name:'Calibri', size:10}; c.border = {bottom:thin}; c.alignment = {vertical:'middle', horizontal:(typeof v === 'number') ? 'right' : 'left'};
-        if(n % 2) c.fill = fill('FFF8FAFC');
-        var L = String(v == null ? '' : v).length + 2; if(L > uw[j]) uw[j] = Math.min(44, L);
+    wsP.columns = [30, 14, 11, 12, 14, 18, 12, 40].map(function(w){ return {width:w}; });
+  }
+
+  /* ---------- sheet 3: Units ---------- */
+  if(gList.length){
+    var wsU = wb.addWorksheet('Units', {views:[{state:'frozen', ySplit:1, activeCell:'A2'}], properties:{tabColor:{argb:'FF3FB950'}}});
+    var UH = ['Equipment', 'Project', 'Unit code', 'Capacity', 'Hours (H/M diff)', 'Limit (h)', 'Last reading', 'Reading age (months behind)', 'Engineer', 'Mobile', 'For request  (\u2b50 = proposed)'];
+    hdrRow(wsU, UH); var ur = 2;
+    gList.forEach(function(g){
+      var hr2 = wsU.getRow(ur++);
+      for(var cI = 1; cI <= UH.length; cI++){ hr2.getCell(cI).fill = fill('FFE8EEF7'); hr2.getCell(cI).border = {top:thin, bottom:thin}; }
+      hr2.getCell(1).value = clean(g.eq); hr2.getCell(2).value = clean(g.proj); hr2.getCell(3).value = clean(stockTxt(g.pf, g.items.length));
+      [1, 2, 3].forEach(function(cI){ hr2.getCell(cI).font = {name:'Calibri', size:10, bold:true, color:{argb:'FF1F3A5F'}}; hr2.getCell(cI).alignment = {vertical:'middle', horizontal:'left', wrapText:false}; });
+      hr2.height = 20;
+      g.items.forEach(function(it, n){
+        var fl = it.fl, e = it.u.e, row = wsU.getRow(ur++);
+        var vals = [g.eq, g.proj, e.code || '', fl.cap || '', fl.d === '' ? '' : fl.d, fl.lim === '' ? '' : fl.lim, fl.lm || '', fl.behind === '' ? '' : fl.behind, fl.eng || '', fl.mob || '', (it.prop.length ? '\u2b50 ' : '') + '#' + (it.prop.length ? it.prop : it.fits).join(', #')];
+        vals.forEach(function(v, j){ var c = row.getCell(j + 1); c.value = clean(v); c.font = {name:'Calibri', size:10, color:{argb:j < 2 ? 'FF6B7785' : 'FF000000'}}; c.border = {bottom:thin}; c.alignment = {vertical:'middle', horizontal:(typeof v === 'number') ? 'right' : 'left'}; });
+        row.getCell(3).font = {name:'Calibri', size:10, bold:true};
+        if(it.prop.length) for(var q = 1; q <= UH.length; q++) row.getCell(q).fill = fill('FFFFF6DA');
+        if(typeof fl.behind === 'number' && fl.behind >= 2){ row.getCell(8).font = {name:'Calibri', size:10, bold:true, color:{argb:'FFD93025'}}; row.getCell(7).font = {name:'Calibri', size:10, color:{argb:'FFD93025'}}; }
       });
-      row.getCell(2).font = {name:'Calibri', size:10, bold:true};
-      if(typeof fl.d === 'number' && fl.d < 0) row.getCell(13).font = {name:'Calibri', size:10, bold:true, color:{argb:'FFD93025'}};
-      if(typeof fl.behind === 'number' && fl.behind >= 2){ row.getCell(15).font = {name:'Calibri', size:10, bold:true, color:{argb:'FFD93025'}}; row.getCell(12).font = {name:'Calibri', size:10, color:{argb:'FFD93025'}}; }
     });
-    wsU.columns = uw.map(function(w){ return {width:Math.min(44, w)}; });
-    wsU.autoFilter = {from:{row:1, column:1}, to:{row:ulRows.length + 1, column:UH.length}};
+    wsU.columns = [18, 24, 14, 13, 12, 10, 13, 14, 24, 17, 20].map(function(w){ return {width:w}; });
+    wsU.autoFilter = {from:{row:1, column:1}, to:{row:ur - 1, column:UH.length}};
     wsU.pageSetup = {paperSize:9, orientation:'landscape', fitToPage:true, fitToWidth:1, fitToHeight:0};
   }
-  /* ---------- sheet 4: Project Stock — one row per project x equipment type ---------- */
-  var PS = {}, psOrder = [];
-  rows.forEach(function(x){
-    if(covTxt(x) === 'External') return;
-    x.o.free.forEach(function(u){
-      if(u.rep || !u.pj) return;
-      var k = fuPjKey(u.e) + '|' + String(x.r.equipment || '').toLowerCase() + '|' + String(x.r.capacity || '').toLowerCase(), cur = PS[k];
-      if(!cur){ cur = PS[k] = {proj:(u.workshop || isCentralWorkshop(u.e.project)) ? 'Central Workshop' : (u.e.project || ''), eq:x.r.equipment || '', cap:x.r.capacity || '', pf:fuPjFields(u), codes:{}}; psOrder.push(k); }
-      cur.codes[fuNormCode(u.e.code)] = 1;
-    });
-  });
-  if(psOrder.length){
-    var psRows = psOrder.map(function(k){ return PS[k]; }).sort(function(a, b){ var x1 = (a.eq + '|' + a.proj).toLowerCase(), x2 = (b.eq + '|' + b.proj).toLowerCase(); return x1 < x2 ? -1 : (x1 > x2 ? 1 : 0); });
-    var wsP = wb.addWorksheet('Project Stock', {views:[{state:'frozen', ySplit:1, activeCell:'A2'}], properties:{tabColor:{argb:'FFF0A500'}}});
-    var PH = ['Equipment (requested type)', 'Capacity', 'Project', 'Same type in project', 'Low H/M', 'High usage', 'High usage avg (h)', 'High usage min (h)', 'High usage max (h)', 'Low units listed'];
-    var phr = wsP.getRow(1); phr.height = 30;
-    PH.forEach(function(h, j){ var c = phr.getCell(j + 1); c.value = h; c.font = {name:'Calibri', size:10, bold:true, color:{argb:'FFFFFFFF'}}; c.fill = fill(NAVY); c.alignment = {vertical:'middle', horizontal:'left', wrapText:true}; c.border = {bottom:{style:'medium', color:{argb:AMBER}}}; });
-    psRows.forEach(function(it, n){
-      var pf = it.pf, vals = [it.eq, it.cap, it.proj, pf.tot, pf.low, pf.work, pf.havg, pf.hmin, pf.hmax, Object.keys(it.codes).length], row = wsP.getRow(n + 2);
-      vals.forEach(function(v, j){ var c = row.getCell(j + 1); c.value = clean(v); c.font = {name:'Calibri', size:10}; c.border = {bottom:thin}; c.alignment = {vertical:'middle', horizontal:(typeof v === 'number') ? 'right' : 'left'}; if(n % 2) c.fill = fill('FFF8FAFC'); });
-      if(pf.low !== '') row.getCell(5).font = {name:'Calibri', size:10, bold:true, color:{argb:'FFD93025'}};
-    });
-    wsP.columns = [30, 12, 28, 14, 11, 11, 14, 14, 14, 13].map(function(w){ return {width:w}; });
-    wsP.autoFilter = {from:{row:1, column:1}, to:{row:psRows.length + 1, column:PH.length}};
-  }
-  /* summary: the "Available" number jumps to that request's units */
-  rows.forEach(function(x, i){ if(groupRow[i] == null || !x.o.free.some(function(u){ return !u.rep; })) return; var c = wsS.getCell(5 + i, 9); c.value = {formula:'HYPERLINK("#\'Matching Units\'!A' + groupRow[i] + '","' + x.nFree + '")', result:x.nFree}; c.font = {name:'Calibri', size:10, bold:true, underline:true, color:{argb:'FF1F6FEB'}}; });
   var d = new Date(), two = function(n){ return (n < 10 ? '0' : '') + n; };
   var fname = 'Requested_equipment_vs_Owned_' + d.getFullYear() + '-' + two(d.getMonth() + 1) + '-' + two(d.getDate()) + '.xlsx';
   wb.xlsx.writeBuffer().then(function(buf){
     var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})); a.download = fname;
     document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
-    toast('Excel exported \u2014 Summary + Matching Units + Units List + Project Stock', 'success');
+    toast('Excel exported \u2014 Summary + Project Summary + Units', 'success');
   }).catch(function(err){ toast('Excel export failed: ' + (err && err.message || err), 'error'); });
 }
 function fuBulkExportUnits(kind){
