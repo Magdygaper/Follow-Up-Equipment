@@ -5820,7 +5820,7 @@ function fuRenderBulk(){
   var list = base.filter(function(r){ var w = fuReqWindow(r); if(w && w.to < today && !incEnd){ nEnded++; return false; } return true; });
   var rows = list.map(function(r){
     var o = fuOwnedFor(r, {low:useLow, LM:LM, fleets:fleets});
-    return {r:r, o:o, qty:Number(r.qty) || 1, alloc:(r.allocated || []).length, nFree:o.free.filter(function(u){ return !u.alloc; }).length, assigned:[], takenN:0, cover:0, saving:null};
+    return {r:r, o:o, qty:Number(r.qty) || 1, alloc:(r.allocated || []).length, nFree:o.free.filter(function(u){ return !u.alloc; }).length, assigned:[], takenN:0, cover:0, saving:null, rCover:0, ownCover:0, rOpts:fuIdleFor(r).map(function(u){ return {u:u, proposed:false, takenBy:0, give:0}; })};
   });
   /* a unit can serve only one request at a time: share the units out in order of request start date */
   var order = rows.map(function(x, i){ return {x:x, i:i}; }).sort(function(a, b){ var fa = a.x.o.win ? a.x.o.win.from : '9999', fb = b.x.o.win ? b.x.o.win.from : '9999'; return fa < fb ? -1 : (fa > fb ? 1 : a.i - b.i); });
@@ -5835,6 +5835,19 @@ function fuRenderBulk(){
       if(x.assigned.length < need){ x.assigned.push(u); u.proposed = true; (taken[k] = taken[k] || []).push({from:win.from, to:win.to, n:n}); }
     });
     x.cover = Math.min(x.qty, x.alloc + x.assigned.length);
+  });
+  /* idle rented units fill what owned units cannot cover; a rented unit also serves one request at a time (it can hold several units: qty) */
+  var rtaken = {};
+  order.forEach(function(it){
+    var x = it.x, n = it.i + 1, win = x.o.win || {from:'0000-00-00', to:'9999-99-99'}, need2 = Math.max(0, x.qty - x.cover);
+    x.ownCover = x.cover; x.rCover = 0;
+    x.rOpts.forEach(function(q){
+      var clash = (rtaken[q.u.key] || []).filter(function(t){ return t.n !== n && t.from <= win.to && t.to >= win.from; });
+      var avail = Math.max(0, (Number(q.u.qty) || 1) - clash.reduce(function(a, t){ return a + t.q; }, 0));
+      if(avail <= 0){ q.takenBy = clash[0] ? clash[0].n : 0; return; }
+      if(need2 > 0){ var g = Math.min(avail, need2); q.proposed = true; q.give = g; need2 -= g; x.rCover += g; (rtaken[q.u.key] = rtaken[q.u.key] || []).push({from:win.from, to:win.to, n:n, q:g}); }
+    });
+    x.cover = Math.min(x.qty, x.ownCover + x.rCover);
   });
   rows.forEach(function(x){ var pulled = {}; x.o.free.forEach(function(u){ if(u.alloc || u.proposed){ var k = fuPjKey(u.e); pulled[k] = (pulled[k] || 0) + 1; } }); x.o.free.forEach(function(u){ u.pjPull = pulled[fuPjKey(u.e)] || 0; }); });
   var nFull = rows.filter(function(x){ return x.cover >= x.qty; }).length, nPart = rows.filter(function(x){ return x.cover > 0 && x.cover < x.qty; }).length, nNone = rows.length - nFull - nPart;
@@ -5856,23 +5869,26 @@ function fuRenderBulk(){
     + '<label><input type="checkbox" id="fu-bulk-fleets" ' + (fleets ? 'checked' : '') + ' onchange="fuRenderBulk()"> include other countries\' fleets</label>'
     + fuUnitBox()
     + '<span style="margin-left:auto;display:flex;gap:6px;"><button class="btn-sm" onclick="fuBulkAll(true)">\u25be Expand all</button><button class="btn-sm" onclick="fuBulkAll(false)">\u25b8 Collapse</button><button class="btn-sm" onclick="fuBulkExport(\'xlsx\')" title="One row per request">\ud83d\udcca Excel</button><button class="btn-sm" onclick="fuBulkExport(\'pdf\')">\ud83d\udcc4 PDF</button><button class="btn-sm" onclick="fuBulkExportUnits(\'xlsx\')" title="One row per request + unit pair">\ud83d\udcca Excel (per unit)</button><button class="btn-sm" onclick="fuBulkMsgOpen()" title="One ready message per engineer, for the proposed units">\ud83d\udcac Engineer messages</button></span></div>'
-    + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">' + chip('Requests checked', rows.length, 'var(--blue)') + chip('Covered by Owned', nFull, 'var(--green)') + chip('Partly covered', nPart, 'var(--accent)') + chip('Nothing available \u2192 external', nNone, 'var(--red)') + '<div id="fu-bulk-total" style="flex:1.4;min-width:200px;background:var(--bg);border:1px solid var(--border);border-top:3px solid var(--green);border-radius:8px;padding:8px 12px;font-size:11px;color:var(--text-muted);">\ud83d\udcb2 Estimating total saving\u2026</div></div>'
+    + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">' + chip('Requests checked', rows.length, 'var(--blue)') + chip('Fully covered', nFull, 'var(--green)') + chip('...of them need idle rented', rows.filter(function(x){ return x.cover >= x.qty && x.rCover > 0; }).length, 'var(--blue)') + chip('Partly covered', nPart, 'var(--accent)') + chip('Nothing available \u2192 external', nNone, 'var(--red)') + '<div id="fu-bulk-total" style="flex:1.4;min-width:200px;background:var(--bg);border:1px solid var(--border);border-top:3px solid var(--green);border-radius:8px;padding:8px 12px;font-size:11px;color:var(--text-muted);">\ud83d\udcb2 Estimating total saving\u2026</div></div>'
     + (low && !LM.loaded ? '<div style="font-size:12px;color:var(--accent);margin-bottom:8px;">H/M data is not loaded yet \u2014 showing all owned units until it loads.</div>' : '')
-    + '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:6px;line-height:1.7;">Each row is one request. <b>Available from Owned</b> = owned units of the same type (and capacity) that are in Low H/M, free in the request\'s dates and not under repair. A unit is given to <b>one request only</b> \u2014 the one that starts first \u2014 so it is never counted twice. Click \u25b8 to see the units, their project, engineer and last reading.'
+    + '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:6px;line-height:1.7;">Each row is one request. <b>Available from Owned</b> = owned units of the same type (and capacity) that are in Low H/M, free in the request\'s dates and not under repair. A unit is given to <b>one request only</b> \u2014 the one that starts first \u2014 so it is never counted twice. <b>Idle rented</b> = rented units of the same type that worked below the limit this month (day-billed &lt; ' + RW.thr + ' d, month-billed &lt; ' + RW.thrMon + '); they are offered when owned units are not enough. Click \u25b8 to see Owned and Rented side by side: project, engineer, operation, entry date and how many of that type are already in the project.'
     + (scoped.length !== FU_DATA.length ? '<br><span style="color:var(--accent);">Follow-Up filters are active (' + scoped.length + ' of ' + FU_DATA.length + ' requests) \u2014 clear them in Follow-Up to check everything.</span>' : '')
     + (nEnded ? '<br><span style="color:var(--accent);">' + nEnded + ' request(s) are hidden because their dates already ended \u2014 tick "include requests whose period already ended" to see them.</span>' : '') + '</div>'
-    + '<div id="fu-bulk-body" style="overflow:auto;border:1px solid var(--border);border-radius:8px;"><table style="width:100%;border-collapse:collapse;"><thead><tr>' + ['', '#', 'Requested', 'For project', 'Period', 'Qty'].concat(showSt ? ['Status'] : []).concat(['Available from Owned', 'Result', 'Proposed units (project)', 'Est. saving', '']).map(th).join('') + '</tr></thead><tbody>';
-  var nc = showSt ? 12 : 11;
+    + '<div id="fu-bulk-body" style="overflow:auto;border:1px solid var(--border);border-radius:8px;"><table style="width:100%;border-collapse:collapse;"><thead><tr>' + ['', '#', 'Requested', 'For project', 'Period', 'Qty'].concat(showSt ? ['Status'] : []).concat(['Owned available', 'Idle rented', 'Result', 'Proposed units (project)', 'Est. saving', '']).map(th).join('') + '</tr></thead><tbody>';
+  var nc = showSt ? 13 : 12;
   if(!rows.length) h += '<tr><td colspan="' + nc + '" style="padding:24px;text-align:center;color:var(--text-muted);">No requests to check.</td></tr>';
   rows.forEach(function(x, i){
     var r = x.r, w = x.o.win;
     var cov = x.cover >= x.qty ? '<span style="color:var(--green);font-weight:700;">\u2705 Covered</span>' : (x.cover > 0 ? '<span style="color:var(--accent);font-weight:700;">\u26a0 ' + x.cover + ' of ' + x.qty + '</span>' : '<span style="color:var(--red);font-weight:700;">\u2716 External</span>');
     if(x.alloc) cov += '<div style="font-size:10.5px;color:var(--green);">\ud83d\udccc ' + x.alloc + ' allocated</div>';
+    if(x.rCover) cov += '<div style="font-size:10.5px;color:var(--accent);">incl. ' + x.rCover + ' from idle rented</div>';
+    var rcell = x.rOpts.length ? '<b>' + x.rOpts.length + '</b> <span style="color:var(--text-muted);font-size:10.5px;">idle rented</span>' + (x.rCover ? '<div style="font-size:10.5px;color:var(--green);">' + x.rCover + ' proposed</div>' : '') : '<span style="color:var(--text-muted);">\u2014</span>';
+    var prp = x.rOpts.filter(function(q){ return q.proposed; }).slice(0, 3).map(function(q){ return '<div style="font-size:11.5px;">\ud83d\udca4 <span style="color:var(--text-muted);">' + fuEsc(q.u.equipment) + ' \u00b7 ' + fuEsc(q.u.subcon || '\u2014') + ' \u00b7 ' + fuEsc(q.u.project || '\u2014') + '</span></div>'; }).join('');
     if(x.takenN) cov += '<div style="font-size:10.5px;color:var(--accent);">' + x.takenN + ' more fit but go to earlier request(s)</div>';
     var give = x.o.free.filter(function(u){ return u.alloc || u.proposed; });
     var pu = give.length ? give.slice(0, 3).map(function(u){ var p = isCentralWorkshop(u.e.project) ? 'Central Workshop' : (u.e.project || '\u2014'); return '<a style="cursor:pointer;font-weight:700;color:var(--blue);" onclick="fuUnitLookup(decodeURIComponent(\'' + encodeURIComponent(u.e.code || '') + '\'))">' + fuEsc(u.e.code || '\u2014') + '</a> <span style="color:var(--text-muted);">' + fuEsc(p) + '</span>'; }).join('<br>') + (give.length > 3 ? '<div style="color:var(--text-muted);font-size:10.5px;">+' + (give.length - 3) + ' more</div>' : '') : '\u2014';
-    h += '<tr><td ' + td + '>' +  ((x.o.free.length || fuIdleFor(x.r).length) ? '<a id="fu-bt-' + i + '" style="cursor:pointer;font-size:14px;" title="Show the units" onclick="fuBulkToggle(' + i + ')">\u25b8</a>' : '') + '</td><td ' + td + '>' + (i + 1) + '</td><td ' + td + '><b>' + fuEsc(r.equipment) + '</b>' + (r.capacity ? '<div style="color:var(--text-muted);font-size:11px;">' + fuEsc(r.capacity) + '</div>' : '') + '</td><td ' + td + '>' + fuEsc(r.project || '\u2014') + '</td><td ' + td + ' style="white-space:nowrap">' + (w ? fuEsc(w.from) + ' \u2192 ' + fuEsc(w.to) : '\u2014') + '</td><td ' + td + '>' + x.qty + '</td>' + (showSt ? '<td ' + td + '>' + fuEsc(r.provision || '\u2014') + '</td>' : '')
-      + '<td ' + td + '><b>' + x.nFree + '</b> <span style="color:var(--text-muted);font-size:10.5px;">of ' + x.o.resAll.length + ' owned of this type</span>' + fuIdleMini(x.r) + '</td><td ' + td + '>' + cov + '</td><td ' + td + '>' + pu + '</td><td ' + td + ' id="fu-bsav-' + i + '">' + (x.cover > 0 ? '\u2026' : '\u2014') + '</td>'
+    h += '<tr><td ' + td + '>' +  ((x.o.free.length || x.rOpts.length) ? '<a id="fu-bt-' + i + '" style="cursor:pointer;font-size:14px;" title="Show the units" onclick="fuBulkToggle(' + i + ')">\u25b8</a>' : '') + '</td><td ' + td + '>' + (i + 1) + '</td><td ' + td + '><b>' + fuEsc(r.equipment) + '</b>' + (r.capacity ? '<div style="color:var(--text-muted);font-size:11px;">' + fuEsc(r.capacity) + '</div>' : '') + '</td><td ' + td + '>' + fuEsc(r.project || '\u2014') + '</td><td ' + td + ' style="white-space:nowrap">' + (w ? fuEsc(w.from) + ' \u2192 ' + fuEsc(w.to) : '\u2014') + '</td><td ' + td + '>' + x.qty + '</td>' + (showSt ? '<td ' + td + '>' + fuEsc(r.provision || '\u2014') + '</td>' : '')
+      + '<td ' + td + '><b>' + x.nFree + '</b> <span style="color:var(--text-muted);font-size:10.5px;">of ' + x.o.resAll.length + ' owned of this type</span></td><td ' + td + '>' + rcell + '</td><td ' + td + '>' + cov + '</td><td ' + td + '>' + (prp && pu === '\u2014' ? '' : pu) + prp + '</td><td ' + td + ' id="fu-bsav-' + i + '">' + (x.cover > 0 ? '\u2026' : '\u2014') + '</td>'
       + '<td ' + td + '><button class="btn-edit" style="padding:1px 7px;font-size:10px;" onclick="closeModal(\'fu-bulk-modal\');fuSearchOwned(\'' + fuEsc(r.id) + '\')">Open</button></td></tr>'
       + '<tr id="fu-bd-' + i + '" style="display:none;"><td colspan="' + nc + '" id="fu-bdc-' + i + '" style="padding:8px 12px 12px 34px;background:var(--bg);border-bottom:1px solid var(--border);"></td></tr>';
   });
@@ -5901,23 +5917,24 @@ function fuBulkToggle(i, forceOpen){
   var tr = document.getElementById('fu-bd-' + i), c = document.getElementById('fu-bdc-' + i), a = document.getElementById('fu-bt-' + i); if(!tr || !c) return;
   var opening = forceOpen === true || tr.style.display === 'none';
   window.__fuBulkOpen = window.__fuBulkOpen || {};
-  if(opening){ c.innerHTML = (x.o.free.length ? fuCandTable(x.o.free, x.r, {max:40, maxH:320}) : '<div style="font-size:12px;color:var(--text-muted);">No free owned unit for this request.</div>') + fuIdleSection(x.r); tr.style.display = ''; if(a) a.textContent = '\u25be'; window.__fuBulkOpen[x.r.id] = true; }
+  if(opening){ c.innerHTML = fuMixTable(x); tr.style.display = ''; if(a) a.textContent = '\u25be'; window.__fuBulkOpen[x.r.id] = true; }
   else { tr.style.display = 'none'; if(a) a.textContent = '\u25b8'; delete window.__fuBulkOpen[x.r.id]; }
 }
-function fuBulkAll(on){ (window.__fuBulkRows || []).forEach(function(x, i){ if(!x.o.free.length && !fuIdleFor(x.r).length) return; var tr = document.getElementById('fu-bd-' + i); if(!tr) return; var isOpen = tr.style.display !== 'none'; if(on !== isOpen) fuBulkToggle(i, on); }); }
+function fuBulkAll(on){ (window.__fuBulkRows || []).forEach(function(x, i){ if(!x.o.free.length && !x.rOpts.length) return; var tr = document.getElementById('fu-bd-' + i); if(!tr) return; var isOpen = tr.style.display !== 'none'; if(on !== isOpen) fuBulkToggle(i, on); }); }
 function fuBulkExport(kind){
   var rows = window.__fuBulkRows || []; if(!rows.length){ toast('Nothing to export', 'error'); return; }
   if(kind === 'xlsx'){ try{ fuBulkXlsxPro(rows); }catch(err){ console.error(err); toast('Excel export failed: ' + (err && err.message || err), 'error'); } return; }
   var data = rows.map(function(x){
     var r = x.r, w = x.o.win, give = x.o.free.filter(function(u){ return u.alloc || u.proposed; }).map(fuFlatUnit);
     return {req:r.equipment || '', rcap:r.capacity || '', rproj:r.project || '', qty:x.qty, from:w ? w.from : '', to:w ? w.to : '', st:r.provision || '',
-            avail:x.nFree, tot:x.o.resAll.length, cov:x.cover >= x.qty ? 'Covered' : (x.cover > 0 ? x.cover + ' of ' + x.qty : 'External'),
+            avail:x.nFree, ren:x.rOpts.length, tot:x.o.resAll.length, cov:(x.cover >= x.qty ? 'Covered' : (x.cover > 0 ? x.cover + ' of ' + x.qty : 'External')) + (x.rCover ? ' (incl. ' + x.rCover + ' idle rented)' : ''),
             units:give.map(function(u){ return u.code + ' (' + (u.proj || '\u2014') + (u.eng ? ' \u00b7 ' + u.eng + (u.mob ? ' ' + u.mob : '') : '') + (u.lm ? ' \u00b7 ' + u.lm + (u.d !== '' ? ': ' + u.d + ' h' : '') : '') + (u.ptot !== '' ? ' \u00b7 ' + (u.plow !== '' ? u.plow + ' low of ' : '') + u.ptot + ' in project' : '') + ')'; }).join(' | '),
             more:x.takenN ? x.takenN + ' more fit but go to earlier request(s)' : '', sav:x.saving != null ? Math.round(x.saving) : ''};
   });
+  data.forEach(function(d, i){ var rp = rows[i].rOpts.filter(function(q){ return q.proposed; }).map(function(q){ return 'RENTED ' + q.u.equipment + ' (' + (q.u.subcon || '\u2014') + ' \u00b7 ' + (q.u.project || '\u2014') + ' \u00b7 ' + rwRaw(q.u) + ')'; }).join(' | '); if(rp) d.units = (d.units ? d.units + ' | ' : '') + rp; });
   function f(k){ return function(o){ return o[k]; }; }
   var cols = [{h:'#', g:function(o, i){ return i + 1; }, t:'t'}, {h:'Requested equipment', g:f('req'), t:'t'}, {h:'Capacity', g:f('rcap'), t:'t'}, {h:'For project', g:f('rproj'), t:'t'}, {h:'Qty', g:f('qty'), t:'t'}, {h:'From', g:f('from'), t:'t'}, {h:'To', g:f('to'), t:'t'}, {h:'Status', g:f('st'), t:'t'},
-    {h:'Available from Owned', g:f('avail'), t:'t'}, {h:'Owned of this type (all)', g:f('tot'), t:'t'}, {h:'Result', g:f('cov'), t:'t'}, {h:'Proposed units (project \u00b7 engineer \u00b7 last reading)', g:f('units'), t:'t'}, {h:'Note', g:f('more'), t:'t'}, {h:'Est. saving (EGP)', g:f('sav'), t:'t'}];
+    {h:'Available from Owned', g:f('avail'), t:'t'}, {h:'Idle rented (same type)', g:f('ren'), t:'t'}, {h:'Owned of this type (all)', g:f('tot'), t:'t'}, {h:'Result', g:f('cov'), t:'t'}, {h:'Proposed units (project \u00b7 engineer \u00b7 last reading)', g:f('units'), t:'t'}, {h:'Note', g:f('more'), t:'t'}, {h:'Est. saving (EGP)', g:f('sav'), t:'t'}];
   var nFull = rows.filter(function(x){ return x.cover >= x.qty; }).length, nPart = rows.filter(function(x){ return x.cover > 0 && x.cover < x.qty; }).length;
   window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 Requested equipment vs. what Owned can give', cols:cols, rows:data, kpis:[{label:'Requests', value:rows.length}, {label:'Covered by Owned', value:nFull}, {label:'Partly covered', value:nPart}, {label:'External', value:rows.length - nFull - nPart}]}, kind);
 }
@@ -5976,22 +5993,23 @@ function fuBulkXlsxPro(rows){
   var nFull = rows.filter(function(x){ return x.cover >= x.qty; }).length, nPart = rows.filter(function(x){ return x.cover > 0 && x.cover < x.qty; }).length;
   var kpis = [{label:'Requests', value:rows.length}, {label:'Covered by Owned', value:nFull}, {label:'Partly covered', value:nPart}, {label:'External', value:rows.length - nFull - nPart}];
   var wb = new EJ.Workbook(); wb.creator = 'HAC PMV'; wb.created = new Date();
-  function covTxt(x){ return x.cover >= x.qty ? 'Covered' : (x.cover > 0 ? x.cover + ' of ' + x.qty : 'External'); }
+  function covTxt(x){ return (x.cover >= x.qty ? 'Covered' : (x.cover > 0 ? x.cover + ' of ' + x.qty : 'External')) + (x.rCover ? ' (incl. ' + x.rCover + ' idle rented)' : ''); }
   /* ---------- sheet 1: summary (one row per request) ---------- */
   var data = rows.map(function(x, i){
     var r = x.r, w = x.o.win, give = x.o.free.filter(function(u){ return (u.alloc || u.proposed) && !u.rep; });
     return {n:i + 1, req:r.equipment || '', rcap:r.capacity || '', rproj:r.project || '', qty:x.qty, from:w ? w.from : '', to:w ? w.to : '', st:r.provision || '',
-            avail:x.nFree, tot:x.o.resAll.length, cov:covTxt(x), prop:give.map(function(u){ return u.e.code || ''; }).join('\n'),
+            avail:x.nFree, ren:x.rOpts.length, tot:x.o.resAll.length, cov:covTxt(x), prop:give.map(function(u){ return u.e.code || ''; }).join('\n'),
             pproj:give.map(function(u){ return fuFlatUnit(u).proj || '\u2014'; }).join('\n'),
             peng:give.map(function(u){ var E = (u.workshop || isCentralWorkshop(u.e.project)) ? [] : fuEngFor(u.e.project); return E.length ? E.map(function(g){ return g.n; }).join(' / ') : '\u2014'; }).join('\n'),
             pmob:give.map(function(u){ var E = (u.workshop || isCentralWorkshop(u.e.project)) ? [] : fuEngFor(u.e.project); return E.length ? E.map(function(g){ return g.m; }).join(' / ') : '\u2014'; }).join('\n'),
             more:x.takenN ? x.takenN + ' more fit but go to earlier request(s)' : '', sav:x.saving != null ? Math.round(x.saving) : ''};
   });
+  data.forEach(function(d, i){ d.ren = rows[i].rOpts.length; rows[i].rOpts.filter(function(o){ return o.proposed; }).forEach(function(o){ var w = o.u, E = fuEngFor(w.project); d.prop += (d.prop ? '\n' : '') + 'RENTED ' + (w.equipment || '') + (w.subcon ? ' (' + w.subcon + ')' : ''); d.pproj += (d.pproj ? '\n' : '') + (w.project || '\u2014'); d.peng += (d.peng ? '\n' : '') + (E.length ? E.map(function(g){ return g.n; }).join(' / ') : '\u2014'); d.pmob += (d.pmob ? '\n' : '') + (E.length ? E.map(function(g){ return g.m; }).join(' / ') : '\u2014'); }); });
   function f(k){ return function(o){ return clean(o[k]); }; }
   var sumCols = [{h:'#', g:f('n'), t:'t'}, {h:'Requested equipment', g:f('req'), t:'t'}, {h:'Capacity', g:f('rcap'), t:'t'}, {h:'For project', g:f('rproj'), t:'t'}, {h:'Qty', g:f('qty'), t:'t'}, {h:'From', g:f('from'), t:'t'}, {h:'To', g:f('to'), t:'t'}, {h:'Status', g:f('st'), t:'t'},
-    {h:'Available from Owned', g:f('avail'), t:'i'}, {h:'Owned of this type (all)', g:f('tot'), t:'i'}, {h:'Result', g:f('cov'), t:'t'}, {h:'Proposed unit(s)', g:f('prop'), t:'t'}, {h:'Current project', g:f('pproj'), t:'t'}, {h:'Engineer', g:f('peng'), t:'t'}, {h:'Mobile', g:f('pmob'), t:'t'}, {h:'Note', g:f('more'), t:'t'}, {h:'Est. saving (EGP)', g:f('sav'), t:'z', s:true}];
+    {h:'Available from Owned', g:f('avail'), t:'i'}, {h:'Owned of this type (all)', g:f('tot'), t:'i'}, {h:'Idle rented (same type)', g:f('ren'), t:'i'}, {h:'Result', g:f('cov'), t:'t'}, {h:'Proposed unit(s)', g:f('prop'), t:'t'}, {h:'Current project', g:f('pproj'), t:'t'}, {h:'Engineer', g:f('peng'), t:'t'}, {h:'Mobile', g:f('pmob'), t:'t'}, {h:'Note', g:f('more'), t:'t'}, {h:'Est. saving (EGP)', g:f('sav'), t:'z', s:true}];
   var wsS = window.hacBuildXlsx({title:'HAC \u00b7 PMV \u2014 Requested equipment vs. what Owned can give', sheetName:'Summary', cols:sumCols, rows:data, kpis:kpis, wb:wb}, EJ).getWorksheet('Summary');
-  for(var rr = 0; rr < rows.length; rr++){ for(var cc = 12; cc <= 15; cc++){ var wc = wsS.getCell(5 + rr, cc); wc.alignment = {vertical:'top', horizontal:'left', wrapText:true}; } }
+  for(var rr = 0; rr < rows.length; rr++){ for(var cc = 13; cc <= 16; cc++){ var wc = wsS.getCell(5 + rr, cc); wc.alignment = {vertical:'top', horizontal:'left', wrapText:true}; } }
   /* ---------- units: ONE row per unit, grouped Equipment -> Project; the project counts are written once on the first line of each project ---------- */
   var UN = {}, unOrder = [];
   rows.forEach(function(x, i){
@@ -6064,12 +6082,27 @@ function fuBulkXlsxPro(rows){
     wsU.autoFilter = {from:{row:1, column:1}, to:{row:ur - 1, column:UH.length}};
     wsU.pageSetup = {paperSize:9, orientation:'landscape', fitToPage:true, fitToWidth:1, fitToHeight:0};
   }
+  /* ---------- sheet 4: idle RENTED units that fit each request ---------- */
+  var RL = []; rows.forEach(function(x, i){ x.rOpts.forEach(function(q){ RL.push({i:i + 1, x:x, q:q}); }); });
+  if(RL.length){
+    var wsR = wb.addWorksheet('Rented idle', {views:[{state:'frozen', ySplit:1, activeCell:'A2'}], properties:{tabColor:{argb:'FF58A6FF'}}});
+    var RH = ['For request #', 'Requested equipment', 'Request project', 'Rented equipment', 'Model / capacity', 'Vendor', 'Contract', 'Project now', 'Engineer', 'Mobile', 'Worked (this month)', 'Limit', 'Entered in project', 'In project: rental', 'In project: owned', 'For this request'];
+    hdrRow(wsR, RH);
+    RL.forEach(function(it, n){
+      var w = it.q.u, E = fuEngFor(w.project), row = wsR.getRow(n + 2), st = it.q.proposed ? '\u2b50 Proposed' : (it.q.takenBy ? 'Fits, goes to request #' + it.q.takenBy : 'Idle');
+      var vals = [it.i, it.x.r.equipment || '', it.x.r.project || '', w.equipment || '', w.model || '', w.subcon || '', w.contract || '', w.project || '', E.map(function(g){ return g.n; }).join(' / '), E.map(function(g){ return g.m; }).join(' / '), rwRaw(w), '< ' + w.thrApplied + (w.mon ? ' month' : ' d'), rwEntryTxt(w), w.inRent || 0, rwOwnIn(w), st];
+      vals.forEach(function(v, j){ var c = row.getCell(j + 1); c.value = clean(v); c.font = {name:'Calibri', size:10, bold:j === 3}; c.border = {bottom:thin}; c.alignment = {vertical:'middle', horizontal:(typeof v === 'number') ? 'center' : 'left'}; });
+      if(it.q.proposed) for(var q2 = 1; q2 <= RH.length; q2++) row.getCell(q2).fill = fill('FFFFF6DA');
+    });
+    wsR.columns = [10, 22, 22, 20, 16, 18, 14, 22, 22, 16, 14, 10, 28, 11, 11, 20].map(function(w){ return {width:w}; });
+    wsR.autoFilter = {from:{row:1, column:1}, to:{row:RL.length + 1, column:RH.length}};
+  }
   var d = new Date(), two = function(n){ return (n < 10 ? '0' : '') + n; };
   var fname = 'Requested_equipment_vs_Owned_' + d.getFullYear() + '-' + two(d.getMonth() + 1) + '-' + two(d.getDate()) + '.xlsx';
   wb.xlsx.writeBuffer().then(function(buf){
     var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})); a.download = fname;
     document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
-    toast('Excel exported \u2014 Summary + Project Summary + Units', 'success');
+    toast('Excel exported \u2014 Summary + Project Summary + Units + Rented idle', 'success');
   }).catch(function(err){ toast('Excel export failed: ' + (err && err.message || err), 'error'); });
 }
 function fuBulkExportUnits(kind){
@@ -6077,12 +6110,16 @@ function fuBulkExportUnits(kind){
   var data = [];
   rows.forEach(function(x, i){
     var r = x.r, w = x.o.win, base = {n:i + 1, req:r.equipment || '', rcap:r.capacity || '', rproj:r.project || '', qty:x.qty, from:w ? w.from : '', to:w ? w.to : ''};
-    x.o.free.forEach(function(u){ if(!u.rep) data.push(Object.assign({}, base, fuFlatUnit(u))); });
+    x.o.free.forEach(function(u){ if(!u.rep) data.push(Object.assign({}, base, fuFlatUnit(u), {type:'Owned'})); });
+    x.rOpts.forEach(function(q){
+      var w = q.u, E = fuEngFor(w.project), st = q.proposed ? 'Proposed for this request' : (q.takenBy ? 'Fits but goes to request #' + q.takenBy : 'Idle');
+      data.push(Object.assign({}, base, {type:'Rented', code:w.sap || '', eq:w.equipment || '', cap:w.model || '', proj:w.project || '', eng:E.map(function(g){ return g.n; }).join(' / '), mob:E.map(function(g){ return g.m; }).join(' / '), lm:rwMonthLabel(w.month), d:rwRaw(w), lim:'< ' + w.thrApplied + (w.mon ? ' month' : ' d'), av:st + ' \u00b7 vendor ' + (w.subcon || '\u2014') + ' \u00b7 in project: rental ' + (w.inRent || 0) + ' / owned ' + rwOwnIn(w)}));
+    });
   });
   if(!data.length){ toast('No unit to list', 'error'); return; }
   function f(k){ return function(o){ return o[k]; }; }
   var cols = [{h:'Request #', g:f('n'), t:'t'}, {h:'Requested equipment', g:f('req'), t:'t'}, {h:'Req. capacity', g:f('rcap'), t:'t'}, {h:'For project', g:f('rproj'), t:'t'}, {h:'Qty', g:f('qty'), t:'t'}, {h:'From', g:f('from'), t:'t'}, {h:'To', g:f('to'), t:'t'},
-    {h:'Unit code', g:f('code'), t:'t'}, {h:'Unit equipment', g:f('eq'), t:'t'}, {h:'Unit capacity', g:f('cap'), t:'t'}, {h:'Current project', g:f('proj'), t:'t'}, {h:'Same type in project', g:f('ptot'), t:'t'}, {h:'Low H/M in project', g:f('plow'), t:'t'}, {h:'High usage in project', g:f('pwork'), t:'t'}, {h:'High usage avg (h)', g:f('phavg'), t:'t'}, {h:'Engineer', g:f('eng'), t:'t'}, {h:'Mobile', g:f('mob'), t:'t'},
+    {h:'Type', g:f('type'), t:'t'}, {h:'Unit code / SAP', g:f('code'), t:'t'}, {h:'Unit equipment', g:f('eq'), t:'t'}, {h:'Unit capacity', g:f('cap'), t:'t'}, {h:'Current project', g:f('proj'), t:'t'}, {h:'Same type in project', g:f('ptot'), t:'t'}, {h:'Low H/M in project', g:f('plow'), t:'t'}, {h:'High usage in project', g:f('pwork'), t:'t'}, {h:'High usage avg (h)', g:f('phavg'), t:'t'}, {h:'Engineer', g:f('eng'), t:'t'}, {h:'Mobile', g:f('mob'), t:'t'},
     {h:'Last reading', g:f('lm'), t:'t'}, {h:'H/M diff (h)', g:f('d'), t:'t'}, {h:'Limit (h)', g:f('lim'), t:'t'}, {h:'Availability', g:f('av'), t:'t'}];
   window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 Owned units that fit each request (one row per request + unit pair, so a unit can appear under several requests)', cols:cols, rows:data, kpis:[{label:'Requests', value:rows.length}, {label:'Request + unit pairs', value:data.length}]}, kind);
 }
@@ -6410,7 +6447,7 @@ function fuCandTable(list, r, o){
     h += '<tr><td ' + td + '><a style="cursor:pointer;font-weight:700;color:var(--blue);" title="Unit card: last reading, project, engineer" onclick="fuUnitLookup(decodeURIComponent(\'' + enc + '\'))">' + fuEsc(e.code || '\u2014') + '</a></td>'
       + '<td ' + td + '>' + fuEsc(e.equipment) + (cap ? ' <span style="color:var(--text-muted);font-size:11px;">' + fuEsc(cap) + '</span>' : '') + '<div style="font-size:10.5px;color:var(--text-muted);">' + fuEsc([e.brand, e.year].filter(Boolean).join(' \u00b7 ')) + '</div>' + (x.note ? '<div style="font-size:10.5px;color:var(--accent);">' + fuEsc(x.note) + '</div>' : '') + '</td>'
       + '<td ' + td + '>' + (ws ? '<span style="color:var(--green)">\ud83c\udfed Central Workshop</span>' : fuEsc(e.project || '\u2014')) + (e.fleet && e.fleet !== 'egypt' ? ' <span style="font-size:10.5px;color:var(--text-muted);">' + fuEsc(e.fleet) + '</span>' : '') + '</td>'
-      + '<td ' + td + '>' + (function(){ var pf = fuPjFields(x); if(pf.tot === '') return '<span style="color:var(--text-muted);font-size:11px;">\u2014</span>'; return '<b>' + pf.tot + '</b> total' + (pf.low !== '' ? ' \u00b7 <span style="color:var(--red);font-weight:700;">' + pf.low + ' low</span> \u00b7 <span style="color:var(--green);">' + pf.work + ' working</span>' : '') + '<div style="font-size:10.5px;color:' + (pf.chk.indexOf('\u26a0') === 0 ? 'var(--red)' : 'var(--green)') + ';white-space:nowrap;">' + fuEsc(pf.chk) + '</div>'; })() + '</td>' + '<td ' + td + '>' + (ws ? '<span style="color:var(--text-muted);font-size:11px;">\u2014</span>' : fuEngHtml(e.project)) + '</td><td ' + td + '>' + fuLastHtml(x.last) + '</td><td ' + td + '>' + fuDiffHtml(x) + '</td><td ' + td + '>' + av + '</td><td ' + td + '>' + act + '</td></tr>';
+      + '<td ' + td + '>' + (function(){ var pf = fuPjFields(x); if(pf.tot === '') return '<span style="color:var(--text-muted);font-size:11px;">\u2014</span>'; return '<b>' + pf.tot + '</b> total' + (pf.low !== '' ? ' \u00b7 <span style="color:var(--red);font-weight:700;">' + pf.low + ' low</span> \u00b7 <span style="color:var(--green);">' + pf.work + ' working</span>' : '') + '<div style="font-size:10.5px;color:' + (pf.chk.indexOf('\u26a0') === 0 ? 'var(--red)' : 'var(--green)') + ';white-space:nowrap;">' + fuEsc(pf.chk) + '</div>'; })() + (ws ? '' : fuRentLine(e.project, r)) + '</td>' + '<td ' + td + '>' + (ws ? '<span style="color:var(--text-muted);font-size:11px;">\u2014</span>' : fuEngHtml(e.project)) + '</td><td ' + td + '>' + fuLastHtml(x.last) + '</td><td ' + td + '>' + fuDiffHtml(x) + '</td><td ' + td + '>' + av + '</td><td ' + td + '>' + act + '</td></tr>';
   });
   return h + '</table></div>' + (list.length > max ? '<div style="font-size:11px;color:var(--text-muted);margin-top:6px;">\u2026 and ' + (list.length - max) + ' more (use Excel export for the full list)</div>' : '');
 }
@@ -6540,6 +6577,89 @@ function rwUnitCard(enc){
   m.classList.add('open');
 }
 /* ── the same watch inside Follow-Up (Pending requests) ── */
+/* ── Owned + Rented together: one table per request, with operation, entry date and the number of units already in the project ── */
+function fuAvailHtml(x){
+  var av = '';
+  if(x.alloc) av += '<div style="color:var(--green);font-size:11px;font-weight:700;white-space:nowrap;">\ud83d\udccc Allocated</div>';
+  if(x.proposed) av += '<div style="color:var(--green);font-size:11px;font-weight:700;white-space:nowrap;">\u2713 Proposed for this request</div>';
+  if(x.takenBy) av += '<div style="color:var(--accent);font-size:11px;white-space:nowrap;">\ud83d\udd01 Fits, but goes to request #' + x.takenBy + '</div>';
+  if(x.rep) av += '<div style="color:var(--red);font-size:11px;white-space:nowrap;">\ud83d\udd27 Under repair</div>';
+  (x.busy || []).forEach(function(c){ av += '<div style="color:var(--red);font-size:11px;white-space:nowrap;">\u26d4 ' + fuEsc(c.text) + '</div>'; });
+  return av || '<span style="color:var(--green);">\u2713 Free</span>';
+}
+function fuPjCell(x){
+  var pf = fuPjFields(x); if(pf.tot === '') return '<span style="color:var(--text-muted);font-size:11px;">\u2014</span>';
+  return 'Owned <b>' + pf.tot + '</b>' + (pf.low !== '' ? ' <span style="color:var(--text-muted);font-size:10.5px;">(<span style="color:var(--red);font-weight:700;">' + pf.low + ' low</span> \u00b7 <span style="color:var(--green);">' + pf.work + ' working</span>)</span>' : '') + '<div style="font-size:10.5px;color:' + (pf.chk.indexOf('\u26a0') === 0 ? 'var(--red)' : 'var(--green)') + ';white-space:nowrap;">' + fuEsc(pf.chk) + '</div>';
+}
+/* rented units of the request's type (and capacity) that sit in a project, this month: how many */
+function fuRentInProj(project, r){
+  if(!(RW.mr && RW.mr.length)) return null;
+  fuIdleRows(); var month = FUIDLE.month; if(!month) return null;
+  var ck = month + '|' + RW.mr.length;
+  if(FUIDLE.rcSig !== ck){ FUIDLE.rcSig = ck; FUIDLE.rcIdx = {}; FUIDLE.rcSame = {}; FUIDLE.rcAns = {}; RW.mr.forEach(function(m){ if(m.month !== month || !(Number(m.qty) > 0)) return; var p = String(m.project || ''); (FUIDLE.rcIdx[p] = FUIDLE.rcIdx[p] || []).push(m); }); }
+  var ak = fuEngKey(project) + '|' + fuEngKey(r.equipment) + '|' + fuEngKey(r.capacity);
+  if(FUIDLE.rcAns[ak] != null) return FUIDLE.rcAns[ak];
+  var n = 0;
+  Object.keys(FUIDLE.rcIdx).forEach(function(p){
+    var sk = fuEngKey(project) + '>' + fuEngKey(p), same = FUIDLE.rcSame[sk]; if(same == null) same = FUIDLE.rcSame[sk] = fuSameProj(project, p);
+    if(!same) return;
+    FUIDLE.rcIdx[p].forEach(function(m){ if(fuIdleMatch(r, {equipment:m.equipment, model:m.model || m.maincap, category:m.category})) n += Number(m.qty) || 0; });
+  });
+  return (FUIDLE.rcAns[ak] = n);
+}
+function fuRentLine(project, r){ var n = fuRentInProj(project, r); return n == null ? '' : '<div style="font-size:11px;">Rental <b>' + n + '</b> <span style="color:var(--text-muted);font-size:10.5px;">same type here</span></div>'; }
+/* date a unit entered its current project = its latest transfer INTO that project */
+function fuOwnedEntry(e){
+  var code = fuNormCode(e.code), best = '', pj = String(e.project || '');
+  (typeof allTransfers !== 'undefined' ? allTransfers : []).forEach(function(t){
+    if(!((t.equipmentId && t.equipmentId === e.id) || (code && fuNormCode(t.code) === code))) return;
+    var d = fuIsoOf(t.date); if(!d || d > new Date().toISOString().slice(0, 10)) return;
+    if(!fuSameProj(t.to, pj)) return;
+    if(d > best) best = d;
+  });
+  return best;
+}
+function fuMixTable(x){
+  var r = x.r, rid = fuEsc(r.id), admin = (typeof isAdmin !== 'undefined' && isAdmin), mut = 'color:var(--text-muted);';
+  var td = 'style="padding:5px 8px;border-bottom:1px solid var(--border);font-size:12px;vertical-align:top;"';
+  var items = [];
+  x.o.free.forEach(function(u){ items.push({t:'o', u:u, first:(u.alloc || u.proposed) ? 0 : 1, k:0}); });
+  x.rOpts.forEach(function(q){ items.push({t:'r', q:q, first:q.proposed ? 0 : 1, k:1}); });
+  items.sort(function(a, b){ return a.first - b.first || a.k - b.k; });
+  var h = '<div style="max-height:360px;overflow:auto;border:1px solid var(--border);border-radius:8px;"><table style="width:100%;border-collapse:collapse;"><tr style="position:sticky;top:0;background:var(--surface);z-index:1;">'
+    + ['Type', 'Unit', 'Project now', 'In project (same type)', 'Engineer', 'Operation', 'Entered', 'Availability', 'Actions'].map(function(t){ return '<th style="text-align:left;padding:5px 8px;font-size:11px;' + mut + 'white-space:nowrap;">' + t + '</th>'; }).join('') + '</tr>';
+  items.slice(0, 50).forEach(function(it){
+    if(it.t === 'o'){
+      var u = it.u, e = u.e, enc = encodeURIComponent(e.code || ''), ws = u.workshop || isCentralWorkshop(e.project), cap = fuCapOf(e), act = '', ent = ws ? '' : fuOwnedEntry(e);
+      if(admin && e.code) act += '<button class="btn-edit" style="padding:1px 7px;font-size:10px;" onclick="fuAllocToggle(\'' + rid + '\',\'' + enc + '\')">' + (u.alloc ? 'Release' : 'Allocate') + '</button> ';
+      if(e.code) act += '<button class="btn-edit" style="padding:1px 7px;font-size:10px;" title="Copy a ready transfer request message" onclick="fuTransferMsg(\'' + rid + '\',\'' + enc + '\')">\u2709</button>';
+      h += '<tr><td ' + td + '><span style="color:var(--blue);font-weight:700;white-space:nowrap;">\ud83c\udfd7 Owned</span></td>'
+        + '<td ' + td + '><a style="cursor:pointer;font-weight:700;color:var(--blue);" title="Unit card" onclick="fuUnitLookup(decodeURIComponent(\'' + enc + '\'))">' + fuEsc(e.code || '\u2014') + '</a> ' + fuEsc(e.equipment) + (cap ? ' <span style="' + mut + 'font-size:11px;">' + fuEsc(cap) + '</span>' : '') + '<div style="font-size:10.5px;' + mut + '">' + fuEsc([e.brand, e.year].filter(Boolean).join(' \u00b7 ')) + '</div></td>'
+        + '<td ' + td + '>' + (ws ? '<span style="color:var(--green)">\ud83c\udfed Central Workshop</span>' : fuEsc(e.project || '\u2014')) + '</td>'
+        + '<td ' + td + '>' + (ws ? '<span style="' + mut + 'font-size:11px;">\u2014</span>' : fuPjCell(u) + fuRentLine(e.project, r)) + '</td>'
+        + '<td ' + td + '>' + (ws ? '<span style="' + mut + 'font-size:11px;">\u2014</span>' : fuEngHtml(e.project)) + '</td>'
+        + '<td ' + td + '>' + fuDiffHtml(u) + '<div style="margin-top:2px;">' + fuLastHtml(u.last) + '</div></td>'
+        + '<td ' + td + '>' + (ent ? '<b>' + fuEsc(rwFmtDate(ent)) + '</b><div style="font-size:10.5px;' + mut + '">transferred in</div>' : '<span style="' + mut + 'font-size:11px;">no transfer on file</span>') + '</td>'
+        + '<td ' + td + '>' + fuAvailHtml(u) + '</td><td ' + td + '>' + act + '</td></tr>';
+    } else {
+      var q = it.q, w = q.u, wenc = encodeURIComponent(w.key), here = fuSameProj(w.project, r.project), av2;
+      if(q.proposed) av2 = '<div style="color:var(--green);font-size:11px;font-weight:700;white-space:nowrap;">\u2713 Proposed for this request' + (q.give > 1 ? ' (' + q.give + ' units)' : '') + '</div>';
+      else if(q.takenBy) av2 = '<div style="color:var(--accent);font-size:11px;white-space:nowrap;">\ud83d\udd01 Fits, but goes to request #' + q.takenBy + '</div>';
+      else av2 = '<span style="color:var(--accent);">\ud83d\udca4 Idle \u2014 can be redeployed</span>';
+      h += '<tr><td ' + td + '><span style="color:var(--accent);font-weight:700;white-space:nowrap;">\ud83d\udca4 Rented</span></td>'
+        + '<td ' + td + '><a style="cursor:pointer;" title="Unit card: entry date, history" onclick="rwUnitCard(\'' + wenc + '\')"><b style="color:var(--blue);">' + fuEsc(w.equipment) + '</b></a>' + (w.model ? ' <span style="' + mut + 'font-size:11px;">' + fuEsc(w.model) + '</span>' : '') + '<div style="font-size:10.5px;' + mut + '">' + fuEsc(w.subcon || '\u2014') + (w.contract ? ' \u00b7 ' + fuEsc(w.contract) : '') + '</div>' + (w.matched ? '' : '<div style="font-size:10.5px;color:var(--accent);">contract not found \u2014 check the note</div>') + '</td>'
+        + '<td ' + td + '>' + fuEsc(w.project || '\u2014') + (here ? '<div style="font-size:10.5px;color:var(--red);font-weight:700;">same project as the request</div>' : '') + '</td>'
+        + '<td ' + td + '>' + rwInProjHtml(w) + '</td><td ' + td + '>' + fuEngHtml(w.project) + '</td>'
+        + '<td ' + td + '><b style="color:var(--red);font-family:monospace;">' + rwRaw(w) + '</b><div style="font-size:10.5px;' + mut + '">limit &lt; ' + w.thrApplied + (w.mon ? ' month' : ' d') + ' \u00b7 ' + fuEsc(rwMonthLabel(w.month)) + '</div></td>'
+        + '<td ' + td + '>' + rwEnteredHtml(w) + '</td><td ' + td + '>' + av2 + '</td>'
+        + '<td ' + td + '><button class="btn-edit" style="padding:1px 7px;font-size:10px;" title="Redeploy / release request to the vendor" onclick="rwIdleMsg(\'' + wenc + '\',\'' + rid + '\')">\u2709</button></td></tr>';
+    }
+  });
+  var H = fuIdleFor(r, true), tail = (H.late || H.keep) ? '<div style="font-size:11px;' + mut + 'margin-top:4px;">' + (H.late ? H.late + ' rented unit(s) look low only because they arrived late in the month. ' : '') + (H.keep ? H.keep + ' have an intermittent-work note or were marked Keep.' : '') + '</div>' : '';
+  if(!items.length) return '<div style="font-size:12px;' + mut + '">No free owned unit and no idle rented unit of this type for this request.</div>' + tail;
+  return h + '</table></div>' + (items.length > 50 ? '<div style="font-size:11px;' + mut + 'margin-top:4px;">\u2026 and ' + (items.length - 50) + ' more (Excel export has them all)</div>' : '') + tail;
+}
+function rwEntryTxt(x){ return x.hire ? (x.hire.slice(0, 7) === x.month && +x.hire.slice(8, 10) > 1 ? 'Entered ' + rwFmtDate(x.hire) + ' (there ' + x.avail + ' of ' + x.dim + ' d)' : 'Hired ' + rwFmtDate(x.hire)) : (x.newUnit ? 'New this month' : (x.first ? 'Since ' + rwMonthLabel(x.first) : '')); }
 function fuSameProj(a, b){ var ka = fuEngKeys(a), kb = fuEngKeys(b), best = 0; ka.forEach(function(x){ kb.forEach(function(y){ best = Math.max(best, fuEngScore(x, y)); }); }); return best >= 0.78; }
 function fuIdleEnsure(){
   if(FUIDLE.state) return; FUIDLE.state = 1;
