@@ -5390,7 +5390,7 @@ function fuStageCell(r){
   }
   var tools = '<button class="btn-edit" title="Owned equipment that could cover this request" style="padding:1px 6px;font-size:10px;margin-left:4px;" onclick="event.stopPropagation();fuSearchOwned(\'' + id + '\')">🔍</button>'
             + '<button class="btn-edit" title="Change history of this request" style="padding:1px 6px;font-size:10px;" onclick="event.stopPropagation();fuOpenHistory(\'' + id + '\')">🕘</button>'
-            + ((r.allocated && r.allocated.length) ? '<span title="Allocated units: ' + fuEsc(r.allocated.join(', ')) + '" style="font-size:10px;color:var(--green);border:1px solid var(--green);border-radius:10px;padding:0 6px;margin-left:4px;cursor:default;">📌 ' + r.allocated.length + '/' + (Number(r.qty) || 1) + '</span>' : '');
+            + ((r.allocated && r.allocated.length) ? '<span title="Allocated units: ' + fuEsc(r.allocated.join(', ')) + '" style="font-size:10px;color:var(--green);border:1px solid var(--green);border-radius:10px;padding:0 6px;margin-left:4px;cursor:default;">📌 ' + r.allocated.length + '/' + (Number(r.qty) || 1) + '</span>' : '') + fuIdleBadge(r);
   return '<div style="display:flex;align-items:center;gap:2px;flex-wrap:wrap;">' + sel + chip + '</div>'
        + '<div style="font-size:10.5px;color:var(--text-muted);margin-top:3px;">' + (owner ? '👤 ' + fuEsc(owner) : '') + tools + '</div>';
 }
@@ -5804,7 +5804,7 @@ function fuOpenBulk(){
 }
 function fuRenderBulk(){
   var m = document.getElementById('fu-bulk-modal'); if(!m) return;
-  fuEngEnsure();
+  fuEngEnsure(); fuIdleEnsure();
   var scEl = document.getElementById('fu-bulk-scope'), sc = scEl ? scEl.value : 'Pending';
   var lEl = document.getElementById('fu-bulk-low'), low = lEl ? lEl.checked : (window.__fuOwnLow !== false);
   var fEl = document.getElementById('fu-bulk-fleets'), fleets = fEl ? fEl.checked : false;
@@ -5871,8 +5871,8 @@ function fuRenderBulk(){
     if(x.takenN) cov += '<div style="font-size:10.5px;color:var(--accent);">' + x.takenN + ' more fit but go to earlier request(s)</div>';
     var give = x.o.free.filter(function(u){ return u.alloc || u.proposed; });
     var pu = give.length ? give.slice(0, 3).map(function(u){ var p = isCentralWorkshop(u.e.project) ? 'Central Workshop' : (u.e.project || '\u2014'); return '<a style="cursor:pointer;font-weight:700;color:var(--blue);" onclick="fuUnitLookup(decodeURIComponent(\'' + encodeURIComponent(u.e.code || '') + '\'))">' + fuEsc(u.e.code || '\u2014') + '</a> <span style="color:var(--text-muted);">' + fuEsc(p) + '</span>'; }).join('<br>') + (give.length > 3 ? '<div style="color:var(--text-muted);font-size:10.5px;">+' + (give.length - 3) + ' more</div>' : '') : '\u2014';
-    h += '<tr><td ' + td + '>' + (x.o.free.length ? '<a id="fu-bt-' + i + '" style="cursor:pointer;font-size:14px;" title="Show the units" onclick="fuBulkToggle(' + i + ')">\u25b8</a>' : '') + '</td><td ' + td + '>' + (i + 1) + '</td><td ' + td + '><b>' + fuEsc(r.equipment) + '</b>' + (r.capacity ? '<div style="color:var(--text-muted);font-size:11px;">' + fuEsc(r.capacity) + '</div>' : '') + '</td><td ' + td + '>' + fuEsc(r.project || '\u2014') + '</td><td ' + td + ' style="white-space:nowrap">' + (w ? fuEsc(w.from) + ' \u2192 ' + fuEsc(w.to) : '\u2014') + '</td><td ' + td + '>' + x.qty + '</td>' + (showSt ? '<td ' + td + '>' + fuEsc(r.provision || '\u2014') + '</td>' : '')
-      + '<td ' + td + '><b>' + x.nFree + '</b> <span style="color:var(--text-muted);font-size:10.5px;">of ' + x.o.resAll.length + ' owned of this type</span></td><td ' + td + '>' + cov + '</td><td ' + td + '>' + pu + '</td><td ' + td + ' id="fu-bsav-' + i + '">' + (x.cover > 0 ? '\u2026' : '\u2014') + '</td>'
+    h += '<tr><td ' + td + '>' +  ((x.o.free.length || fuIdleFor(x.r).length) ? '<a id="fu-bt-' + i + '" style="cursor:pointer;font-size:14px;" title="Show the units" onclick="fuBulkToggle(' + i + ')">\u25b8</a>' : '') + '</td><td ' + td + '>' + (i + 1) + '</td><td ' + td + '><b>' + fuEsc(r.equipment) + '</b>' + (r.capacity ? '<div style="color:var(--text-muted);font-size:11px;">' + fuEsc(r.capacity) + '</div>' : '') + '</td><td ' + td + '>' + fuEsc(r.project || '\u2014') + '</td><td ' + td + ' style="white-space:nowrap">' + (w ? fuEsc(w.from) + ' \u2192 ' + fuEsc(w.to) : '\u2014') + '</td><td ' + td + '>' + x.qty + '</td>' + (showSt ? '<td ' + td + '>' + fuEsc(r.provision || '\u2014') + '</td>' : '')
+      + '<td ' + td + '><b>' + x.nFree + '</b> <span style="color:var(--text-muted);font-size:10.5px;">of ' + x.o.resAll.length + ' owned of this type</span>' + fuIdleMini(x.r) + '</td><td ' + td + '>' + cov + '</td><td ' + td + '>' + pu + '</td><td ' + td + ' id="fu-bsav-' + i + '">' + (x.cover > 0 ? '\u2026' : '\u2014') + '</td>'
       + '<td ' + td + '><button class="btn-edit" style="padding:1px 7px;font-size:10px;" onclick="closeModal(\'fu-bulk-modal\');fuSearchOwned(\'' + fuEsc(r.id) + '\')">Open</button></td></tr>'
       + '<tr id="fu-bd-' + i + '" style="display:none;"><td colspan="' + nc + '" id="fu-bdc-' + i + '" style="padding:8px 12px 12px 34px;background:var(--bg);border-bottom:1px solid var(--border);"></td></tr>';
   });
@@ -5901,10 +5901,10 @@ function fuBulkToggle(i, forceOpen){
   var tr = document.getElementById('fu-bd-' + i), c = document.getElementById('fu-bdc-' + i), a = document.getElementById('fu-bt-' + i); if(!tr || !c) return;
   var opening = forceOpen === true || tr.style.display === 'none';
   window.__fuBulkOpen = window.__fuBulkOpen || {};
-  if(opening){ c.innerHTML = fuCandTable(x.o.free, x.r, {max:40, maxH:320}); tr.style.display = ''; if(a) a.textContent = '\u25be'; window.__fuBulkOpen[x.r.id] = true; }
+  if(opening){ c.innerHTML = (x.o.free.length ? fuCandTable(x.o.free, x.r, {max:40, maxH:320}) : '<div style="font-size:12px;color:var(--text-muted);">No free owned unit for this request.</div>') + fuIdleSection(x.r); tr.style.display = ''; if(a) a.textContent = '\u25be'; window.__fuBulkOpen[x.r.id] = true; }
   else { tr.style.display = 'none'; if(a) a.textContent = '\u25b8'; delete window.__fuBulkOpen[x.r.id]; }
 }
-function fuBulkAll(on){ (window.__fuBulkRows || []).forEach(function(x, i){ if(!x.o.free.length) return; var tr = document.getElementById('fu-bd-' + i); if(!tr) return; var isOpen = tr.style.display !== 'none'; if(on !== isOpen) fuBulkToggle(i, on); }); }
+function fuBulkAll(on){ (window.__fuBulkRows || []).forEach(function(x, i){ if(!x.o.free.length && !fuIdleFor(x.r).length) return; var tr = document.getElementById('fu-bd-' + i); if(!tr) return; var isOpen = tr.style.display !== 'none'; if(on !== isOpen) fuBulkToggle(i, on); }); }
 function fuBulkExport(kind){
   var rows = window.__fuBulkRows || []; if(!rows.length){ toast('Nothing to export', 'error'); return; }
   if(kind === 'xlsx'){ try{ fuBulkXlsxPro(rows); }catch(err){ console.error(err); toast('Excel export failed: ' + (err && err.message || err), 'error'); } return; }
@@ -6088,19 +6088,20 @@ function fuBulkExportUnits(kind){
 }
 /* ── Rental Pull-Back Watch: rented units with very few working days and NO "intermittent work" note on the contract ── */
 var RW_KW = ['\u0645\u062a\u0642\u0637\u0639','intermittent','on call','on-call','oncall','as needed','as required','when needed','when required','\u0639\u0646\u062f \u0627\u0644\u0637\u0644\u0628','\u062d\u0633\u0628 \u0627\u0644\u062d\u0627\u062c\u0629','\u062d\u0633\u0628 \u0627\u0644\u0637\u0644\u0628','seasonal','\u0645\u0648\u0633\u0645\u064a','part time','part-time'];
-var RW = {thr:10, last:1, month:'', showKeep:false, showDone:false, kw:RW_KW.slice(), dec:{}, view:[], res:null, busy:false};
+var RW = {thr:7, thrMon:0.3, showLate:false, last:1, month:'', showKeep:false, showDone:false, kw:RW_KW.slice(), dec:{}, view:[], res:null, busy:false};
 function rwNorm(x){ return String(x == null ? '' : x).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ''); }
 function rwEq(a, b){ return !!a && !!b && (a === b || (a.length >= 4 && b.indexOf(a) >= 0) || (b.length >= 4 && a.indexOf(b) >= 0)); }
 function rwHash(x){ var h = 5381; x = String(x); for(var i = 0; i < x.length; i++) h = ((h << 5) + h + x.charCodeAt(i)) | 0; return (h >>> 0).toString(36); }
 function rwMonthLabel(m){ var M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'], p = String(m || '').split('-'); return p.length > 1 ? (M[+p[1] - 1] || p[1]) + ' ' + p[0] : (m || ''); }
 /* pure: Master Rental rows + Rental Database rows -> candidate list */
 function rwCompute(mr, rd, o){
-  var thr = Number(o.thr), N = Math.max(1, Number(o.last) || 1), kw = (o.kw || []).map(function(k){ return String(k).toLowerCase().trim(); }).filter(Boolean);
+  var thr = Number(o.thr), thrMon = (o.thrMon != null && o.thrMon !== '') ? Number(o.thrMon) : 0.3, N = Math.max(1, Number(o.last) || 1), kw = (o.kw || []).map(function(k){ return String(k).toLowerCase().trim(); }).filter(Boolean);
   var seen = {}; mr.forEach(function(r){ if(r.month) seen[r.month] = 1; });
-  var ml = Object.keys(seen).sort(), idx = ml.indexOf(o.month), out = {months:ml, rows:[], stats:{low:0, hourly:0, keepNote:0, noHistory:false}};
+  var ml = Object.keys(seen).sort(), idx = ml.indexOf(o.month), out = {months:ml, rows:[], stats:{low:0, hourly:0, keepNote:0, late:0, noHistory:false}};
   if(idx < 0) return out;
   if(idx - N + 1 < 0){ out.stats.noHistory = true; return out; }
   var win = ml.slice(idx - N + 1, idx + 1), U = {};
+  var first = {}; mr.forEach(function(r){ if(!r.month || !(Number(r.qty) > 0)) return; var k0 = [rwNorm(r.sap), rwNorm(r.plant), rwNorm(r.equipment), rwNorm(r.project), rwNorm(r.subcon)].join('|'); if(!first[k0] || r.month < first[k0]) first[k0] = r.month; });   /* first month the unit shows up in Master Rental */
   mr.forEach(function(r){
     if(win.indexOf(r.month) < 0) return;
     var qty = Number(r.qty) || 0; if(qty <= 0) return;
@@ -6109,13 +6110,14 @@ function rwCompute(mr, rd, o){
     u.sap = r.sap; u.plant = r.plant; u.equipment = r.equipment; u.model = r.model || r.maincap || ''; u.project = r.project; u.od = r.od; u.subcon = r.subcon; u.category = r.category;
     var b = u.by[r.month] || (u.by[r.month] = {days:0, qty:0, total:0, unit:0});
     var rawD = Number(r.days) || 0, isMon = r.uom === 'month' || (!r.uom && rawD > 0 && rawD < 1.5 && rawD !== Math.round(rawD));   /* month fraction (0.7 = 70% of the month) -> days */
-    b.days += isMon ? rawD * 30 : rawD; if(isMon) b.mon = true; if(r.uom === 'hour') u.hr = true; b.qty += qty; b.total += Number(r.totalPrice) || 0; b.unit = Number(r.unitPrice) || b.unit;
+    b.days += isMon ? rawD * 30 : rawD; if(isMon) b.mon = true;
+    b.raw = (b.raw || 0) + rawD; var hd = String(r.hiringDate || ''); if(/^\d{4}-\d{2}-\d{2}/.test(hd) && (!b.hire || hd.slice(0, 10) < b.hire)) b.hire = hd.slice(0, 10); if(r.uom === 'hour') u.hr = true; b.qty += qty; b.total += Number(r.totalPrice) || 0; b.unit = Number(r.unitPrice) || b.unit;
   });
   var X = rd.map(function(r){ return {r:r, v:rwNorm(r.vendor), p:rwNorm(r.project), i:rwNorm(r.item), m:rwNorm(r.model)}; });
   Object.keys(U).forEach(function(k){
     var u = U[k], cur = u.by[o.month];
     if(!cur || !(cur.total > 0)) return;
-    var low = win.every(function(m){ return u.by[m] && u.by[m].days < thr; });
+    var low = win.every(function(m){ var q = u.by[m]; return q && (q.mon ? q.raw < thrMon : q.raw < thr); });   /* month-billed rows: raw value is a fraction of a month; day-billed: working days */
     if(!low) return;
     out.stats.low++;
     var v = rwNorm(u.subcon), p = rwNorm(u.project), i = rwNorm(u.equipment), md = rwNorm(u.model);
@@ -6129,9 +6131,18 @@ function rwCompute(mr, rd, o){
     var inter = kw.some(function(w){ return lower.indexOf(w) >= 0; });
     var hourly = Object.keys(rates).indexOf('hour') >= 0 || !!u.hr;
     var row = {key:k, sap:u.sap, equipment:u.equipment, model:u.model, project:u.project, od:u.od, subcon:u.subcon, qty:cur.qty, days:cur.days, total:cur.total, unit:cur.unit,
-               mon:!!cur.mon, hist:win.map(function(m){ return {m:m, days:u.by[m].days}; }), matched:c.length > 0, loose:loose, contract:Object.keys(contracts).join(', '), note:joined, basis:Object.keys(rates).join('/'), inter:inter, hourly:hourly};
+               mon:!!cur.mon, hist:win.map(function(m){ return {m:m, days:u.by[m].days, raw:u.by[m].raw, mon:!!u.by[m].mon}; }), matched:c.length > 0, loose:loose, contract:Object.keys(contracts).join(', '), note:joined, basis:Object.keys(rates).join('/'), inter:inter, hourly:hourly, category:u.category, month:o.month, raw:cur.raw, thrApplied:(cur.mon ? thrMon : thr), hire:cur.hire || '', first:first[k] || ''};
+    /* did the unit simply arrive late in the month? (hiring date inside the month -> judge it on the days it was actually there) */
+    var dim = new Date(+String(o.month).slice(0, 4), +String(o.month).slice(5, 7), 0).getDate();
+    row.dim = dim; row.late = false; row.newUnit = false; row.eff = null; row.avail = null;
+    if(row.hire && row.hire.slice(0, 7) === o.month){ var dd = +row.hire.slice(8, 10); if(dd > 1){ row.avail = dim - dd + 1; row.eff = cur.mon ? cur.raw / (row.avail / dim) : cur.raw / row.avail; row.late = row.eff >= 0.5; } }
+    else if(!row.hire && row.first === o.month) row.newUnit = true;
+    var pjn = rwNorm(u.project), eqn = rwNorm(u.equipment), inR = 0;
+    mr.forEach(function(r2){ if(r2.month !== o.month) return; var q2 = Number(r2.qty) || 0; if(q2 <= 0) return; if(rwEq(pjn, rwNorm(r2.project)) && rwEq(eqn, rwNorm(r2.equipment))) inR += q2; });
+    row.inRent = inR;
     if(hourly){ out.stats.hourly++; return; }
     row.verdict = !row.matched ? 'verify' : (inter ? 'keep' : 'pull');
+    if(row.late){ row.verdict = 'late'; out.stats.late++; }
     if(inter) out.stats.keepNote++;
     out.rows.push(row);
   });
@@ -6159,21 +6170,22 @@ function rwOpen(){
   m.innerHTML = '<div class="modal" style="width:420px;"><div class="modal-title">\ud83d\udd3b Rental pull-back watch</div><div style="padding:18px;color:var(--text-muted);font-size:13px;">Loading Master Rental and Rental Database\u2026</div></div>';
   rwLoad().then(rwRender);
 }
-function rwSet(k, v){ RW[k] = (k === 'thr' || k === 'last') ? Number(v) : v; rwRender(); }
+function rwSet(k, v){ RW[k] = (k === 'thr' || k === 'thrMon' || k === 'last') ? Number(v) : v; if(k === 'thr' || k === 'thrMon'){ try{ localStorage.setItem('rwThr', JSON.stringify({thr:RW.thr, thrMon:RW.thrMon})); }catch(e){} if(typeof FUIDLE !== 'undefined') FUIDLE.sig = ''; } rwRender(); }
 function rwRender(){
   var m = document.getElementById('rw-modal'); if(!m) return;
   if(!RW.mr || !RW.mr.length){ m.innerHTML = '<div class="modal" style="width:460px;"><div class="modal-title">\ud83d\udd3b Rental pull-back watch</div><div style="padding:16px;font-size:13px;">Master Rental has no data loaded. Open the Master Rental page once (or import the month) and try again.</div><div class="modal-actions"><button class="btn-cancel" onclick="closeModal(\'rw-modal\')">Close</button></div></div>'; return; }
-  var R = rwCompute(RW.mr, RW.rd || [], {thr:RW.thr, last:RW.last, month:RW.month, kw:RW.kw});
+  var R = rwCompute(RW.mr, RW.rd || [], {thr:RW.thr, thrMon:RW.thrMon, last:RW.last, month:RW.month, kw:RW.kw});
   RW.res = R;
   var all = R.rows, shown = all.filter(function(x){
     var d = RW.dec[rwHash(x.key)]; x.dec = d || null;
     if(x.verdict === 'keep' && !RW.showKeep) return false;
+    if(x.verdict === 'late' && !RW.showLate) return false;
     if(d && d.s === 'keep' && !RW.showDone) return false;
     return true;
   });
   RW.view = shown;
   var nPull = shown.filter(function(x){ return x.verdict === 'pull'; }).length, nVer = shown.filter(function(x){ return x.verdict === 'verify'; }).length;
-  var risk = shown.filter(function(x){ return x.verdict !== 'keep' && !(x.dec && x.dec.s === 'keep'); }).reduce(function(a, x){ return a + x.total; }, 0);
+  var risk = shown.filter(function(x){ return x.verdict !== 'keep' && x.verdict !== 'late' && !(x.dec && x.dec.s === 'keep'); }).reduce(function(a, x){ return a + x.total; }, 0);
   var f0 = function(v){ return Math.round(v).toLocaleString('en-US'); };
   var inp = 'background:var(--surface);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:6px;font-size:12px;';
   var chip = function(l, n, c){ return '<div style="flex:1;min-width:130px;background:var(--bg);border:1px solid var(--border);border-top:3px solid ' + c + ';border-radius:8px;padding:8px 12px;"><div style="font-size:20px;font-weight:700;color:' + c + ';font-family:\'JetBrains Mono\',monospace;">' + n + '</div><div style="font-size:11px;color:var(--text-muted);">' + l + '</div></div>'; };
@@ -6181,29 +6193,32 @@ function rwRender(){
   var td = 'style="padding:5px 8px;border-bottom:1px solid var(--border);font-size:12px;vertical-align:top;"';
   var admin = (typeof isAdmin !== 'undefined' && isAdmin);
   var h = '<div class="modal" style="width:1240px;max-width:97vw;max-height:92vh;display:flex;flex-direction:column;"><div class="modal-title">\ud83d\udd3b Rental pull-back watch \u2014 rented units paid for but barely used</div>'
-    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">A rented unit is listed when its <b>working days</b> in the chosen month are below the limit <u>and</u> its contract in the Rental Database has <b>no note</b> saying the work is intermittent / on call.</div>'
+    + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">A rented unit is listed when its <b>working days</b> (day-billed) or <b>month fraction</b> (month-billed) in the chosen month are below the limit <u>and</u> it did not simply arrive late in the month <u>and</u> its contract in the Rental Database has <b>no note</b> saying the work is intermittent / on call.</div>'
     + '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:10px;font-size:12px;">'
     + '<label>Month <select onchange="rwSet(\'month\',this.value)" style="' + inp + '">' + R.months.slice().reverse().map(function(x){ return '<option value="' + x + '"' + (x === RW.month ? ' selected' : '') + '>' + rwMonthLabel(x) + '</option>'; }).join('') + '</select></label>'
-    + '<label>Working days below <input type="number" min="1" max="31" value="' + RW.thr + '" onchange="rwSet(\'thr\',this.value)" style="' + inp + 'width:56px;"></label>'
+    + '<label>Day-billed: working days below <input type="number" min="1" max="31" value="' + RW.thr + '" onchange="rwSet(\'thr\',this.value)" style="' + inp + 'width:52px;"></label><label>Month-billed: fraction below <input type="number" min="0.05" max="1" step="0.05" value="' + RW.thrMon + '" onchange="rwSet(\'thrMon\',this.value)" style="' + inp + 'width:56px;"></label>'
     + '<label>Low for the last <select onchange="rwSet(\'last\',this.value)" style="' + inp + '">' + [1, 2, 3].map(function(n){ return '<option value="' + n + '"' + (RW.last === n ? ' selected' : '') + '>' + n + ' month' + (n > 1 ? 's' : '') + '</option>'; }).join('') + '</select></label>'
     + '<label><input type="checkbox" ' + (RW.showKeep ? 'checked' : '') + ' onchange="rwSet(\'showKeep\',this.checked)"> show units whose contract note says intermittent</label>'
+    + '<label><input type="checkbox" ' + (RW.showLate ? 'checked' : '') + ' onchange="rwSet(\'showLate\',this.checked)"> show units that entered late in the month</label>'
     + '<label><input type="checkbox" ' + (RW.showDone ? 'checked' : '') + ' onchange="rwSet(\'showDone\',this.checked)"> show units already marked Keep</label>'
     + (admin ? '<button class="btn-sm" onclick="rwEditKw()" title="Words searched for in the contract note">\u2699 Note keywords</button>' : '')
     + '<span style="margin-left:auto;display:flex;gap:6px;"><button class="btn-sm" onclick="rwNotice()">\u2709 Release notice by vendor</button><button class="btn-sm" onclick="rwExport(\'xlsx\')">\ud83d\udcca Excel</button><button class="btn-sm" onclick="rwExport(\'pdf\')">\ud83d\udcc4 PDF</button></span></div>'
-    + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">' + chip('Low-use units (all)', R.stats.low, 'var(--blue)') + chip('No note \u2192 pull back', nPull, 'var(--red)') + chip('Contract not found \u2192 verify', nVer, 'var(--accent)') + chip('Month value of listed units (EGP)', f0(risk), 'var(--red)') + chip('Excluded: intermittent note', R.stats.keepNote, 'var(--green)') + chip('Excluded: hourly-rated', R.stats.hourly, 'var(--text-muted)') + '</div>';
+    + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">' + chip('Low-use units (all)', R.stats.low, 'var(--blue)') + chip('No note \u2192 pull back', nPull, 'var(--red)') + chip('Contract not found \u2192 verify', nVer, 'var(--accent)') + chip('Month value of listed units (EGP)', f0(risk), 'var(--red)') + chip('Excluded: intermittent note', R.stats.keepNote, 'var(--green)') + chip('Excluded: entered late', R.stats.late, 'var(--green)') + chip('Excluded: hourly-rated', R.stats.hourly, 'var(--text-muted)') + '</div>';
   if(R.stats.noHistory) h += '<div style="font-size:12px;color:var(--accent);margin-bottom:8px;">Not enough earlier months in Master Rental for a ' + RW.last + '-month check \u2014 choose a later month or a shorter window.</div>';
-  h += '<div style="overflow:auto;border:1px solid var(--border);border-radius:8px;"><table style="width:100%;border-collapse:collapse;"><thead><tr>' + ['<input type="checkbox" onclick="rwAll(this.checked)" title="Select all">', 'Equipment', 'Project / O.D', 'Vendor', 'Qty', 'Working days', 'Month value', 'Contract / note', 'Verdict', 'Decision'].map(th).join('') + '</tr></thead><tbody>';
-  if(!shown.length) h += '<tr><td colspan="10" style="padding:24px;text-align:center;color:var(--text-muted);">Nothing to pull back for these settings.</td></tr>';
+  h += '<div style="overflow:auto;border:1px solid var(--border);border-radius:8px;"><table style="width:100%;border-collapse:collapse;"><thead><tr>' + ['<input type="checkbox" onclick="rwAll(this.checked)" title="Select all">', 'Equipment', 'Project / O.D', 'Vendor', 'Qty', 'Working days', 'Entered in project', 'In project (same type)', 'Month value', 'Contract / note', 'Verdict', 'Decision'].map(th).join('') + '</tr></thead><tbody>';
+  if(!shown.length) h += '<tr><td colspan="12" style="padding:24px;text-align:center;color:var(--text-muted);">Nothing to pull back for these settings.</td></tr>';
   shown.forEach(function(x, i){
     var enc = encodeURIComponent(x.key), d = x.dec;
     var vd = x.verdict === 'pull' ? '<span style="color:var(--red);font-weight:700;">\u26d4 No note \u2014 pull back</span>' : (x.verdict === 'verify' ? '<span style="color:var(--accent);font-weight:700;">\u26a0 Contract not found \u2014 check the note</span>' : '<span style="color:var(--green);font-weight:700;">\u2713 Intermittent note \u2014 keep</span>');
+    if(x.verdict === 'late') vd = '<span style=\"color:var(--green);font-weight:700;\">\u2713 Entered late \u2014 not low usage</span>';
     if(x.loose && x.matched) vd += '<div style="font-size:10.5px;color:var(--text-muted);">matched by vendor + item only</div>';
     var decHtml = d ? '<div style="font-size:11px;font-weight:700;color:' + (d.s === 'keep' ? 'var(--green)' : (d.s === 'pull' ? 'var(--red)' : 'var(--accent)')) + ';">' + (d.s === 'keep' ? 'Keep' : (d.s === 'pull' ? 'Pull back' : 'Under review')) + '</div><div style="font-size:10.5px;color:var(--text-muted);">' + fuEsc(d.note || '') + ' ' + fuEsc(d.by ? '\u00b7 ' + String(d.by).split('@')[0] : '') + ' ' + fuEsc(d.at || '') + '</div>' : '';
     var btn = function(s, t){ return '<button class="btn-edit" style="padding:1px 7px;font-size:10px;margin:1px;" onclick="rwDecide(\'' + enc + '\',\'' + s + '\')">' + t + '</button>'; };
     h += '<tr><td ' + td + '><input type="checkbox" class="rw-chk" data-i="' + i + '"></td>'
-      + '<td ' + td + '><b>' + fuEsc(x.equipment) + '</b>' + (x.model ? '<div style="color:var(--text-muted);font-size:11px;">' + fuEsc(x.model) + '</div>' : '') + (x.sap ? '<div style="font-family:monospace;font-size:10.5px;color:var(--text-muted);">' + fuEsc(x.sap) + '</div>' : '') + '</td>'
+      + '<td ' + td + '><a style="cursor:pointer;" title="Unit card: entry date, monthly history, units in the project" onclick="rwUnitCard(\'' + enc + '\')"><b>' + fuEsc(x.equipment) + '</b></a>' + (x.model ? '<div style="color:var(--text-muted);font-size:11px;">' + fuEsc(x.model) + '</div>' : '') + (x.sap ? '<div style="font-family:monospace;font-size:10.5px;color:var(--text-muted);">' + fuEsc(x.sap) + '</div>' : '') + '</td>'
       + '<td ' + td + '>' + fuEsc(x.project || '\u2014') + (x.od ? '<div style="color:var(--text-muted);font-size:11px;">' + fuEsc(x.od) + '</div>' : '') + '</td><td ' + td + '>' + fuEsc(x.subcon || '\u2014') + '</td><td ' + td + '>' + x.qty + '</td>'
-      + '<td ' + td + '><b style="color:var(--red);font-family:monospace;">' + (Math.round(x.days * 10) / 10) + '</b>' + (x.mon ? '<div style="font-size:10.5px;color:var(--text-muted);">month basis (\u00d730)</div>' : '') + (x.hist.length > 1 ? '<div style="font-size:10.5px;color:var(--text-muted);white-space:nowrap;">' + x.hist.map(function(q){ return rwMonthLabel(q.m).slice(0, 3) + ': ' + Math.round(q.days * 10) / 10; }).join(' \u00b7 ') + '</div>' : '') + '</td>'
+      + '<td ' + td + '><b style="color:var(--red);font-family:monospace;">' + rwRaw(x) + '</b><div style="font-size:10.5px;color:var(--text-muted);">limit &lt; ' + x.thrApplied + (x.mon ? ' month' : ' d') + '</div>' + (x.hist.length > 1 ? '<div style="font-size:10.5px;color:var(--text-muted);white-space:nowrap;">' + x.hist.map(function(q){ return rwMonthLabel(q.m).slice(0, 3) + ': ' + (q.mon ? Math.round(q.raw * 100) / 100 + 'm' : Math.round(q.days * 10) / 10); }).join(' \u00b7 ') + '</div>' : '') + '</td>'
+      + '<td ' + td + '>' + rwEnteredHtml(x) + '</td><td ' + td + '>' + rwInProjHtml(x) + '</td>'
       + '<td ' + td + '><b>' + f0(x.total) + '</b></td>'
       + '<td ' + td + '>' + (x.matched ? '<div style="font-size:11px;">' + fuEsc(x.contract || '\u2014') + (x.basis ? ' <span style="color:var(--text-muted);">(' + fuEsc(x.basis) + ')</span>' : '') + '</div><div style="font-size:11px;color:var(--text-muted);max-width:260px;">' + (x.note ? fuEsc(x.note.length > 140 ? x.note.slice(0, 140) + '\u2026' : x.note) : '<i>no note</i>') + '</div>' : '<span style="color:var(--text-muted);font-size:11px;">not in Rental Database</span>') + '</td>'
       + '<td ' + td + '>' + vd + '</td><td ' + td + '>' + decHtml + (admin ? btn('pull', 'Pull back') + btn('keep', 'Keep') + btn('review', 'Review') + (d ? btn('reset', '\u21ba') : '') : '') + '</td></tr>';
@@ -6243,8 +6258,8 @@ function rwNotice(){
   var by = {}; list.forEach(function(x){ (by[x.subcon || '(vendor not stated)'] = by[x.subcon || '(vendor not stated)'] || []).push(x); });
   var ml = rwMonthLabel(RW.month), T = [];
   Object.keys(by).sort().forEach(function(v){
-    T.push('Subject: Request to release rented equipment \u2014 ' + v, '', 'Dear ' + v + ',', '', 'The units below showed minimal utilization in ' + ml + ' (less than ' + RW.thr + ' working days' + (RW.last > 1 ? ' in each of the last ' + RW.last + ' months' : '') + ') and the contract does not provide for intermittent work. Please arrange their release / collection and stop billing from the release date:', '');
-    by[v].forEach(function(x, i){ T.push((i + 1) + '. ' + x.equipment + (x.model ? ' (' + x.model + ')' : '') + (x.sap ? ' \u2014 SAP ' + x.sap : '') + ' \u2014 Qty ' + x.qty + ' \u2014 ' + (x.project || '\u2014') + ' \u2014 ' + (Math.round(x.days * 10) / 10) + ' working day(s)' + (x.contract ? ' \u2014 Contract ' + x.contract : '')); });
+    T.push('Subject: Request to release rented equipment \u2014 ' + v, '', 'Dear ' + v + ',', '', 'The units below showed minimal utilization in ' + ml + ' (below ' + RW.thr + ' working days, or ' + RW.thrMon + ' of a month for month-billed units' + (RW.last > 1 ? ' in each of the last ' + RW.last + ' months' : '') + ') and the contract does not provide for intermittent work. Please arrange their release / collection and stop billing from the release date:', '');
+    by[v].forEach(function(x, i){ T.push((i + 1) + '. ' + x.equipment + (x.model ? ' (' + x.model + ')' : '') + (x.sap ? ' \u2014 SAP ' + x.sap : '') + ' \u2014 Qty ' + x.qty + ' \u2014 ' + (x.project || '\u2014') + ' \u2014 ' + rwRaw(x) + ' worked' + (x.contract ? ' \u2014 Contract ' + x.contract : '')); });
     T.push('', 'Kindly confirm the release date.', '', 'Best regards,', '', '\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014', '');
   });
   var m = document.getElementById('rw-msg-modal');
@@ -6254,11 +6269,16 @@ function rwNotice(){
 }
 function rwExport(kind){
   var list = RW.view || []; if(!list.length){ toast('Nothing to export', 'error'); return; }
-  var rows = list.map(function(x){ return {eq:x.equipment || '', model:x.model || '', sap:x.sap || '', proj:x.project || '', od:x.od || '', ven:x.subcon || '', qty:x.qty, days:Math.round(x.days * 10) / 10, tot:Math.round(x.total), con:x.contract || '', note:x.note || '', vd:x.verdict === 'pull' ? 'No note - pull back' : (x.verdict === 'verify' ? 'Contract not found - verify' : 'Intermittent note - keep'), dec:x.dec ? ((x.dec.s === 'keep' ? 'Keep' : (x.dec.s === 'pull' ? 'Pull back' : 'Review')) + (x.dec.note ? ': ' + x.dec.note : '')) : ''}; });
+  var rows = list.map(function(x){
+    var ent = x.hire ? (x.hire.slice(0, 7) === x.month && +x.hire.slice(8, 10) > 1 ? 'Entered ' + rwFmtDate(x.hire) + ' (there ' + x.avail + ' of ' + x.dim + ' d)' : 'Hired ' + rwFmtDate(x.hire)) : (x.newUnit ? 'New this month' : (x.first ? 'Since ' + rwMonthLabel(x.first) : ''));
+    return {eq:x.equipment || '', model:x.model || '', sap:x.sap || '', proj:x.project || '', od:x.od || '', ven:x.subcon || '', qty:x.qty, raw:rwRaw(x), lim:'< ' + x.thrApplied + (x.mon ? ' month' : ' d'), ent:ent, inp:'Rental ' + (x.inRent || 0) + ' \u00b7 Owned ' + rwOwnIn(x), tot:Math.round(x.total), con:x.contract || '', note:x.note || '',
+            vd:x.verdict === 'pull' ? 'No note - pull back' : (x.verdict === 'verify' ? 'Contract not found - verify' : (x.verdict === 'late' ? 'Entered late - not low' : 'Intermittent note - keep')),
+            dec:x.dec ? ((x.dec.s === 'keep' ? 'Keep' : (x.dec.s === 'pull' ? 'Pull back' : 'Review')) + (x.dec.note ? ': ' + x.dec.note : '')) : ''};
+  });
   function f(k){ return function(o){ return o[k]; }; }
   var cols = [{h:'#', g:function(o, i){ return i + 1; }, t:'t'}, {h:'Equipment', g:f('eq'), t:'t'}, {h:'Model / Capacity', g:f('model'), t:'t'}, {h:'SAP', g:f('sap'), t:'t'}, {h:'Project', g:f('proj'), t:'t'}, {h:'O.D', g:f('od'), t:'t'}, {h:'Vendor', g:f('ven'), t:'t'},
-    {h:'Qty', g:f('qty'), t:'i', s:true}, {h:'Working days', g:f('days'), t:'t'}, {h:'Month value (EGP)', g:f('tot'), t:'i', s:true}, {h:'Contract', g:f('con'), t:'t'}, {h:'Contract note', g:f('note'), t:'t'}, {h:'Verdict', g:f('vd'), t:'t'}, {h:'Decision', g:f('dec'), t:'t'}];
-  window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 Rental pull-back watch \u00b7 ' + rwMonthLabel(RW.month) + ' (< ' + RW.thr + ' working days)', cols:cols, rows:rows, kpis:[{label:'Units listed', value:rows.length}, {label:'No note - pull back', value:list.filter(function(x){ return x.verdict === 'pull'; }).length}, {label:'Contract not found', value:list.filter(function(x){ return x.verdict === 'verify'; }).length}]}, kind);
+    {h:'Qty', g:f('qty'), t:'i', s:true}, {h:'Worked', g:f('raw'), t:'t'}, {h:'Limit', g:f('lim'), t:'t'}, {h:'Entered in project', g:f('ent'), t:'t'}, {h:'In project (same type)', g:f('inp'), t:'t'}, {h:'Month value (EGP)', g:f('tot'), t:'i', s:true}, {h:'Contract', g:f('con'), t:'t'}, {h:'Contract note', g:f('note'), t:'t'}, {h:'Verdict', g:f('vd'), t:'t'}, {h:'Decision', g:f('dec'), t:'t'}];
+  window.hacPdfTable({title:'HAC \u00b7 PMV \u2014 Rental pull-back watch \u00b7 ' + rwMonthLabel(RW.month) + ' (day-billed < ' + RW.thr + ' d \u00b7 month-billed < ' + RW.thrMon + ')', cols:cols, rows:rows, kpis:[{label:'Units listed', value:rows.length}, {label:'No note - pull back', value:list.filter(function(x){ return x.verdict === 'pull'; }).length}, {label:'Contract not found', value:list.filter(function(x){ return x.verdict === 'verify'; }).length}]}, kind);
 }
 /* ── Engineers (project -> responsible engineer), unit card, candidate table ── */
 var FU_ENG_DEFAULT = [{"n": "Ahmed Abdelmaboud", "t": "Sr. Maintenance Engineer", "p": "El Shohada Hospital", "m": "01270959526", "e": "ahmed.abdelmaboud@hassanallam.com"}, {"n": "Abdel Kader Mohamed", "t": "Equipment Manager", "p": "El Dabaa NPP", "m": "01008428530", "e": "abdelkader.mohamed@hassanallam.com"}, {"n": "Khaled Rashed", "t": "Maintenance Section Head", "p": "El Dabaa NPP", "m": "01094485857", "e": "khaled.rashed@hassanallam.com"}, {"n": "Mohamed Elgammal", "t": "Maintenance Section Head", "p": "Swan Lake Extension", "m": "01028921527", "e": "mohammed.elgammal@hassanallam.com"}, {"n": "Khaled El Sayed", "t": "Maintenance Section Head", "p": "Allam Steel", "m": "01200877473", "e": "khaled.elbaqly@hassanallam.com"}, {"n": "Ayman El Sayed", "t": "Maintenance Section Head", "p": "Lokanda", "m": "01147037101", "e": "ayman.elsayed@hassanallam.com"}, {"n": "Mostafa Qamar", "t": "Maintenance Section Head", "p": "Soul", "m": "01020754405", "e": "mostafa.kamar@hassanallam.com"}, {"n": "Ayman Gad", "t": "Maintenance Manager", "p": "Mostakbal Masr Zone (G)", "m": "01120378388", "e": "ayman.gad@hassanallam.com"}, {"n": "Ahmed El Khodary", "t": "Maintenance Section Head", "p": "Alex Raml Tram", "m": "01112453393", "e": "ahmed.khodry@hassanallam.com"}, {"n": "Mohamed Ashraf", "t": "Maintenance Section Head", "p": "Silver Sand", "m": "01016445101", "e": "mohamed.aabdelmohsen@hassanallam.com"}, {"n": "Ahmed El Labban", "t": "Maintenance Section Head", "p": "Alameen station / Wadi Elnatroon", "m": "01024733946", "e": "ahmed.ellabban@hassanallam.com"}, {"n": "Hany Rashwan", "t": "Equipment Manager", "p": "Ras El Hekma (JV)", "m": "01278163331", "e": "hany.rashwan@hassanallam.com"}, {"n": "Radwan EL Sayed", "t": "Maintenance Section Head", "p": "Ras El Hekma (DPP6)", "m": "01151713597", "e": "radwan.ahmed@hassanallam.com"}, {"n": "Khaled Ibrahim", "t": "Sr. Maintenance Engineer", "p": "U - Section Alex", "m": "01227191802", "e": "khaled.dessoki@hassanallam.com"}, {"n": "Mohamed Abdelnaby", "t": "Sr. Maintenance Engineer", "p": "Hub-mall & LRT", "m": "01002380170", "e": "mohamed.msalama@hassanallam.com"}, {"n": "Hesham Amr", "t": "Sr. Maintenance Engineer", "p": "Bab Masr", "m": "01014600541", "e": "hesham.alrkaiby@hassanallam.com"}, {"n": "Ahmed Anwar", "t": "Maintenance Section Head", "p": "Haptowen", "m": "01159107120", "e": "ahmed.anwar@hassanallam.com"}, {"n": "Mohamed Shaban", "t": "Equipment Manager", "p": "Metro Line 4", "m": "01271407930", "e": "mohamed.sabdelghany@hassanallam.com"}, {"n": "Mohamed Brakat", "t": "Maintenance Section Head", "p": "Metro Line 4", "m": "01016441216", "e": "mohamed.babdelazim@hassanallam.com"}, {"n": "Fathy Khattab", "t": "Maintenance Section Head", "p": "HAC - HARD 350 Feddan", "m": "01091975720", "e": "fathy.khattab@hassanallam.com"}, {"n": "Hany Serag", "t": "Maintenance Section Head", "p": "R05 / Kayan", "m": "01201985979", "e": "hany.sirag@hassanallam.com"}, {"n": "Shady Abdel Naeem", "t": "Sr. Maintenance Engineer", "p": "Nasser Institute", "m": "01206615175", "e": "shady.abdelnaeem@hassanallam.com"}, {"n": "Hamdy Bahloul", "t": "Maintenance Section Head", "p": "Mavida", "m": "01064305085", "e": "hamdy.mohamed@hassanallam.com"}, {"n": "Ahmed Ezzat", "t": "Equipment Manager", "p": "Afrexim Bank", "m": "01040996669", "e": "ahmed.eali@hassanallam.com"}, {"n": "Hazem Khalil", "t": "Maintenance Section Head", "p": "Afrexim Bank", "m": "01111746787", "e": "hazem.khalil@hassanallam.com"}, {"n": "Taha Abdel Mawgood", "t": "Lifting Section Head", "p": "Sofitel", "m": "01017788005", "e": "taha.soliman@hassanallam.com"}, {"n": "Ashraf Mansour", "t": "Equipment Manager", "p": "Mansour Factory(mac)", "m": "01025450223", "e": "ashraf.mansour@hassanallam.com"}, {"n": "Maher Mady", "t": "Sr. Maintenance Engineer", "p": "10th Of Ramadan Sector", "m": "01272751014", "e": "Maher.Mady@hassanallam.com"}, {"n": "Ahmed Saber", "t": "Sr. Maintenance Engineer", "p": "Luxor Warehouse", "m": "01015834609", "e": "ahmed.selsaied@hassanallam.com"}, {"n": "Ahmed Selmy", "t": "Maintenance Engineer", "p": "Benban", "m": "01221518888", "e": "ahmed.salma@hassanallam.com"}, {"n": "Robeir Eskander", "t": "Maintenance Section Head - Mech", "p": "H.S-Train Depots-Minia", "m": "01200377857", "e": ""}, {"n": "Ismail Mostafa", "t": "Maintenance Section Head - Elec", "p": "H.S-Train Depots-Minia", "m": "01005562622", "e": ""}, {"n": "Mohamed Tarek", "t": "Senior Maintenance Engineer -Mech", "p": "H.S-Train Depots-Minia", "m": "01155390387", "e": ""}, {"n": "Tarek Saleh", "t": "Senior Maintenance Engineer -Elec", "p": "H.S-Train Depots-Minia", "m": "01019853525", "e": ""}, {"n": "Ibrahim El Belsha", "t": "Maintenance Section Head", "p": "Foundition", "m": "01066211803", "e": "ibrahem.elbalsha@hassanallam.com"}, {"n": "Saber El Beshlawy", "t": "Maintenance Section Head", "p": "NCRTL - WTP JV", "m": "01095096487", "e": "saber.abdelrahman@hassanallam.com"}, {"n": "Morshed El Sayed", "t": "Sr. Maintenance Engineer", "p": "Safaga Port", "m": "01091397690", "e": "morshed.elsayed@hassanallam.com"}, {"n": "Reda Ahmed", "t": "Maintenance Section Head", "p": "Fairmont Hotel Sharm El Sheikh", "m": "01014360802", "e": "reda.ahmed@hassanallam.com"}];
@@ -6428,6 +6448,161 @@ function fuUnitLookup(q){
     + '<div class="modal-actions"><button class="btn-cancel" onclick="closeModal(\'fu-unit-modal\')">Close</button><button class="btn-sm" onclick="fuCopyText(this.getAttribute(\'data-t\'))" data-t="' + fuEsc([e.code + ' \u2014 ' + (e.equipment || ''), 'Project: ' + (ws ? 'Central Workshop' : (e.project || '\u2014')), 'Engineer: ' + (ws ? '\u2014' : fuEngLine(e.project)), 'Last reading: ' + (L ? fuMLab(L.m) + (L.d != null ? ' \u2014 ' + Math.round(L.d * 10) / 10 + ' h' + (L.low ? ' (LOW, limit ' + L.lim + ' h)' : '') : '') : 'none')].join('\n')) + '">Copy summary</button></div></div>';
   m.innerHTML = h; m.classList.add('open');
 }
+/* ── Rental idle watch: month-billed vs day-billed limits, entry date, units in the project, and the same check inside Follow-Up ── */
+try{ var rq0 = JSON.parse(localStorage.getItem('rwThr') || 'null'); if(rq0){ if(rq0.thr > 0) RW.thr = rq0.thr; if(rq0.thrMon > 0) RW.thrMon = rq0.thrMon; } }catch(e){}
+var FUIDLE = {state:0, sig:'', rows:[], stats:null, month:''};
+function rwRaw(x){ return x.mon ? (Math.round(x.raw * 100) / 100) + ' month' : (Math.round(x.days * 10) / 10) + ' d'; }
+function rwFmtDate(iso){ var M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'], p = String(iso || '').split('-'); return p.length >= 3 ? (+p[2]) + ' ' + (M[+p[1] - 1] || p[1]) + ' ' + p[0] : (iso || ''); }
+function rwKeyOfRow(r){ return [rwNorm(r.sap), rwNorm(r.plant), rwNorm(r.equipment), rwNorm(r.project), rwNorm(r.subcon)].join('|'); }
+function rwOwnIn(x){
+  if(x.inOwn != null) return x.inOwn;
+  var n = 0, pj = rwNorm(x.project);
+  try{ fuOwnedMatches({equipment:x.equipment, capacity:x.model}, (typeof allEquipment !== 'undefined' ? allEquipment : []), {sameCap:true, allFleets:false}).forEach(function(m){ if(rwEq(pj, rwNorm(m.e.project))) n++; }); }catch(e){}
+  return (x.inOwn = n);
+}
+function rwEnteredHtml(x){
+  var mut = 'font-size:10.5px;color:var(--text-muted);';
+  if(x.hire && x.hire.slice(0, 7) === x.month){
+    var dd = +x.hire.slice(8, 10);
+    if(dd > 1) return '<b>' + fuEsc(rwFmtDate(x.hire)) + '</b><div style="' + mut + '">there ' + x.avail + ' of ' + x.dim + ' days</div><div style="font-size:11px;font-weight:700;color:' + (x.late ? 'var(--green)' : 'var(--red)') + ';">' + (x.late ? '\u2713 arrived late \u2014 worked ' + rwRaw(x) + ' of ' + x.avail + ' d there' : '\u2716 low even after arriving') + '</div>';
+    return '<b>' + fuEsc(rwFmtDate(x.hire)) + '</b><div style="' + mut + '">full month</div>';
+  }
+  if(x.hire) return '<b>' + fuEsc(rwFmtDate(x.hire)) + '</b><div style="' + mut + '">before this month' + (x.first ? ' \u00b7 in Master Rental since ' + fuEsc(rwMonthLabel(x.first)) : '') + '</div>';
+  if(x.newUnit) return '<span style="color:var(--accent);font-weight:700;">New this month</span><div style="' + mut + '">first appears ' + fuEsc(rwMonthLabel(x.first)) + ' \u2014 entry day not recorded</div>';
+  return x.first ? '<div style="' + mut + '">in Master Rental since ' + fuEsc(rwMonthLabel(x.first)) + '</div>' : '<span style="' + mut + '">\u2014</span>';
+}
+function rwInProjHtml(x){
+  return '<div style="font-size:11.5px;white-space:nowrap;">Rental <b>' + (x.inRent || 0) + '</b> \u00b7 Owned <b>' + rwOwnIn(x) + '</b></div><div style="font-size:10.5px;color:var(--text-muted);">same type in this project</div>';
+}
+function rwFindRow(key){
+  var f = null, L = [(RW.res && RW.res.rows) || [], FUIDLE.rows || []];
+  L.some(function(a){ return a.some(function(x){ if(x.key === key){ f = x; return true; } return false; }); });
+  return f;
+}
+function rwHistory(key){
+  var by = {};
+  (RW.mr || []).forEach(function(r){
+    if(!(Number(r.qty) > 0) || !r.month || rwKeyOfRow(r) !== key) return;
+    var rawD = Number(r.days) || 0, isMon = r.uom === 'month' || (!r.uom && rawD > 0 && rawD < 1.5 && rawD !== Math.round(rawD));
+    var b = by[r.month] || (by[r.month] = {m:r.month, raw:0, mon:false, qty:0, total:0, hire:''});
+    b.raw += rawD; if(isMon) b.mon = true; b.qty += Number(r.qty) || 0; b.total += Number(r.totalPrice) || 0;
+    var hd = String(r.hiringDate || ''); if(/^\d{4}-\d{2}-\d{2}/.test(hd) && (!b.hire || hd.slice(0, 10) < b.hire)) b.hire = hd.slice(0, 10);
+  });
+  return Object.keys(by).sort().map(function(k){ return by[k]; });
+}
+function rwShowMsg(title, text){
+  var m = document.getElementById('rw-msg-modal');
+  if(!m){ m = document.createElement('div'); m.className = 'modal-overlay'; m.id = 'rw-msg-modal'; document.body.appendChild(m); }
+  m.innerHTML = '<div class="modal" style="width:700px;max-width:96vw;"><div class="modal-title">' + fuEsc(title) + '</div><textarea id="rw-msg-text" style="width:100%;height:320px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:12.5px;font-family:inherit;">' + fuEsc(text) + '</textarea><div class="modal-actions"><button class="btn-cancel" onclick="closeModal(\'rw-msg-modal\')">Close</button><button class="btn-save" onclick="fuCopyText(document.getElementById(\'rw-msg-text\').value)">Copy</button></div></div>';
+  m.classList.add('open');
+}
+/* message to the vendor: release the idle unit, or (when opened from a request) move it to the project that asked for the equipment */
+function rwIdleMsg(enc, reqId){
+  var x = rwFindRow(decodeURIComponent(enc)); if(!x) return;
+  var r = reqId ? FU_DATA.filter(function(o){ return o.id === reqId; })[0] : null, win = r ? fuReqWindow(r) : null, ml = rwMonthLabel(x.month);
+  var L = ['Subject: ' + (r ? 'Redeployment of rented unit \u2014 ' : 'Release of rented unit \u2014 ') + x.equipment + (x.model ? ' (' + x.model + ')' : ''), '', 'Dear ' + (x.subcon || 'Team') + ',', '',
+    'The unit below worked only ' + rwRaw(x) + ' in ' + ml + (x.hire && x.hire.slice(0, 7) === x.month ? ' (it arrived on ' + rwFmtDate(x.hire) + ')' : '') + ':', '',
+    '\u2022 Equipment: ' + x.equipment + (x.model ? ' \u2014 ' + x.model : '') + (x.sap ? '   \u2022 SAP: ' + x.sap : ''),
+    '\u2022 Current project: ' + (x.project || '\u2014') + (x.contract ? '   \u2022 Contract: ' + x.contract : ''), ''];
+  if(r) L.push('We need the same equipment at ' + (r.project || 'another project') + (win ? ' from ' + win.from + ' to ' + win.to : '') + '. Please confirm whether this unit can be moved there under the same terms (transport and any re-mobilization), instead of a new hire.');
+  else L.push('Please arrange the release / collection of this unit and stop billing from the release date.');
+  L.push('', 'Kindly confirm the date.', '', 'Best regards,');
+  rwShowMsg(r ? 'Redeploy request \u2014 ' + x.equipment : 'Release request \u2014 ' + x.equipment, L.join('\n'));
+}
+/* unit card: when it entered the project, how it worked month by month, and what else of the same type is in that project */
+function rwUnitCard(enc){
+  var key = decodeURIComponent(enc), x = rwFindRow(key); if(!x){ toast('Unit not found in the current list', 'error'); return; }
+  fuEngEnsure();
+  var H = rwHistory(key).slice(-8), E = fuEngFor(x.project), mut = 'color:var(--text-muted);';
+  var row = function(a, b){ return '<div style="display:flex;gap:10px;padding:4px 0;border-bottom:1px solid var(--border);font-size:12.5px;"><div style="width:130px;' + mut + '">' + a + '</div><div style="flex:1;">' + b + '</div></div>'; };
+  var others = {};
+  (RW.mr || []).forEach(function(r){
+    if(r.month !== x.month || !(Number(r.qty) > 0)) return;
+    var k2 = rwKeyOfRow(r); if(k2 === key) return;
+    if(!(rwEq(rwNorm(x.project), rwNorm(r.project)) && rwEq(rwNorm(x.equipment), rwNorm(r.equipment)))) return;
+    var rawD = Number(r.days) || 0, isMon = r.uom === 'month' || (!r.uom && rawD > 0 && rawD < 1.5 && rawD !== Math.round(rawD));
+    var o = others[k2] || (others[k2] = {v:r.subcon, q:0, raw:0, mon:false}); o.q += Number(r.qty) || 0; o.raw += rawD; if(isMon) o.mon = true;
+  });
+  var ol = Object.keys(others).map(function(k){ return others[k]; });
+  var m = document.getElementById('rw-unit-modal');
+  if(!m){ m = document.createElement('div'); m.className = 'modal-overlay'; m.id = 'rw-unit-modal'; document.body.appendChild(m); }
+  m.innerHTML = '<div class="modal" style="width:700px;max-width:96vw;max-height:92vh;overflow:auto;"><div class="modal-title">\ud83d\udccb ' + fuEsc(x.equipment) + (x.model ? ' \u2014 ' + fuEsc(x.model) : '') + '</div>'
+    + row('Vendor / contract', fuEsc(x.subcon || '\u2014') + (x.contract ? ' \u00b7 ' + fuEsc(x.contract) : '') + (x.basis ? ' <span style="' + mut + '">(' + fuEsc(x.basis) + ')</span>' : ''))
+    + row('Project', fuEsc(x.project || '\u2014') + (x.od ? ' <span style="' + mut + '">' + fuEsc(x.od) + '</span>' : ''))
+    + row('Engineer', E.length ? E.map(function(g){ var wa = fuWaLink(g.m); return '<div><b>' + fuEsc(g.n) + '</b> <span style="' + mut + 'font-size:11px;">' + fuEsc(g.t) + '</span> <span style="font-family:monospace;font-size:11.5px;">' + fuEsc(g.m) + '</span>' + (wa ? ' <a href="' + wa + '" target="_blank" rel="noopener">\ud83d\udcac</a>' : '') + '</div>'; }).join('') : '<span style="' + mut + '">no engineer matched to this project name</span>')
+    + row(rwMonthLabel(x.month), '<b style="color:var(--red);">' + rwRaw(x) + '</b> <span style="' + mut + '">(limit &lt; ' + x.thrApplied + (x.mon ? ' month' : ' d') + ' \u00b7 ' + (x.mon ? 'month-billed' : 'day-billed') + ')</span>')
+    + row('Entered in project', rwEnteredHtml(x))
+    + row('In this project', 'Rental <b>' + (x.inRent || 0) + '</b> \u00b7 Owned <b>' + rwOwnIn(x) + '</b> <span style="' + mut + '">of the same type</span>')
+    + (x.note ? row('Contract note', fuEsc(x.note)) : '')
+    + (H.length ? row('Month by month', '<table style="border-collapse:collapse;font-size:12px;">' + H.map(function(q){ var lim = q.mon ? RW.thrMon : RW.thr, low = q.raw < lim; return '<tr><td style="padding:1px 12px 1px 0;' + mut + '">' + fuEsc(rwMonthLabel(q.m)) + '</td><td style="padding:1px 12px 1px 0;font-family:monospace;font-weight:700;color:' + (low ? 'var(--red)' : 'var(--text)') + ';">' + (Math.round(q.raw * 100) / 100) + (q.mon ? ' month' : ' d') + '</td><td style="padding:1px 12px 1px 0;' + mut + '">' + (q.hire ? 'hired ' + fuEsc(rwFmtDate(q.hire)) : '') + '</td><td style="' + mut + '">' + Math.round(q.total).toLocaleString('en-US') + ' EGP</td></tr>'; }).join('') + '</table>') : '')
+    + (ol.length ? row('Other rented units here', ol.slice(0, 8).map(function(o){ return fuEsc(o.v || '\u2014') + ' \u00b7 qty ' + o.q + ' \u00b7 ' + (Math.round(o.raw * 100) / 100) + (o.mon ? ' month' : ' d'); }).join('<br>')) : '')
+    + '<div class="modal-actions"><button class="btn-cancel" onclick="closeModal(\'rw-unit-modal\')">Close</button><button class="btn-sm" onclick="rwIdleMsg(\'' + enc + '\')">\u2709 Release request</button></div></div>';
+  m.classList.add('open');
+}
+/* ── the same watch inside Follow-Up (Pending requests) ── */
+function fuSameProj(a, b){ var ka = fuEngKeys(a), kb = fuEngKeys(b), best = 0; ka.forEach(function(x){ kb.forEach(function(y){ best = Math.max(best, fuEngScore(x, y)); }); }); return best >= 0.78; }
+function fuIdleEnsure(){
+  if(FUIDLE.state) return; FUIDLE.state = 1;
+  rwLoad().then(function(){ FUIDLE.state = 2; FUIDLE.sig = ''; try{ renderFollowUpTable(); }catch(e){} try{ fuEngRefresh(); }catch(e){} }).catch(function(){ FUIDLE.state = 2; });
+}
+function fuIdleRows(){
+  if(!(RW.mr && RW.mr.length)) return null;
+  var ms = {}; RW.mr.forEach(function(r){ if(r.month) ms[r.month] = 1; });
+  var ml = Object.keys(ms).sort(), month = ml[ml.length - 1]; if(!month) return null;
+  var sig = [month, RW.thr, RW.thrMon, RW.mr.length, (RW.rd || []).length, RW.kw.join(',')].join('|');
+  if(FUIDLE.sig !== sig){ var R = rwCompute(RW.mr, RW.rd || [], {thr:RW.thr, thrMon:RW.thrMon, last:1, month:month, kw:RW.kw}); FUIDLE.rows = R.rows; FUIDLE.stats = R.stats; FUIDLE.month = month; FUIDLE.sig = sig; }
+  return FUIDLE.rows;
+}
+function fuIdleMatch(r, u){
+  var rt = fuToks(r.equipment); if(!rt.length) return false;
+  var toks = fuToks([u.equipment, u.model, u.category].join(' '));
+  if(!rt.every(function(t){ return toks.indexOf(t) >= 0 || toks.some(function(q){ return q.indexOf(t) === 0; }); })) return false;
+  var comparable = /(kva|k\.?\s*w|\bhp\b|\bton|\btonne|\bt\b|\bkg\b|m\s*[3\u00b3]|\blit|\bl\b|\bbar\b|\bmm\b|\bcm\b|\bm\b|\bkn\b|\bhz\b|\bv\b|\bamp)/i.test(String(r.capacity || ''));
+  var cn = comparable ? fuNums(r.capacity) : [], un = fuNums(u.model);
+  if(cn.length && un.length && !cn.some(function(a){ return un.some(function(b){ return a > 0 && Math.abs(a - b) / a <= 0.1; }); })) return false;
+  return true;
+}
+function fuIdleFor(r, withHidden){
+  var all = fuIdleRows(); if(!all) return withHidden ? {list:[], late:0, keep:0} : [];
+  var m = all.filter(function(u){ return fuIdleMatch(r, u); }), list = [], late = 0, keep = 0;
+  m.forEach(function(u){
+    var d = RW.dec[rwHash(u.key)];
+    if(d && d.s === 'keep'){ keep++; return; }
+    if(u.verdict === 'late'){ late++; return; }
+    if(u.verdict === 'keep'){ keep++; return; }
+    list.push(u);
+  });
+  list.sort(function(a, b){ var sa = fuSameProj(a.project, r.project) ? 0 : 1, sb = fuSameProj(b.project, r.project) ? 0 : 1; return sa - sb || b.total - a.total; });
+  return withHidden ? {list:list, late:late, keep:keep} : list;
+}
+function fuIdleBadge(r){
+  if(r.provision !== 'Pending') return '';
+  fuIdleEnsure();
+  var L = fuIdleFor(r); if(!L.length) return '';
+  var same = L.filter(function(u){ return fuSameProj(u.project, r.project); }).length;
+  var tip = L.slice(0, 4).map(function(u){ return (u.subcon || '\u2014') + ' \u00b7 ' + (u.project || '\u2014') + ' \u00b7 ' + rwRaw(u); }).join(' | ');
+  return '<span title="' + fuEsc('Rented units of this type that worked very little: ' + tip) + '" onclick="event.stopPropagation();fuSearchOwned(\'' + fuEsc(r.id) + '\')" style="font-size:10px;color:var(--accent);border:1px solid var(--accent);border-radius:10px;padding:0 6px;margin-left:4px;cursor:pointer;">\ud83d\udca4 ' + L.length + (same ? ' (' + same + ' here)' : '') + '</span>';
+}
+function fuIdleMini(r){ var n = fuIdleFor(r).length; return n ? '<div style="font-size:10.5px;color:var(--accent);">\ud83d\udca4 ' + n + ' idle rented</div>' : ''; }
+function fuIdleSection(r){
+  var all = fuIdleRows();
+  if(all === null){ fuIdleEnsure(); return FUIDLE.state === 1 ? '<div style="font-size:11.5px;color:var(--text-muted);margin-top:10px;">Loading rental data\u2026</div>' : ''; }
+  var R = fuIdleFor(r, true), list = R.list, mut = 'color:var(--text-muted);';
+  var head = '<div style="margin-top:14px;font-size:12.5px;font-weight:700;">\ud83d\udca4 Rented units of this type already in projects but barely used <span style="font-weight:400;' + mut + 'font-size:11px;">(' + fuEsc(rwMonthLabel(FUIDLE.month)) + ' \u00b7 day-billed below ' + RW.thr + ' d \u00b7 month-billed below ' + RW.thrMon + ')</span></div>';
+  var tail = (R.late || R.keep) ? '<div style="font-size:11px;' + mut + 'margin-top:4px;">' + (R.late ? R.late + ' more look low only because they arrived late in the month. ' : '') + (R.keep ? R.keep + ' more have an intermittent-work note or were marked Keep.' : '') + '</div>' : '';
+  if(!list.length) return head + '<div style="font-size:11.5px;' + mut + 'margin-top:4px;">None found.</div>' + tail;
+  var td = 'style="padding:5px 8px;border-bottom:1px solid var(--border);font-size:12px;vertical-align:top;"';
+  var h = head + '<div style="margin-top:6px;max-height:300px;overflow:auto;border:1px solid var(--border);border-radius:8px;"><table style="width:100%;border-collapse:collapse;"><tr style="position:sticky;top:0;background:var(--surface);z-index:1;">'
+    + ['Rented unit', 'Project now', 'Engineer', 'This month', 'Entered', 'In project', 'Month value', ''].map(function(t){ return '<th style="text-align:left;padding:5px 8px;font-size:11px;' + mut + 'white-space:nowrap;">' + t + '</th>'; }).join('') + '</tr>';
+  list.slice(0, 15).forEach(function(u){
+    var enc = encodeURIComponent(u.key), here = fuSameProj(u.project, r.project);
+    h += '<tr><td ' + td + '><a style="cursor:pointer;" onclick="rwUnitCard(\'' + enc + '\')" title="Unit card"><b style="color:var(--blue);">' + fuEsc(u.equipment) + '</b></a>' + (u.model ? ' <span style="' + mut + 'font-size:11px;">' + fuEsc(u.model) + '</span>' : '') + '<div style="font-size:10.5px;' + mut + '">' + fuEsc(u.subcon || '\u2014') + (u.contract ? ' \u00b7 ' + fuEsc(u.contract) : '') + '</div>' + (u.matched ? '' : '<div style="font-size:10.5px;color:var(--accent);">contract not found \u2014 check the note</div>') + '</td>'
+      + '<td ' + td + '>' + fuEsc(u.project || '\u2014') + (here ? '<div style="font-size:10.5px;color:var(--red);font-weight:700;">same project as the request</div>' : '') + '</td><td ' + td + '>' + fuEngHtml(u.project) + '</td>'
+      + '<td ' + td + '><b style="color:var(--red);font-family:monospace;">' + rwRaw(u) + '</b><div style="font-size:10.5px;' + mut + '">limit &lt; ' + u.thrApplied + (u.mon ? ' month' : ' d') + '</div></td><td ' + td + '>' + rwEnteredHtml(u) + '</td><td ' + td + '>' + rwInProjHtml(u) + '</td><td ' + td + '>' + Math.round(u.total).toLocaleString('en-US') + '</td>'
+      + '<td ' + td + '><button class="btn-edit" style="padding:1px 7px;font-size:10px;" title="Redeploy / release request to the vendor" onclick="rwIdleMsg(\'' + enc + '\',\'' + fuEsc(r.id) + '\')">\u2709</button></td></tr>';
+  });
+  return h + '</table></div>' + (list.length > 15 ? '<div style="font-size:11px;' + mut + 'margin-top:4px;">\u2026 and ' + (list.length - 15) + ' more</div>' : '') + tail;
+}
 document.addEventListener('hm-loaded', function(){ var m = document.getElementById('fu-owned-modal'); if(m && m.classList.contains('open') && window.__fuOwnedReq && window.__fuOwnLow !== false) fuSearchOwned(window.__fuOwnedReq); });
 function fuSearchOwned(id){
   var r = FU_DATA.find(function(x){ return x.id === id; }); if(!r){ toast('Record not found', 'error'); return; }
@@ -6438,7 +6613,7 @@ function fuSearchOwned(id){
   var fleets = !!(document.getElementById('fu-own-fleets') || {}).checked;
   var lowEl = document.getElementById('fu-own-low'), lowOn = lowEl ? lowEl.checked : (window.__fuOwnLow !== false);
   window.__fuOwnLow = lowOn;
-  fuEngEnsure();
+  fuEngEnsure(); fuIdleEnsure();
   var lmEl = document.getElementById('fu-own-lowm'), lowYm = lmEl ? lmEl.value : (window.__fuLowYm || 'last'); window.__fuLowYm = lowYm;
   var LM = (typeof window.hmLowMap === 'function') ? window.hmLowMap(lowYm) : {map:{}, loaded:false, months:[], ym:''};
   if(lowOn && !LM.loaded && typeof hmReload === 'function'){ try{ hmReload(); }catch(x){} }
@@ -6486,6 +6661,7 @@ function fuSearchOwned(id){
     h += fuCandTable(res, r, {max:60});
     h += '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;">Units in Central Workshop are the easiest to allocate; units at a project need that project\'s agreement. Matching is by equipment name and the numbers in the capacity — always confirm technically.</div>';
   }
+  h += fuIdleSection(r);
   if(res.length) h += '<div id="fu-own-sav" style="margin-top:10px;padding:10px 12px;border:1px solid var(--border);border-left:3px solid var(--green);border-radius:8px;font-size:12px;background:var(--bg);color:var(--text-muted);">\ud83d\udcb2 Estimating the saving vs. an external rental\u2026</div>';
   if(repHidden) h += '<div style="font-size:11.5px;color:var(--accent);margin-top:8px;">' + repHidden + ' unit(s) hidden because they are under repair \u2014 untick "Hide units under repair" to see them.</div>';
   if(busyHidden) h += '<div style="font-size:11.5px;color:var(--accent);margin-top:8px;">' + busyHidden + ' unit(s) hidden because they are busy (workshop / transfer / allocated) during the request period \u2014 untick "Hide units busy" to see them with the reason.</div>';
