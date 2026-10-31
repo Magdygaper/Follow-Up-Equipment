@@ -5689,10 +5689,14 @@ function fuHrsOf(code, LM){
 function fuAttachPj(r, all, fleets, LM, list){
   var pjAll = fuOwnedMatches(r, all, {allFleets:!!fleets, sameCap:true}), pj = {}, known = !!(LM && LM.loaded);
   pjAll.forEach(function(x){
-    var k = fuPjKey(x.e), s = pj[k] || (pj[k] = {total:0, low:0, lowKnown:known, codes:{}, hi:[]});
+    var k = fuPjKey(x.e), s = pj[k] || (pj[k] = {total:0, low:0, lowKnown:known, codes:{}, hi:[], units:[]});
     s.total++; s.codes[fuNormCode(x.e.code)] = 1;
-    if(known && LM.map[fuNormCode(x.e.code)]) s.low++;
+    var isLow = !!(known && LM.map[fuNormCode(x.e.code)]), hh = null;
+    if(isLow) s.low++;
     else if(known){ var h = fuHrsOf(x.e.code, LM); if(h != null) s.hi.push(h); }
+    if(known) hh = isLow ? LM.map[fuNormCode(x.e.code)].d : fuHrsOf(x.e.code, LM);
+    var L0 = fuLastOf(x.e);
+    s.units.push({code:x.e.code || '', cap:fuCapOf(x.e), d:(hh == null ? null : hh), low:isLow, lim:L0 ? L0.lim : null, lm:L0 ? fuMLab(L0.m) : '', behind:L0 ? fuMonthsBehind(L0.m, L0.latest) : ''});
   });
   (list || []).forEach(function(x){ var s = pj[fuPjKey(x.e)]; x.pj = (s && s.codes[fuNormCode(x.e.code)]) ? s : null; });
 }
@@ -6035,9 +6039,11 @@ function fuBulkXlsxPro(rows){
 
   /* ---------- sheet 2: Project Summary ---------- */
   if(gList.length){
-    var wsP = wb.addWorksheet('Project Summary', {views:[{state:'frozen', ySplit:1, activeCell:'A2', showGridLines:false}], properties:{tabColor:{argb:'FFF0A500'}}});
+    var wsP = wb.addWorksheet('Project Summary', {views:[{state:'frozen', ySplit:1, activeCell:'A2', showGridLines:false}], properties:{tabColor:{argb:'FFF0A500'}, outlineLevelRow:1, outlineProperties:{summaryBelow:false}}});
     var PH = ['Project', 'Same type in project', 'Low H/M', 'High usage', 'High usage avg (h)', 'High usage min \u2192 max (h)', 'Low units listed', 'Proposed unit(s)'];
     hdrRow(wsP, PH); var pr = 2, eqSeen = {};
+    var hintC = wsP.getRow(1).getCell(10); hintC.value = '\u25b8 Click the + at the left of a project (or the small \"2\" at the top-left corner) to open its units \u2014 lowest operation first'; hintC.font = {name:'Calibri', size:10, italic:true, color:{argb:'FF6B7280'}}; hintC.alignment = {vertical:'middle'};
+    var setColl = function(r0, v){ try{ Object.defineProperty(r0, 'collapsed', {get:function(){ return v; }, configurable:true}); }catch(e){} };   /* Excel needs collapsed=1 on the project row itself to draw the + button */
     gList.forEach(function(g){
       var ek = g.eq.toLowerCase();
       if(!eqSeen[ek]){
@@ -6054,6 +6060,21 @@ function fuBulkXlsxPro(rows){
       vals.forEach(function(v, j){ var c = row.getCell(j + 1); c.value = clean(v); c.font = {name:'Calibri', size:10, bold:j === 0}; c.border = {bottom:thin}; c.alignment = {vertical:'middle', horizontal:(typeof v === 'number') ? 'center' : 'left', wrapText:j === 7}; });
       if(pf.low !== '') row.getCell(3).font = {name:'Calibri', size:10, bold:true, color:{argb:'FFD93025'}};
       if(pf.work !== '') row.getCell(4).font = {name:'Calibri', size:10, bold:true, color:{argb:'FF1B7F3B'}};
+      /* the units of this project (same type + capacity), low AND high usage, from the lowest operation to the highest */
+      var pjs = g.items[0] && g.items[0].u && g.items[0].u.pj, U2 = (pjs && pjs.units) ? pjs.units.slice() : [];
+      if(U2.length){
+        U2.sort(function(a, b){ var da = a.d == null ? 1e9 : a.d, db = b.d == null ? 1e9 : b.d; return da - db || String(a.code).localeCompare(String(b.code)); });
+        var sh = wsP.getRow(pr++); sh.outlineLevel = 1; sh.hidden = true; setColl(sh, false);
+        ['Unit code', 'Capacity', 'Operation (h)', 'Usage', 'Last reading', 'Limit (h)', 'Months behind', 'Proposed for'].forEach(function(t, j){ var c = sh.getCell(j + 1); c.value = t; c.font = {name:'Calibri', size:9, bold:true, color:{argb:'FF1F3A5F'}}; c.fill = fill('FFE8EEF7'); c.alignment = {vertical:'middle', horizontal:'left', indent:j === 0 ? 2 : 0}; });
+        U2.forEach(function(q){
+          var dr = wsP.getRow(pr++); dr.outlineLevel = 1; dr.hidden = true; setColl(dr, false);
+          var un = UN[fuNormCode(q.code)], pv = (un && un.prop && un.prop.length) ? '\u2b50 #' + un.prop.join(', #') : '';
+          var v2 = [q.code, q.cap, q.d == null ? '' : Math.round(q.d * 10) / 10, q.d == null ? 'no reading' : (q.low ? 'Low' : 'High'), q.lm || '', q.lim == null ? '' : q.lim, q.behind === '' || q.behind == null ? '' : q.behind, pv];
+          v2.forEach(function(v, j){ var c = dr.getCell(j + 1); c.value = clean(v); c.font = {name:'Calibri', size:10, bold:j === 0, color:{argb:j === 3 ? (q.d == null ? 'FF6B7280' : (q.low ? 'FFD93025' : 'FF1B7F3B')) : 'FF000000'}}; c.alignment = {vertical:'middle', horizontal:(typeof v === 'number') ? 'center' : 'left', indent:j === 0 ? 2 : 0}; c.border = {bottom:thin}; });
+          if(pv) for(var q3 = 1; q3 <= 8; q3++) dr.getCell(q3).fill = fill('FFFFF6DA');
+        });
+        setColl(row, true); row.getCell(1).value = clean('\u25b8 ' + g.proj);
+      }
     });
     wsP.columns = [30, 14, 11, 12, 14, 18, 12, 40].map(function(w){ return {width:w}; });
   }
