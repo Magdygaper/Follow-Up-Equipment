@@ -6390,6 +6390,7 @@ function fuEngRefresh(){
   var o = document.getElementById('fu-owned-modal'), b = document.getElementById('fu-bulk-modal');
   if(o && o.classList.contains('open') && window.__fuOwnedReq) fuSearchOwned(window.__fuOwnedReq);
   if(b && b.classList.contains('open')) fuRenderBulk();
+  if(typeof window.hmLowRedraw === 'function') window.hmLowRedraw();
 }
 function fuEngEnsure(){
   if(FU_ENG_LOADED) return; FU_ENG_LOADED = true;
@@ -16907,8 +16908,8 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
 <script>
 /* ═════ Low H/M usage — units whose monthly hour-meter difference (End − Start) is below a limit ═════ */
 (function(){
-  var LS='hm_low_thr_v1', thr={eq:80,gen:125,inc:false}, ST={ym:'',fleet:'all',q:'',ur:''}, LAST=[];
-  try{ var o=JSON.parse(localStorage.getItem(LS)||'null'); if(o){ thr.eq=isFinite(+o.eq)?+o.eq:80; thr.gen=isFinite(+o.gen)?+o.gen:125; thr.inc=!!o.inc; } }catch(e){}
+  var LS='hm_low_thr_v1', thr={eq:80,gen:125,inc:false,mode:'either',tol:0}, ST={ym:'',fleet:'all',q:'',ur:''}, LAST=[];
+  try{ var o=JSON.parse(localStorage.getItem(LS)||'null'); if(o){ thr.eq=isFinite(+o.eq)?+o.eq:80; thr.gen=isFinite(+o.gen)?+o.gen:125; thr.inc=!!o.inc; thr.mode=(o.mode==='hm'||o.mode==='bm')?o.mode:'either'; thr.tol=(isFinite(+o.tol)&&+o.tol>0)?+o.tol:0; } }catch(e){}
   function HMS(){ return window.HM_STATE||{byCode:{},months:[],latest:'',loaded:false,rows:[]}; }
   function esc(v){ return (typeof _hacEsc==='function')?_hacEsc(v):String(v==null?'':v); }
   function norm(c){ return String(c==null?'':c).toUpperCase().replace(/\s+/g,''); }
@@ -16929,6 +16930,39 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
       _mo={ref:D,len:D.length,map:m};
     }
     return _mo.map;
+  }
+  /* ---- Benchmark (B.M) from Master Owned: the unit's utilization % in that month vs the B.M of its equipment / capacity ---- */
+  var _bm={ref:null,len:-1,map:{}};
+  function pctN(v){ var n=parseFloat(v); if(!isFinite(n)) return null; return (n&&n<=1.5)?n*100:n; }   /* same rule as the Master Owned report: 0.65 -> 65 */
+  function bmMap(){
+    var D=[]; try{ D=(window.MO&&typeof window.MO.data==='function')?(window.MO.data()||[]):[]; }catch(x){}
+    if(_bm.ref!==D||_bm.len!==D.length){
+      var m={}; D.forEach(function(r){
+        var ym=String(r.month||(r.hiring?String(r.hiring).slice(0,7):'')).slice(0,7); if(!ym||!r.code) return;
+        var u=(r.utl===null||r.utl===undefined||r.utl==='')?null:pctN(r.utl), b=(parseFloat(r.bm)>0)?pctN(r.bm):null;
+        if(u===null&&b===null) return;
+        var k=norm(r.code)+'|'+ym, cur=m[k], w=parseFloat(r.worked)||0;
+        if(!cur||w>cur.w) m[k]={util:u,bm:b,st:r.bmStatus?String(r.bmStatus):'',w:w};
+      });
+      _bm={ref:D,len:D.length,map:m};
+    }
+    return _bm.map;
+  }
+  function bmOf(code,ym){ if(!code||!ym) return null; return bmMap()[norm(code)+'|'+ym]||null; }
+  function bmHas(){ var m=bmMap(); for(var k in m) return true; return false; }
+  var _moP=0;
+  function ensureMO(){
+    try{ if(window.MO&&typeof window.MO.data==='function'&&!(window.MO.data()||[]).length&&typeof window.MO.reload==='function'&&!_moP){ _moP=1; var p=window.MO.reload(false); if(p&&p.then) p.then(function(){ _moP=0; draw(); }).catch(function(){ _moP=0; }); else _moP=0; } }catch(e){ _moP=0; }
+  }
+  function bmCell(x){
+    var b=x.bmx; if(!b||b.util==null) return '<span style="color:var(--text-muted);" title="No utilization for this unit in Master Owned this month">\u2014</span>';
+    var gap=(b.bm!=null)?b.bm-b.util:null, r1=function(v){ return Math.round(v*10)/10; };
+    return '<span style="font-family:monospace;">'+r1(b.util)+'%</span>'+(b.bm!=null?' <span style="color:var(--text-muted);font-size:10.5px;">of '+r1(b.bm)+'%</span>':' <span style="color:var(--text-muted);font-size:10.5px;">no B.M</span>')
+      +(gap!=null?'<div style="font-size:10.5px;font-weight:700;color:'+(gap>(thr.tol||0)?'var(--red,#f85149)':'#3fb950')+';">'+(gap>0?'\u2212':'+')+Math.abs(r1(gap))+' pts</div>':'')+(b.st?'<div style="font-size:10px;color:var(--text-muted);">'+esc(b.st)+'</div>':'');
+  }
+  function byCell(x){
+    var t=[]; if(x.hLow) t.push('\u23f1 Hours'); if(x.bLow) t.push('\ud83d\udcca B.M');
+    return t.length?'<span style="white-space:nowrap;font-size:11px;font-weight:700;color:'+(x.hLow&&x.bLow?'var(--red,#f85149)':'#e3a008')+';">'+t.join(' + ')+'</span>':'<span style="color:var(--text-muted);">\u2014</span>';
   }
   function repairInfo(code,ym){
     if(!code||!ym) return null;
@@ -16970,26 +17004,88 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
       if(ST.fleet!=='all'&&fl!==ST.fleet) return;
       total++;
       var g=isGen(e), lim=g?thr.gen:thr.eq;
-      if(q){ var hay=(String(e.code||'')+' '+(e.equipment||'')+' '+(e.project||'')+' '+(e.od||'')+' '+(e.brand||'')).toLowerCase(); if(hay.indexOf(q)<0) return; }
+      if(q){ var hay=(String(e.code||'')+' '+(e.equipment||'')+' '+(e.project||'')+' '+(e.od||'')+' '+(e.brand||'')+' '+engStr(e)).toLowerCase(); if(hay.indexOf(q)<0) return; }
       var ALL=(ST.ym==='all'), months=ALL?HMS().months:[ST.ym];
       months.forEach(function(ym){
-        var r=reading(e.code,ym), item=null;
-        if(!r){ if(thr.inc&&!ALL) item={e:e,g:g,lim:lim,r:null,d:null}; }
-        else if(r.s!=null){ withRead++; var d=r.e-r.s; if(d<lim) item={e:e,g:g,lim:lim,r:r,d:d}; }
+        var r=reading(e.code,ym), item=null, mode=thr.mode||'either', bx=bmOf(e.code,ym), dd=(r&&r.s!=null)?(r.e-r.s):null;
+        if(dd!=null) withRead++;
+        var hLow=(dd!=null&&dd<lim), bLow=!!(bx&&bx.bm!=null&&bx.util!=null&&bx.util<bx.bm-(thr.tol||0));
+        var pick=(mode==='bm')?bLow:((mode==='hm')?hLow:(hLow||bLow));
+        if(pick) item={e:e,g:g,lim:lim,r:(dd!=null?r:null),d:dd};
+        else if(!r&&thr.inc&&!ALL&&mode!=='bm') item={e:e,g:g,lim:lim,r:null,d:null};
         if(!item) return;
+        item.bmx=bx; item.hLow=(mode==='bm')?false:hLow; item.bLow=(mode==='hm')?false:bLow;
         item.ym=ym; item.ur=repairInfo(e.code,ym);
         if(ST.ur==='only'&&!item.ur) return; if(ST.ur==='hide'&&item.ur) return;
         out.push(item);
       });
     });
-    out.sort(function(a,b){ if(a.d==null&&b.d==null) return String(a.e.code).localeCompare(String(b.e.code)); if(a.d==null) return 1; if(b.d==null) return -1; return a.d-b.d; });
+    out.sort(function(a,b){ if((thr.mode||'either')==='bm'){ var ga=(a.bmx&&a.bmx.bm!=null&&a.bmx.util!=null)?a.bmx.bm-a.bmx.util:-1e9, gb=(b.bmx&&b.bmx.bm!=null&&b.bmx.util!=null)?b.bmx.bm-b.bmx.util:-1e9; if(ga!==gb) return gb-ga; }
+      if(a.d==null&&b.d==null) return String(a.e.code).localeCompare(String(b.e.code)); if(a.d==null) return 1; if(b.d==null) return -1; return a.d-b.d; });
     LAST=out; return {rows:out,withRead:withRead,total:total};
   }
+  /* ── engineers (project -> responsible engineer, phone) ── */
+  function engOf(e){ try{ if(typeof fuEngFor!=='function') return []; var p=String(e.project||'').trim(); if(!p) return []; if(typeof isCentralWorkshop==='function'&&isCentralWorkshop(p)) return []; return fuEngFor(p)||[]; }catch(x){ return []; } }
+  function waNum(m){ var d=String(m||'').replace(/\D/g,''); if(d.indexOf('0')===0) d='20'+d.slice(1); return d.length>=11?d:''; }
+  function engStr(e){ return engOf(e).map(function(g){ return (g.n||'')+' '+(g.m||''); }).join(' '); }
+  function engCell(e){
+    var E=engOf(e); if(!E.length) return '<span style="color:var(--text-muted);" title="No engineer matched to this project name">\u2014</span>';
+    var p=E[0];
+    return '<div style="font-weight:600;">'+esc(p.n)+'</div><div style="font-size:10.5px;color:var(--text-muted);">'+esc(p.t||'')+'</div>'+(E.length>1?'<div style="font-size:10.5px;color:#f0a500;cursor:help;" title="'+esc(E.slice(1).map(function(g){ return g.n+' ('+g.t+') '+g.m; }).join(' | '))+'">+'+(E.length-1)+' more</div>':'');
+  }
+  function mobCell(e){
+    var E=engOf(e); if(!E.length) return '<span style="color:var(--text-muted);">\u2014</span>';
+    var p=E[0], n=waNum(p.m);
+    return '<span style="font-family:monospace;white-space:nowrap;">'+esc(p.m||'')+'</span>'+(n?' <a href="https://wa.me/'+n+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Open WhatsApp">\ud83d\udcac</a>':'');
+  }
+  window.hmLowRedraw=function(){ var m=document.getElementById('hm-low-modal'); if(m&&m.classList.contains('open')) draw(); };
+  /* one message per engineer with every low-usage unit of his project(s) (the units currently listed) */
+  window.hmLowMsgOpen=function(){
+    var rows=(LAST||[]).filter(function(x){ return x.d!=null||x.bLow; });
+    if(!rows.length){ if(typeof toast==='function') toast('No low-usage units in the list','error'); return; }
+    var groups={}, keys=[], noEng={}, noEngN=0, mode=thr.mode||'either';
+    rows.forEach(function(x){
+      var E=engOf(x.e);
+      if(!E.length){ var pn=String(x.e.project||'(no project)'); noEng[pn]=(noEng[pn]||0)+1; noEngN++; return; }
+      var g=E[0], k=(g.m||'')+'|'+(g.n||''), G=groups[k];
+      if(!G){ G=groups[k]={eng:g,others:E.slice(1),units:[],projects:{}}; keys.push(k); }
+      G.units.push(x); G.projects[String(x.e.project||'')]=1;
+    });
+    keys.sort(function(a,b){ return groups[b].units.length-groups[a].units.length; });
+    var hr=new Date().getHours(), greet=hr<12?'صباح الخير':'مساء الخير', r1=function(v){ return Math.round(v*10)/10; };
+    var mlab=(ST.ym==='all')?'الشهور اللي فاتت':lab(ST.ym);
+    var crit=[]; if(mode!=='bm') crit.push('أقل من '+thr.eq+' ساعة، والمولدات وأبراج الإنارة '+thr.gen); if(mode!=='hm') crit.push('أو استخدامها تحت الـ Benchmark (B.M)');
+    var old=document.getElementById('hmLowMsgBox'); if(old) old.remove();
+    var h='<div id="hmLowMsgBox" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10050;display:flex;align-items:center;justify-content:center;padding:16px;" onclick="if(event.target===this)this.remove()">'
+      +'<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);width:min(780px,100%);max-height:90vh;display:flex;flex-direction:column;">'
+      +'<div style="display:flex;align-items:center;padding:14px 16px;border-bottom:1px solid var(--border);"><b style="font-size:15px;">\ud83d\udcac Low H/M \u2014 message each engineer</b><span style="margin-left:10px;color:var(--text-muted);font-size:12px;">'+(rows.length-noEngN)+' unit(s) \u00b7 '+keys.length+' engineer(s)</span><button class="btn-sm" style="margin-left:auto;" onclick="document.getElementById(\'hmLowMsgBox\').remove()">\u2715</button></div>'
+      +'<div style="overflow:auto;padding:12px 16px;display:flex;flex-direction:column;gap:10px;">';
+    if(!keys.length) h+='<div style="color:var(--text-muted);padding:20px;text-align:center;">No engineer matched to the projects in this list.</div>';
+    keys.forEach(function(k,i){
+      var G=groups[k], g=G.eng, first=String(g.n||'').trim().split(/\s+/)[0], projs=Object.keys(G.projects).filter(Boolean), num=waNum(g.m);
+      var lines=G.units.slice(0,30).map(function(x){
+        var e=x.e, cp=capOf(e), b=x.bmx, parts=[];
+        if(x.d!=null) parts.push(r1(x.d)+' ساعة'+(ST.ym==='all'?' ('+lab(x.ym)+')':'')+(x.d<0?' — راجع القراية':''));
+        if(b&&b.util!=null&&b.bm!=null) parts.push('استخدام '+r1(b.util)+'% من الـ B.M '+r1(b.bm)+'%');
+        return '• '+(e.code||'')+' — '+(e.equipment||'')+(cp?' '+cp:'')+(projs.length>1?' ('+(e.project||'')+')':'')+' : '+(parts.join(' | ')||'—')+(x.ur?' — تحت صيانة':'');
+      });
+      var text=greet+' م/'+first+'\nالمعدات دي في '+(projs.length===1?'مشروع '+projs[0]:'مشاريعك')+' تشغيلها ضعيف في '+mlab+' ('+crit.join(' ')+'):\n'+lines.join('\n')+(G.units.length>30?'\n… و'+(G.units.length-30)+' معدة كمان':'')+'\n\nمحتاجينها فعلًا في المشروع؟ لو لأ نعمل لها ترانسفير لمشروع تاني.';
+      h+='<div style="border:1px solid var(--border);border-radius:var(--radius);background:var(--surface2);padding:10px;">'
+        +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;"><b>'+esc(g.n||'')+'</b><span style="color:var(--text-muted);font-size:12px;">'+esc(g.t||'')+' \u00b7 '+esc(projs.join(', ')||'\u2014')+' \u00b7 '+esc(g.m||'')+' \u00b7 '+G.units.length+' unit(s)</span>'
+        +'<span style="margin-left:auto;display:flex;gap:6px;"><button class="btn-sm" onclick="fuCopyText(document.getElementById(\'hmLM'+i+'\').value)">Copy</button>'
+        +(num?'<button class="btn-sm" onclick="window.open(\'https://web.whatsapp.com/send?phone='+num+'&text=\'+encodeURIComponent(document.getElementById(\'hmLM'+i+'\').value),\'_blank\')">WhatsApp Web</button>':'')+'</span></div>'
+        +(G.others.length?'<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Also responsible: '+G.others.map(function(o){ return esc(o.n||''); }).join(', ')+'</div>':'')
+        +'<textarea id="hmLM'+i+'" dir="rtl" style="width:100%;height:'+Math.min(320,120+Math.min(G.units.length,12)*22)+'px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px;font:13px/1.6 Inter,sans-serif;resize:vertical;">'+esc(text)+'</textarea></div>';
+    });
+    if(noEngN) h+='<div style="font-size:11.5px;color:var(--accent);">\u26a0 '+noEngN+' unit(s) not included \u2014 no engineer matched to their project: '+esc(Object.keys(noEng).slice(0,8).join(' \u00b7 '))+(Object.keys(noEng).length>8?' \u2026':'')+'</div>';
+    h+='</div></div></div>';
+    document.body.insertAdjacentHTML('beforeend',h);
+  };
   function ensureModal(){
     if(document.getElementById('hm-low-modal')) return;
     var d=document.createElement('div'); d.className='modal-overlay'; d.id='hm-low-modal';
     d.innerHTML='<div class="modal" style="max-width:1180px;width:96vw;max-height:92vh;display:flex;flex-direction:column;">'
-      +'<div class="modal-title" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;"><span>📉 Low H/M usage <span style="font-size:12px;font-weight:400;color:var(--text-muted);">— monthly hour-meter difference (End − Start) below the limit</span></span><button class="btn-sm" onclick="closeModal(\'hm-low-modal\')">✕ Close</button></div>'
+      +'<div class="modal-title" style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;"><span>📉 Low H/M usage <span style="font-size:12px;font-weight:400;color:var(--text-muted);">— monthly hour-meter difference (End − Start) below the limit, and / or utilization below the Master Owned B.M</span></span><button class="btn-sm" onclick="closeModal(\'hm-low-modal\')">✕ Close</button></div>'
       +'<div id="hm-low-body" style="overflow:auto;"></div></div>';
     document.body.appendChild(d);
   }
@@ -17005,24 +17101,28 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
       +'<label>Generators / Light towers below <input id="hml-gen" type="number" min="0" value="'+thr.gen+'" style="'+inp+'width:70px;"> h</label>'
       +'<label>Fleet <select id="hml-fl" style="'+inp+'"><option value="all">All fleets</option>'+Object.keys(FL).map(function(k){ return '<option value="'+k+'"'+(ST.fleet===k?' selected':'')+'>'+FL[k]+'</option>'; }).join('')+'</select></label>'
       +'<label><input id="hml-inc" type="checkbox"'+(thr.inc?' checked':'')+'> include units with no reading this month</label>'
-      +'<input id="hml-q" placeholder="Search code / equipment / project / O.D" value="'+esc(ST.q)+'" style="'+inp+'min-width:230px;">'
+      +'<input id="hml-q" placeholder="Search code / equipment / project / O.D / engineer" value="'+esc(ST.q)+'" style="'+inp+'min-width:230px;">'
       +'<label>Repair <select id="hml-ur" style="'+inp+'"><option value="">All units</option><option value="only"'+(ST.ur==='only'?' selected':'')+'>Under repair only</option><option value="hide"'+(ST.ur==='hide'?' selected':'')+'>Hide under repair</option></select></label>'
-      +'<button class="btn-sm accent" onclick="hmLowExport()">📊 Excel</button></div>';
+      +'<label title="Which units are listed: low by H/M hours, below the Master Owned benchmark (B.M), or either">Low by <select id="hml-mode" style="'+inp+'"><option value="either"'+((thr.mode||'either')==='either'?' selected':'')+'>Hours or B.M</option><option value="hm"'+(thr.mode==='hm'?' selected':'')+'>H/M hours only</option><option value="bm"'+(thr.mode==='bm'?' selected':'')+'>Below B.M only</option></select></label>'
+      +'<label title="A unit counts as below B.M when its utilization is lower than the B.M by more than this many points">B.M tolerance <input id="hml-tol" type="number" min="0" step="1" value="'+(thr.tol||0)+'" style="'+inp+'width:56px;"> pts</label>'
+      +'<button class="btn-sm accent" onclick="hmLowExport()">📊 Excel</button><button class="btn-sm" onclick="hmLowMsgOpen()" title="One WhatsApp-ready message per engineer with his low-usage units">💬 Message engineers</button></div>';
     h+='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">'
       +'<span class="mr-chip" style="cursor:default;">'+fmt(R.rows.length)+(ST.ym==='all'?' unit-months listed':' units listed')+'</span>'
       +'<span class="mr-chip" style="cursor:default;">Equipment &lt; '+thr.eq+' h: <b>'+fmt(nE)+'</b></span>'
       +'<span class="mr-chip" style="cursor:default;">Gen. / Light towers &lt; '+thr.gen+' h: <b>'+fmt(nG)+'</b></span>'
       +'<span class="mr-chip" style="cursor:default;border-color:rgba(248,81,73,.5);color:#ff7b72;">\ud83d\udd27 Under repair: <b>'+fmt(nR)+'</b></span>'
+      +'<span class="mr-chip" style="cursor:default;">\ud83d\udcca Below B.M: <b>'+fmt(R.rows.filter(function(x){return x.bLow;}).length)+'</b></span>'
+      +((thr.mode||'either')!=='hm'&&!bmHas()?'<span style="font-size:11px;color:#f0a500;align-self:center;">Master Owned has no B.M / utilization loaded yet \u2014 open Master Owned once, the list updates by itself.</span>':'')
       +(thr.inc?'<span class="mr-chip" style="cursor:default;">No reading: <b>'+fmt(nN)+'</b></span>':'')
       +'<span style="font-size:11px;color:var(--text-muted);align-self:center;">'+(ST.ym==='all'?fmt(R.withRead)+' monthly readings checked across all months':fmt(R.withRead)+' of '+fmt(R.total)+' units have a '+lab(ST.ym)+' reading')+'</span></div>';
     var th='style="text-align:left;padding:8px 10px;font-size:10px;letter-spacing:.8px;color:var(--text-muted);position:sticky;top:0;background:var(--surface,#161b22);"';
-    h+='<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr><th '+th+'>#</th><th '+th+'>Code</th><th '+th+'>Month</th><th '+th+'>Equipment</th><th '+th+'>Category</th><th '+th+'>Brand / Model</th><th '+th+'>Capacity</th><th '+th+'>Project</th><th '+th+'>O.D</th><th '+th+'>Start</th><th '+th+'>End</th><th '+th+'>Diff (h)</th><th '+th+'>Limit</th><th '+th+'>Repair status</th></tr></thead><tbody>';
+    h+='<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr><th '+th+'>#</th><th '+th+'>Code</th><th '+th+'>Month</th><th '+th+'>Equipment</th><th '+th+'>Category</th><th '+th+'>Brand / Model</th><th '+th+'>Capacity</th><th '+th+'>Project</th><th '+th+'>O.D</th><th '+th+'>Engineer</th><th '+th+'>Mobile</th><th '+th+'>Start</th><th '+th+'>End</th><th '+th+'>Diff (h)</th><th '+th+'>Limit</th><th '+th+'>Util vs B.M</th><th '+th+'>Repair status</th><th '+th+'>Low by</th></tr></thead><tbody>';
     var lim=Math.min(R.rows.length,800);
     for(var i=0;i<lim;i++){ var x=R.rows[i], e=x.e, td='style="padding:7px 10px;border-top:1px solid var(--border);"', mono='style="padding:7px 10px;border-top:1px solid var(--border);font-family:monospace;"';
-      h+='<tr class="hml-r" data-eid="'+esc(e.id||'')+'" title="Click to open equipment details"><td '+td+'>'+(i+1)+'</td><td '+mono+'><span style="color:#e3a008;">'+esc(e.code||'—')+'</span></td><td '+mono+'>'+lab(x.ym||ST.ym)+'</td><td '+td+'><b>'+esc(e.equipment||'—')+'</b>'+(x.g?' <span style="font-size:10px;color:var(--text-muted);">gen</span>':'')+'</td><td '+td+'>'+esc(catOf(e)||'—')+'</td><td '+td+'>'+esc(e.brand||'—')+'</td><td '+mono+'>'+esc(capOf(e)||'—')+'</td><td '+td+'>'+esc(e.project||'—')+'</td><td '+td+'>'+esc(e.od||'—')+'</td>'
+      h+='<tr class="hml-r" data-eid="'+esc(e.id||'')+'" title="Click to open equipment details"><td '+td+'>'+(i+1)+'</td><td '+mono+'><span style="color:#e3a008;">'+esc(e.code||'—')+'</span></td><td '+mono+'>'+lab(x.ym||ST.ym)+'</td><td '+td+'><b>'+esc(e.equipment||'—')+'</b>'+(x.g?' <span style="font-size:10px;color:var(--text-muted);">gen</span>':'')+'</td><td '+td+'>'+esc(catOf(e)||'—')+'</td><td '+td+'>'+esc(e.brand||'—')+'</td><td '+mono+'>'+esc(capOf(e)||'—')+'</td><td '+td+'>'+esc(e.project||'—')+'</td><td '+td+'>'+esc(e.od||'—')+'</td><td '+td+'>'+engCell(e)+'</td><td '+td+'>'+mobCell(e)+'</td>'
         +(x.r?('<td '+mono+'>'+fmt(x.r.s)+'</td><td '+mono+'>'+fmt(x.r.e)+'</td><td '+mono+'><b style="color:'+(x.d<0?'#e3a008':'var(--red,#f85149)')+';">'+fmt(x.d)+(x.d<0?' ⚠':'')+'</b></td>'):('<td '+mono+'>—</td><td '+mono+'>—</td><td '+mono+'><span style="color:var(--text-muted);">no reading</span></td>'))
-        +'<td '+mono+'>&lt; '+x.lim+'</td><td '+td+'>'+(x.ur?urBadge(x.ur):'<span style="color:var(--text-muted);">\u2014</span>')+'</td></tr>'; }
-    if(!R.rows.length) h+='<tr><td colspan="14" style="padding:30px;text-align:center;color:var(--text-muted);">No units below the limit in '+lab(ST.ym)+' 🎉</td></tr>';
+        +'<td '+mono+'>&lt; '+x.lim+'</td><td '+td+'>'+bmCell(x)+'</td><td '+td+'>'+(x.ur?urBadge(x.ur):'<span style="color:var(--text-muted);">\u2014</span>')+'</td><td '+td+'>'+byCell(x)+'</td></tr>'; }
+    if(!R.rows.length) h+='<tr><td colspan="18" style="padding:30px;text-align:center;color:var(--text-muted);">No units below the limit in '+lab(ST.ym)+' 🎉</td></tr>';
     h+='</tbody></table>'+(R.rows.length>lim?'<div style="font-size:11px;color:var(--text-muted);margin-top:6px;">Showing the first '+lim+' — use Excel for the full list.</div>':'');
     var keepQ=(document.activeElement&&document.activeElement.id==='hml-q'), pos=keepQ?document.activeElement.selectionStart:0;
     body.innerHTML=h; wire();
@@ -17044,6 +17144,8 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
       var hm=document.getElementById('history-modal'); if(hm) hm.style.zIndex='10001';   /* keep the details window above the Low H/M list */
     }); }
     on('hml-ur','change',function(){ ST.ur=this.value; draw(); });
+    on('hml-mode','change',function(){ thr.mode=this.value; save(); draw(); });
+    on('hml-tol','change',function(){ thr.tol=Math.max(0,+this.value||0); save(); draw(); });
     on('hml-q','input',function(){ ST.q=this.value; draw(); });
   }
   /* Used by Follow-Up > Search Owned: code -> {d,lim,ym,ur} for units below the limit (same limits as the Low H/M list) */
@@ -17090,7 +17192,7 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
   window.hmLowBadge=function(info){ return urBadge(info); };
   window.hmLowLabel=lab;
   window.hmLowOpen=function(){
-    ensureModal(); var H=HMS();
+    ensureModal(); var H=HMS(); if(typeof fuEngEnsure==='function') fuEngEnsure(); ensureMO();
     if(!H.loaded&&typeof hmReload==='function'){ hmReload(); }
     ST.ym=(H.sel||H.latest||ST.ym||'');
     document.getElementById('hm-low-modal').classList.add('open'); draw();
@@ -17142,11 +17244,13 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
     /* ── data ── */
     var eqName='Low HM (<'+thr.eq+' & <'+thr.gen+')', gnName=eqName, GEN='Generators & Light Towers', GSH='Gen. & Light Towers';
     var recs=LAST.map(function(x){
-      var e=x.e, fl=e.fleet||'egypt', ymk=x.ym||ST.ym||'';
+      var e=x.e, fl=e.fleet||'egypt', ymk=x.ym||ST.ym||'', EG=engOf(e);
       return {g:!!x.g, ymk:ymk, code:String(e.code||''), month:lab(ymk), eq:String(e.equipment||''), cat:String(catOf(e)||'').trim()||'(No category)',
         brand:String(e.brand||''), cap:String(capOf(e)||''), project:String(e.project||'').trim()||'(No project)', od:String(e.od||'').trim()||'(No O.D)',
         fleet:FL[fl]||fl, s:(x.r&&x.r.s!=null)?x.r.s:null, en:(x.r&&x.r.e!=null)?x.r.e:null, d:(x.d==null?null:x.d), lim:x.lim,
-        rep:x.ur?x.ur.label:'', repd:(x.ur&&x.ur.days)?x.ur.days:0};
+        rep:x.ur?x.ur.label:'', repd:(x.ur&&x.ur.days)?x.ur.days:0,
+        eng:EG.map(function(g){ return g.n; }).join(' / '), mob:EG.map(function(g){ return g.m; }).join(' / '), wa:EG.length?waNum(EG[0].m):'',
+        u:(x.bmx&&x.bmx.util!=null)?Math.round(x.bmx.util*10)/10:null, b:(x.bmx&&x.bmx.bm!=null)?Math.round(x.bmx.bm*10)/10:null, gap:(x.bmx&&x.bmx.util!=null&&x.bmx.bm!=null)?Math.round((x.bmx.bm-x.bmx.util)*10)/10:null, bst:(x.bmx&&x.bmx.st)||'', by:(x.hLow&&x.bLow)?'Hours + B.M':(x.bLow?'B.M':(x.hLow?'Hours':''))};
     });
     recs.sort(function(a,b){ return (a.ymk<b.ymk?-1:a.ymk>b.ymk?1:0) || ((a.d==null?1e9:a.d)-(b.d==null?1e9:b.d)); });
     var eqRows=recs.filter(function(r){ return !r.g; }), gnRows=recs.filter(function(r){ return r.g; });
@@ -17180,11 +17284,16 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
       var H=['S/N','Code','Month','Equipment','Category','Brand / Model','Capacity','Project','O.D','Fleet','H/M Start','H/M End','Diff (h)','Limit (h)','Hours short','Repair status','Repair days'];
       H.forEach(function(t,k){ hdrCell(ws,4,k+1,t,k===0?'6C757D':color); ws.getCell(4,k+1).font={name:'Calibri',size:10,bold:true,color:{argb:A(WHITE)}}; });
       [['R','Visible'],['S','Under repair'],['T','Pre-filter (Eq)'],['U','In selection (Eq)'],['V','Type'],['W','Pre-filter (Gen)'],['X','In selection (Gen)']].forEach(function(h){ hdrCell(ws,4,h[0].charCodeAt(0)-64,h[1]); });
+      hdrCell(ws,4,25,'Engineer',color); hdrCell(ws,4,26,'Mobile (WhatsApp)',color); hdrCell(ws,4,27,'Utilization %',color); hdrCell(ws,4,28,'B.M %',color); hdrCell(ws,4,29,'Gap to B.M (pts)',color); hdrCell(ws,4,30,'B.M status (sheet)',color); hdrCell(ws,4,31,'Low by',color);
+      for(var hc=25;hc<=31;hc++) ws.getCell(4,hc).font={name:'Calibri',size:10,bold:true,color:{argb:A(WHITE)}};
       ws.getRow(4).height=30;
-      [6,12,10,26,22,22,14,36,12,14,11,11,10,10,11,20,10,3,9,9,9,9,24,9,9].forEach(function(w,k){ ws.getColumn(k+1).width=w; });
+      [6,12,10,26,22,22,14,36,12,14,11,11,10,10,11,20,10,3,9,9,9,9,24,9,9,28,20,12,10,14,18,14].forEach(function(w,k){ ws.getColumn(k+1).width=w; });
       for(i=0;i<list.length;i++){ var d=list[i], r=F+i;
         var vals=[i+1,d.code,d.month,d.eq,d.cat,d.brand,d.cap,d.project,d.od,d.fleet,d.s,d.en,d.d,d.lim,null,d.rep,d.repd||null,null,null,null,null,d.g?GEN:'Equipment'];
         for(var k=0;k<vals.length;k++){ var v=vals[k]; if(v===null||v===undefined||v==='') continue; ws.getCell(r,k+1).value=v; }
+        if(d.eng) ws.getCell(r,25).value=d.eng;
+        if(d.mob) ws.getCell(r,26).value=d.wa?{text:d.mob,hyperlink:'https://wa.me/'+d.wa}:d.mob;
+        if(d.u!=null) ws.getCell(r,27).value=d.u; if(d.b!=null) ws.getCell(r,28).value=d.b; if(d.gap!=null) ws.getCell(r,29).value=d.gap; if(d.bst) ws.getCell(r,30).value=d.bst; if(d.by) ws.getCell(r,31).value=d.by;
       }
       for(i=0;i<list.length+SPARE;i++){
         var r2=F+i;
@@ -17204,7 +17313,7 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
         {type:'expression',formulae:['$S'+F+'=1'],style:{fill:{type:'pattern',pattern:'solid',fgColor:{argb:A('FDE8E8')},bgColor:{argb:A('FDE8E8')}}}},
         {type:'expression',formulae:['AND($B'+F+'<>"",MOD(ROW(),2)=0)'],style:{fill:{type:'pattern',pattern:'solid',fgColor:{argb:A('F5F8FB')},bgColor:{argb:A('F5F8FB')}}}}]});
       ws.addConditionalFormatting({ref:'M'+F+':M'+Lr,rules:[{type:'expression',formulae:['AND(ISNUMBER($M'+F+'),$M'+F+'<0)'],style:{font:{bold:true,color:{argb:A('E3A008')}}}}]});
-      ws.autoFilter={from:{row:4,column:1},to:{row:Lr,column:17}};
+      ws.autoFilter={from:{row:4,column:1},to:{row:Lr,column:31}};
       ws.pageSetup={paperSize:9,orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0};
     }
     dataSheet(wsE,recs,'Equipment < '+thr.eq+' h  \u00b7  '+GEN+' < '+thr.gen+' h','',0,'1F4E9E');
