@@ -6433,7 +6433,88 @@ function fuEngImport(input){
 function fuUnitBox(){
   var admin = (typeof isAdmin !== 'undefined' && isAdmin);
   return '<span style="display:flex;gap:4px;align-items:center;">\ud83d\udd0e <input placeholder="Unit code\u2026" onkeydown="if(event.key===\'Enter\')fuUnitLookup(this.value)" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:6px;font-size:12px;width:110px;"><button class="btn-sm" onclick="fuUnitLookup(this.previousElementSibling.value)">Find unit</button></span>'
+    + '<button class="btn-sm" onclick="fuCensusOpen()" title="Send the equipment-census WhatsApp message to the engineer of every project">📣 Census request</button>'
     + (admin ? '<label class="btn-sm" style="cursor:pointer;" title="Upload the engineers contact list (Excel) \u2014 replaces the current one">\ud83d\udc77 Engineers list<input type="file" accept=".xlsx,.xls" style="display:none" onchange="fuEngImport(this)"></label>' : '');
+}
+/* ── Equipment census: one WhatsApp message to the engineer(s) of every project in the contact list ── */
+var FU_CENSUS_DEF = '{greet} يا هندسة\nمع حضرتك مجدي من إدارة معدات العاشر مع أستاذ عرفة\nكنت محتاج حصر للمعدات الموجودة بالفعل دلوقتي في المشروع، سواء ملك أو إيجار\nوشكراً.';
+function fuCensusGreet(){ return new Date().getHours() < 12 ? 'صباح الخير' : 'مساء الخير'; }
+function fuCensusSent(){ try{ return JSON.parse(localStorage.getItem('fuCensusSent') || '{}') || {}; }catch(e){ return {}; } }
+function fuCensusSave(o){ try{ localStorage.setItem('fuCensusSent', JSON.stringify(o)); }catch(e){} }
+function fuCensusMsg(){
+  var el = document.getElementById('fuCensusTpl'), t = el ? el.value : '';
+  if(!el){ try{ t = localStorage.getItem('fuCensusTpl') || ''; }catch(e){} }
+  return (t || FU_CENSUS_DEF).replace(/\{greet\}/g, fuCensusGreet());
+}
+function fuCensusNum(m){ var d = String(m || '').replace(/\D/g, ''); if(/^01\d{9}$/.test(d)) return '20' + d.slice(1); if(/^201\d{9}$/.test(d)) return d; return ''; }
+function fuCensusRows(){
+  var all = !!(document.getElementById('fuCensusAll') || {}).checked, by = {}, order = [], rows = [];
+  FU_ENG.forEach(function(g){ var p = String(g.p || '').trim(); if(!p) return; if(!by[p]){ by[p] = []; order.push(p); } by[p].push(g); });
+  order.forEach(function(p){
+    by[p].sort(function(a, b){ return fuEngRank(a.t) - fuEngRank(b.t) || String(a.n).localeCompare(String(b.n)); }).forEach(function(g, i){
+      if(i > 0 && !all) return;
+      rows.push({p:p, g:g, i:i, num:fuCensusNum(g.m)});
+    });
+  });
+  return rows;
+}
+function fuCensusRender(){
+  var rows = fuCensusRows(), sent = fuCensusSent(), seen = {}, done = 0, todo = 0, h = '';
+  window.__fuCensusRows = rows;
+  rows.forEach(function(r, k){
+    var s = r.num ? sent[r.num] : null, dup = false;
+    if(r.num){ if(seen[r.num]) dup = true; else { seen[r.num] = 1; if(s) done++; else todo++; } }
+    h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface2);padding:8px 10px;' + (s ? 'opacity:.55;' : '') + '">'
+      + '<span style="width:18px;text-align:center;">' + (s ? '✅' : (r.num ? '⬜' : '⚠️')) + '</span>'
+      + '<div style="flex:1;min-width:200px;"><div style="font-weight:700;">' + fuEscH(r.p) + (r.i > 0 ? ' <span style="font-weight:400;font-size:11px;color:var(--text-muted);">(additional)</span>' : '') + '</div>'
+      + '<div style="font-size:11.5px;color:var(--text-muted);">' + fuEscH(r.g.n || '') + ' · ' + fuEscH(r.g.t || '') + ' · <span style="font-family:monospace;">' + fuEscH(r.g.m || '') + '</span>'
+      + (s ? ' · sent ' + fuEscH(new Date(s).toLocaleString('en-GB', {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'})) : '')
+      + (dup ? ' · same number as a project above' : '') + (!r.num ? ' · <span style="color:var(--red);">no valid mobile number</span>' : '') + '</div></div>'
+      + (r.num ? '<button class="btn-sm" onclick="fuCensusSend(' + k + ')">WhatsApp</button><button class="btn-sm" title="' + (s ? 'Mark as not sent' : 'Mark as sent') + '" onclick="fuCensusToggle(' + k + ')">' + (s ? '↺' : '✓') + '</button>' : '')
+      + '</div>';
+  });
+  var l = document.getElementById('fuCensusList'), c = document.getElementById('fuCensusCnt');
+  if(l) l.innerHTML = h || '<div style="color:var(--text-muted);padding:20px;text-align:center;">The engineers list is empty.</div>';
+  if(c) c.textContent = done + ' / ' + (done + todo) + ' sent';
+}
+function fuCensusSend(k){
+  var r = (window.__fuCensusRows || [])[k]; if(!r || !r.num) return;
+  window.open('https://wa.me/' + r.num + '?text=' + encodeURIComponent(fuCensusMsg()), '_blank');
+  var s = fuCensusSent(); s[r.num] = new Date().toISOString(); fuCensusSave(s); fuCensusRender();
+}
+function fuCensusNext(){
+  var rows = window.__fuCensusRows || [], s = fuCensusSent();
+  for(var k = 0; k < rows.length; k++){ if(rows[k].num && !s[rows[k].num]){ fuCensusSend(k); return; } }
+  toast('Everyone has been messaged ✓');
+}
+function fuCensusToggle(k){
+  var r = (window.__fuCensusRows || [])[k]; if(!r || !r.num) return;
+  var s = fuCensusSent(); if(s[r.num]) delete s[r.num]; else s[r.num] = new Date().toISOString();
+  fuCensusSave(s); fuCensusRender();
+}
+function fuCensusReset(){ if(confirm('Clear the "sent" marks for everyone?')){ fuCensusSave({}); fuCensusRender(); } }
+function fuCensusTplSave(){ try{ localStorage.setItem('fuCensusTpl', document.getElementById('fuCensusTpl').value); }catch(e){} }
+function fuCensusTplReset(){ var el = document.getElementById('fuCensusTpl'); el.value = FU_CENSUS_DEF; fuCensusTplSave(); }
+function fuCensusOpen(){
+  fuEngEnsure();
+  var old = document.getElementById('fuCensusBox'); if(old) old.remove();
+  var tpl = ''; try{ tpl = localStorage.getItem('fuCensusTpl') || ''; }catch(e){}
+  var h = '<div id="fuCensusBox" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;" onclick="if(event.target===this)this.remove()">'
+    + '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);width:min(780px,100%);max-height:92vh;display:flex;flex-direction:column;">'
+    + '<div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border);"><b style="font-size:15px;">📣 Equipment census — message every project engineer</b>'
+    + '<span id="fuCensusCnt" style="color:var(--text-muted);font-size:12px;"></span>'
+    + '<button class="btn-sm" style="margin-left:auto;" onclick="document.getElementById(\'fuCensusBox\').remove()">✕</button></div>'
+    + '<div style="padding:12px 16px;border-bottom:1px solid var(--border);">'
+    + '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:4px;">Message (editable — <code>{greet}</code> becomes صباح/مساء الخير automatically)</div>'
+    + '<textarea id="fuCensusTpl" dir="rtl" oninput="fuCensusTplSave()" style="width:100%;height:96px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px;font:13px/1.6 Inter,sans-serif;resize:vertical;">' + fuEscH(tpl || FU_CENSUS_DEF) + '</textarea>'
+    + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px;">'
+    + '<button class="btn-sm" style="background:var(--accent);color:#000;font-weight:700;" onclick="fuCensusNext()">▶ Open next chat</button>'
+    + '<label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" id="fuCensusAll" onchange="fuCensusRender()"> Also message the other engineers of each project</label>'
+    + '<span style="margin-left:auto;display:flex;gap:6px;"><button class="btn-sm" onclick="fuCensusTplReset()">Reset text</button><button class="btn-sm" onclick="fuCensusReset()">Clear sent marks</button></span></div>'
+    + '<div style="font-size:11px;color:var(--text-muted);margin-top:6px;">WhatsApp opens with the message filled in — press Send there, then come back and press “Open next chat”. Browsers block opening many tabs at once, so it goes one chat at a time.</div></div>'
+    + '<div id="fuCensusList" style="overflow:auto;padding:12px 16px;display:flex;flex-direction:column;gap:6px;"></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend', h);
+  fuCensusRender();
 }
 /* last reading helpers */
 function fuLastOf(e){ return (typeof window.hmLastRead === 'function' && e && e.code) ? window.hmLastRead(e.code) : null; }
