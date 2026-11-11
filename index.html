@@ -6479,7 +6479,7 @@ function fuCensusRender(){
 }
 function fuCensusSend(k){
   var r = (window.__fuCensusRows || [])[k]; if(!r || !r.num) return;
-  window.open('https://wa.me/' + r.num + '?text=' + encodeURIComponent(fuCensusMsg()), '_blank');
+  window.open('https://web.whatsapp.com/send?phone=' + r.num + '&text=' + encodeURIComponent(fuCensusMsg()), '_blank');
   var s = fuCensusSent(); s[r.num] = new Date().toISOString(); fuCensusSave(s); fuCensusRender();
 }
 function fuCensusNext(){
