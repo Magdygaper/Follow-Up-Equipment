@@ -6437,14 +6437,14 @@ function fuUnitBox(){
     + (admin ? '<label class="btn-sm" style="cursor:pointer;" title="Upload the engineers contact list (Excel) \u2014 replaces the current one">\ud83d\udc77 Engineers list<input type="file" accept=".xlsx,.xls" style="display:none" onchange="fuEngImport(this)"></label>' : '');
 }
 /* ── Equipment census: one WhatsApp message to the engineer(s) of every project in the contact list ── */
-var FU_CENSUS_DEF = '{greet} يا هندسة\nمع حضرتك مجدي من إدارة معدات العاشر مع أستاذ عرفة\nكنت محتاج حصر للمعدات الموجودة بالفعل دلوقتي في المشروع، سواء ملك أو إيجار\nوشكراً.';
+var FU_CENSUS_DEF = '{greet} يا هندسة\nمع حضرتك مجدي من إدارة معدات العاشر مع أستاذ عرفة\nكنت محتاج حصر للمعدات الموجودة بالفعل دلوقتي في مشروع {project}، سواء ملك أو إيجار\nوشكراً.';
 function fuCensusGreet(){ return new Date().getHours() < 12 ? 'صباح الخير' : 'مساء الخير'; }
 function fuCensusSent(){ try{ return JSON.parse(localStorage.getItem('fuCensusSent') || '{}') || {}; }catch(e){ return {}; } }
 function fuCensusSave(o){ try{ localStorage.setItem('fuCensusSent', JSON.stringify(o)); }catch(e){} }
-function fuCensusMsg(){
+function fuCensusMsg(proj){
   var el = document.getElementById('fuCensusTpl'), t = el ? el.value : '';
-  if(!el){ try{ t = localStorage.getItem('fuCensusTpl') || ''; }catch(e){} }
-  return (t || FU_CENSUS_DEF).replace(/\{greet\}/g, fuCensusGreet());
+  if(!el){ try{ t = localStorage.getItem('fuCensusTpl2') || ''; }catch(e){} }
+  return (t || FU_CENSUS_DEF).replace(/\{greet\}/g, fuCensusGreet()).replace(/\{project\}/g, proj || 'المشروع');
 }
 function fuCensusNum(m){ var d = String(m || '').replace(/\D/g, ''); if(/^01\d{9}$/.test(d)) return '20' + d.slice(1); if(/^201\d{9}$/.test(d)) return d; return ''; }
 function fuCensusRows(){
@@ -6479,7 +6479,8 @@ function fuCensusRender(){
 }
 function fuCensusSend(k){
   var r = (window.__fuCensusRows || [])[k]; if(!r || !r.num) return;
-  window.open('https://web.whatsapp.com/send?phone=' + r.num + '&text=' + encodeURIComponent(fuCensusMsg()), '_blank');
+  var ps = []; (window.__fuCensusRows || []).forEach(function(x){ if(x.num === r.num && ps.indexOf(x.p) < 0) ps.push(x.p); });
+  window.open('https://web.whatsapp.com/send?phone=' + r.num + '&text=' + encodeURIComponent(fuCensusMsg(ps.join(' و '))), '_blank');
   var s = fuCensusSent(); s[r.num] = new Date().toISOString(); fuCensusSave(s); fuCensusRender();
 }
 function fuCensusNext(){
@@ -6493,19 +6494,19 @@ function fuCensusToggle(k){
   fuCensusSave(s); fuCensusRender();
 }
 function fuCensusReset(){ if(confirm('Clear the "sent" marks for everyone?')){ fuCensusSave({}); fuCensusRender(); } }
-function fuCensusTplSave(){ try{ localStorage.setItem('fuCensusTpl', document.getElementById('fuCensusTpl').value); }catch(e){} }
+function fuCensusTplSave(){ try{ localStorage.setItem('fuCensusTpl2', document.getElementById('fuCensusTpl').value); }catch(e){} }
 function fuCensusTplReset(){ var el = document.getElementById('fuCensusTpl'); el.value = FU_CENSUS_DEF; fuCensusTplSave(); }
 function fuCensusOpen(){
   fuEngEnsure();
   var old = document.getElementById('fuCensusBox'); if(old) old.remove();
-  var tpl = ''; try{ tpl = localStorage.getItem('fuCensusTpl') || ''; }catch(e){}
+  var tpl = ''; try{ tpl = localStorage.getItem('fuCensusTpl2') || ''; }catch(e){}
   var h = '<div id="fuCensusBox" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;" onclick="if(event.target===this)this.remove()">'
     + '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);width:min(780px,100%);max-height:92vh;display:flex;flex-direction:column;">'
     + '<div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border);"><b style="font-size:15px;">📣 Equipment census — message every project engineer</b>'
     + '<span id="fuCensusCnt" style="color:var(--text-muted);font-size:12px;"></span>'
     + '<button class="btn-sm" style="margin-left:auto;" onclick="document.getElementById(\'fuCensusBox\').remove()">✕</button></div>'
     + '<div style="padding:12px 16px;border-bottom:1px solid var(--border);">'
-    + '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:4px;">Message (editable — <code>{greet}</code> becomes صباح/مساء الخير automatically)</div>'
+    + '<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:4px;">Message (editable — <code>{greet}</code> = صباح/مساء الخير, <code>{project}</code> = the engineer\'s project name)</div>'
     + '<textarea id="fuCensusTpl" dir="rtl" oninput="fuCensusTplSave()" style="width:100%;height:96px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px;font:13px/1.6 Inter,sans-serif;resize:vertical;">' + fuEscH(tpl || FU_CENSUS_DEF) + '</textarea>'
     + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px;">'
     + '<button class="btn-sm" style="background:var(--accent);color:#000;font-weight:700;" onclick="fuCensusNext()">▶ Open next chat</button>'
