@@ -967,7 +967,8 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
             </label>
             <button id="fu-btn-backups" class="btn-sm" style="display:none;" onclick="fuOpenBackups()" title="Automatic backups taken before every import — undo / restore">🛟 Backups</button>
             <button id="fu-btn-history" class="btn-sm" onclick="fuOpenHistory()" title="Who changed what, and when (status, stage, imports)">🕘 History</button>
-            <button id="fu-btn-forecast" class="btn-sm" onclick="fuOpenForecast()" title="Reference prices from the Rental Database and cost forecast per project / month">💲 Forecast</button>
+            <button id="fu-btn-publish" class="btn-sm" style="display:none;" onclick="fuPublishPrices()" title="Read the newest Rental Database price of every request and store it on the request — viewers then see it from the 💰 button (and nothing else from the Rental Database)">🔄 Publish prices</button>
+            <button id="fu-btn-forecast" class="btn-sm" style="display:none;" onclick="fuOpenForecast()" title="Reference prices from the Rental Database and cost forecast per project / month">💲 Forecast</button>
             <button id="fu-btn-bulk" class="btn-sm" onclick="fuOpenBulk()" title="Check every request against owned equipment in one table (Low H/M, same capacity, free in the period)">🔍 Bulk owned search</button>
             <button id="fu-btn-erms" class="btn-sm" style="display:none;" onclick="fuOpenErms()" title="Owners per equipment category and time limits per ERMS stage">⚙ ERMS</button>
             <button id="fu-btn-clear" class="btn-sm" style="display:none;background:rgba(248,81,73,.1);border-color:rgba(248,81,73,.3);color:var(--red);" onclick="clearFollowUpData()">🗑 Clear Data</button>
@@ -2079,6 +2080,8 @@ auth.onAuthStateChanged(function(user) {
     document.getElementById('fu-btn-sync').style.display = isAdmin ? 'inline-flex' : 'none';
     document.getElementById('fu-btn-backups').style.display = isAdmin ? 'inline-flex' : 'none';
     document.getElementById('fu-btn-erms').style.display = isAdmin ? 'inline-flex' : 'none';
+    document.getElementById('fu-btn-forecast').style.display = isAdmin ? 'inline-flex' : 'none';
+    document.getElementById('fu-btn-publish').style.display = isAdmin ? 'inline-flex' : 'none';
     document.getElementById('fu-btn-clear').style.display  = isAdmin ? 'inline-flex' : 'none';
     document.getElementById('fu-btn-add').style.display    = isAdmin ? 'inline-flex' : 'none';
     document.getElementById('btn-viewers-log').style.display = isAdmin ? 'inline-flex' : 'none';
@@ -3747,6 +3750,16 @@ function fuShowLastPrice(id){
   var r = FU_DATA.find(function(x){ return x.id === id; });
   if(!r){ toast('Record not found','error'); return; }
   if(!r.equipment){ toast('This record has no equipment name','error'); return; }
+  if(!isAdmin){   /* viewers never touch the Rental Database: they see the last price the administrator published on this request */
+    var stored = null; try{ stored = r.ref_price_res ? JSON.parse(r.ref_price_res) : null; }catch(e){}
+    document.getElementById('fup-title').textContent = '💰 Last Price — ' + r.equipment;
+    document.getElementById('fup-sub').textContent = 'Project: ' + (r.project||'—') + (r.capacity ? '  ·  Capacity: ' + r.capacity : '');
+    document.getElementById('fup-content').innerHTML = stored
+      ? renderFuPriceResult(stored) + '<div style="font-size:10.5px;color:var(--text-muted);margin-top:8px;">Last price as published by the administrator' + (r.ref_price_at ? ' on ' + fuEsc(r.ref_price_at) : '') + '.</div>'
+      : '<div class="rd-msg">No price has been published for this request yet.</div>';
+    document.getElementById('fu-price-modal').classList.add('open');
+    return;
+  }
   if(typeof window.rdLastPrice !== 'function'){ toast('Rental database module not ready yet','error'); return; }
 
   document.getElementById('fup-title').textContent = '💰 Last Price — ' + r.equipment;
@@ -3767,6 +3780,7 @@ function renderFuPriceResult(res){
   if(res.error === 'exception')        return '<div class="rd-msg err">Something went wrong while checking prices'+(res.message?': '+fuEsc(res.message):'.')+'</div>';
   if(res.error === 'empty')            return '<div class="rd-msg">Rental Database has no records yet.</div>';
   if(res.error === 'noequip')          return '<div class="rd-msg">This request has no equipment name to look up.</div>';
+  if(res.error === 'restricted')       return '<div class="rd-msg err">🔒 Rental Database prices are restricted to administrators.</div>';
   if(res.error === 'noproject')
     return '<div class="rd-msg">Couldn\'t find a project close enough to "'+fuEsc(res.project||'—')+'" in Rental Database, so there\'s no Plant to match on yet — this looks like a new project, check the price manually.</div>';
 
@@ -6929,6 +6943,14 @@ function fuForecastPivot(rows){
   });
   return {months:Object.keys(months).sort(), proj:proj};
 }
+/* what a viewer is allowed to see: the matching info + the LAST price only (no history, no other plants, no vendor shares) */
+function fuSlimRes(res){
+  if(!res || !res.ok) return null;
+  var o = {ok:true, plant:res.plant, ccy:res.ccy, equipment:res.equipment, project:res.project, matchedProject:res.matchedProject, projectFuzzy:!!res.projectFuzzy,
+           matchedEquipment:res.matchedEquipment, equipFuzzy:!!res.equipFuzzy, capMode:res.capMode, capLabel:res.capLabel, capacity:res.capacity, last:null};
+  if(res.last){ o.last = {cost:res.last.cost, rate:res.last.rate, rateL:res.last.rateL, dateLabel:res.last.dateLabel, vendor:res.last.vendor, model:res.last.model, fuel:res.last.fuel, project:res.last.project, note:res.last.note}; }
+  return o;
+}
 function fuFetchPrices(list, onProgress){
   var keys = {}, order = [];
   list.forEach(function(r){ var k = fuKeyOf(r); if(r.equipment && !keys[k]){ keys[k] = r; order.push(k); } });
@@ -6939,8 +6961,10 @@ function fuFetchPrices(list, onProgress){
       if(i >= order.length) return;
       var k = order[i++], r = keys[k];
       window.rdLastPrice(r.equipment, r.project, function(res){
-        if(res && res.last){ var d = fuDailyFrom(res.last); prices[k] = {daily:d, cost:res.last.cost, rate:res.last.rateL || res.last.rate || '', ccy:res.ccy || '', vendor:res.last.vendor || '', date:res.last.dateLabel || '', plant:res.plant || '', fuel:res.last.fuel || '', converted:d != null}; }
-        else prices[k] = {error:(res && res.error) || 'none'};
+        if(res && res.ok){
+          var d = res.last ? fuDailyFrom(res.last) : null, l = res.last || {};
+          prices[k] = {daily:d, cost:l.cost || 0, rate:l.rateL || l.rate || '', ccy:res.ccy || '', vendor:l.vendor || '', date:l.dateLabel || '', plant:res.plant || '', fuel:l.fuel || '', converted:d != null, raw:fuSlimRes(res)};
+        } else prices[k] = {error:(res && res.error) || 'none'};
         done++; if(onProgress) onProgress(done, order.length);
         if(done === order.length) resolve(prices); else worker();
       }, r.capacity);
@@ -6949,6 +6973,7 @@ function fuFetchPrices(list, onProgress){
   });
 }
 function fuOpenForecast(){
+  if(!isAdmin){ toast('🔒 Price forecast is restricted to administrators', 'error'); return; }
   var m = document.getElementById('fu-fc-modal');
   if(!m){ m = document.createElement('div'); m.className = 'modal-overlay'; m.id = 'fu-fc-modal'; document.body.appendChild(m); }
   var n = getFilteredFuData().length;
@@ -7007,17 +7032,38 @@ function fuForecastCsv(){
 }
 function fuSaveRefPrices(){
   var fc = window.__fuFc; if(!fc) return;
-  var rows = fc.rows.filter(function(x){ return x.daily != null && x.r.id && String(x.r.id).indexOf('local_') !== 0; });
-  if(!rows.length) return;
-  if(!confirm('Save the reference daily price (and vendor / date) on ' + rows.length + ' records?\n\nThis adds ref_price_* fields only — your existing cost and savings fields are not touched.')) return;
+  fuStoreRefPrices(fc.rows);
+}
+/* writes the last price (slim JSON) on each request so viewers can read it from the 💰 button without any access to the Rental Database */
+function fuStoreRefPrices(rows, quiet){
+  rows = rows.filter(function(x){ return x.p && x.p.raw && x.r.id && String(x.r.id).indexOf('local_') !== 0; });
   var today = fuTodayIso();
-  var ops = rows.map(function(x){ return {t:'upd', ref:db.collection('followup').doc(x.r.id), data:{ref_price_daily:Math.round(x.daily), ref_price_ccy:x.p.ccy || '', ref_price_vendor:x.p.vendor || '', ref_price_date:x.p.date || '', ref_price_at:today}}; });
-  toast('⏳ Saving reference prices…');
-  fuRunOps(ops).then(function(){
-    rows.forEach(function(x){ Object.assign(x.r, ops[rows.indexOf(x)].data); });
-    fuLogMany([{type:'price', docId:'', equipment:'', project:'', field:'', from:'', to:'', note:'Reference prices saved on ' + rows.length + ' records'}]);
-    toast('✅ Reference prices saved on ' + rows.length + ' records');
-  }).catch(function(err){ toast('❌ ' + (err && err.message || err), 'error'); });
+  var todo = rows.filter(function(x){ return x.r.ref_price_res !== JSON.stringify(x.p.raw); });
+  if(!todo.length){ toast('✅ Published prices are already up to date (' + rows.length + ' requests checked)'); return Promise.resolve(0); }
+  if(!quiet && !confirm('Publish the last Rental Database price on ' + todo.length + ' request(s) (' + (rows.length - todo.length) + ' already up to date)?\n\nViewers will see it only when they press 💰 on that request. Your cost and savings fields are not touched.')) return Promise.resolve(0);
+  var ops = todo.map(function(x){
+    var d = {ref_price_res:JSON.stringify(x.p.raw), ref_price_at:today};
+    if(x.daily != null){ d.ref_price_daily = Math.round(x.daily); d.ref_price_ccy = x.p.ccy || ''; d.ref_price_vendor = x.p.vendor || ''; d.ref_price_date = x.p.date || ''; }
+    return {t:'upd', ref:db.collection('followup').doc(x.r.id), data:d};
+  });
+  toast('⏳ Publishing prices on ' + todo.length + ' requests…');
+  return fuRunOps(ops).then(function(){
+    todo.forEach(function(x, i){ Object.assign(x.r, ops[i].data); });
+    fuLogMany([{type:'price', docId:'', equipment:'', project:'', field:'', from:'', to:'', note:'Last prices published on ' + todo.length + ' requests'}]);
+    toast('✅ Last prices published on ' + todo.length + ' requests');
+    return todo.length;
+  }).catch(function(err){ toast('❌ ' + (err && err.message || err), 'error'); return 0; });
+}
+/* admin: read the newest Rental Database price of EVERY request and publish it on the request */
+function fuPublishPrices(){
+  if(!isAdmin){ toast('🔒 Publishing prices is restricted to administrators', 'error'); return; }
+  if(typeof window.rdLastPrice !== 'function'){ toast('Rental database module not ready yet', 'error'); return; }
+  var list = (FU_DATA || []).filter(function(r){ return r.equipment && r.id && String(r.id).indexOf('local_') !== 0; });
+  if(!list.length){ toast('No requests to price', 'error'); return; }
+  toast('⏳ Reading Rental Database prices…');
+  fuFetchPrices(list, function(d, t){ if(d % 25 === 0 || d === t) toast('⏳ Reading Rental Database prices… ' + d + ' / ' + t); }).then(function(prices){
+    fuStoreRefPrices(fuForecastRows(list, prices), false);
+  });
 }
 /*FU-PRO-END*/
 
@@ -16032,6 +16078,88 @@ try{firebase.auth().onAuthStateChanged(function(u){
   resetIdle();
 });}catch(e){}
 try{console.log('%cHAC \u00b7 PMV','color:#f0a500;font-size:18px;font-weight:700');console.log('Confidential. Access is logged.');}catch(e){}
+})();
+</script>
+<!-- ===== VIEWER LOCK: viewer accounts cannot export / print, and cannot open or read Rental Database prices ===== -->
+<style>
+body.is-viewer .vl-hide{display:none !important}
+@media print{ body.is-viewer *{display:none !important} body.is-viewer::before{display:block !important;content:"Printing is disabled for viewer accounts";padding:40px;font:16px Arial} }
+</style>
+<script>
+(function(){
+'use strict';
+function viewer(){ return document.body.classList.contains('is-viewer'); }
+function deny(what){ try{ toast('🔒 ' + (what || 'Export') + ' is disabled for viewer accounts', 'error'); }catch(e){} }
+
+/* 1 — every file download goes through an <a download>: block it for viewers */
+var origClick = HTMLAnchorElement.prototype.click;
+HTMLAnchorElement.prototype.click = function(){
+  if(viewer() && (this.hasAttribute('download') || /^blob:/.test(this.href || ''))){ deny(); return; }
+  return origClick.apply(this, arguments);
+};
+var origDispatch = EventTarget.prototype.dispatchEvent;
+EventTarget.prototype.dispatchEvent = function(ev){
+  if(viewer() && this instanceof HTMLAnchorElement && ev && ev.type === 'click' && (this.hasAttribute('download') || /^blob:/.test(this.href || ''))){ deny(); return false; }
+  return origDispatch.apply(this, arguments);
+};
+/* 2 — print / "save as PDF", and the blank pop-up windows the PDF reports are written into */
+var origPrint = window.print; window.print = function(){ if(viewer()){ deny('Print / PDF'); return; } return origPrint.apply(this, arguments); };
+var origOpen = window.open;
+window.open = function(url){ if(viewer() && (!url || url === 'about:blank')){ deny('Reports / PDF'); return null; } return origOpen.apply(this, arguments); };
+document.addEventListener('keydown', function(e){ if(viewer() && (e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === 'p'){ e.preventDefault(); e.stopPropagation(); deny('Print / PDF'); } }, true);
+
+/* 3 — the export / report functions themselves (so a console call or a leftover button does nothing either) */
+var EXPORTS = ['printExecSummary','exportDashPDF','cbExport','exportEquipPDF','exportEquipByOD','exportWsExcel','exportFuPDF','exportAllCountriesXlsx','exportPage','exportProjEquip',
+  'fuBulkExport','fuBulkExportUnits','fuBulkXlsxPro','fuDashXlsx','fuForecastCsv','fuHistCsv','fuOwnExport','fuDownload','moDashXlsx','moDirectorReport','moExport','moExportPDF','moExportXlsxDashboard',
+  'mrDashXlsx','mrDirectorReport','mrExportPDF','odaExport','rptXlsx','rwExport','viewReport','cmpDirectorReport','hacDownloadWb','hacXlsxTable','hacPdfTable','hacBuildXlsx','hacXlsxJson','hacXlsxMulti',
+  'hacRentalWorkbook','rdExport','download'];
+/* Rental Database prices: no page, no lookups, no rows */
+var PRICE_FNS = {
+  rdOpen:function(){ deny('The Rental Database'); },
+  rwOpen:function(){ deny('The Rental Pull-Back watch'); },
+  fuOpenForecast:function(){ deny('Price forecast'); },
+  fuPublishPrices:function(){ deny('Publishing prices'); },
+  rdAllRows:function(){ return Promise.resolve([]); },
+  rdLastPrice:function(a, b, cb){ if(typeof cb === 'function') cb({error:'restricted'}); }
+};
+function wrap(name, onDeny){
+  var f = window[name];
+  if(typeof f !== 'function' || f.__vl) return;
+  var w = function(){ if(viewer()) return onDeny ? onDeny.apply(this, arguments) : deny(name.indexOf('print') === 0 || /PDF$/.test(name) ? 'Print / PDF' : 'Export'); return f.apply(this, arguments); };
+  w.__vl = 1; try{ window[name] = w; }catch(e){}
+}
+function wrapAll(){
+  EXPORTS.forEach(function(n){ wrap(n); });
+  Object.keys(PRICE_FNS).forEach(function(n){ wrap(n, PRICE_FNS[n]); });
+  /* page switch: the Rental Database page cannot be opened */
+  var sp = window.showPage;
+  if(typeof sp === 'function' && !sp.__vl){ var w = function(page){ if(viewer() && page === 'rentaldb'){ deny('The Rental Database'); return; } return sp.apply(this, arguments); }; w.__vl = 1; try{ window.showPage = w; }catch(e){} }
+}
+
+/* 4 — hide the buttons (and keep hiding them when tables / modals re-render) */
+var RX = /export|excel|csv|\bpdf\b|print|\bword\b|download|backup|\.xlsx|تصدير|تحميل|طباعة/i;
+function looksLikeExport(el){
+  if(el.classList.contains('vl-keep')) return false;
+  var oc = el.getAttribute('onclick') || '';
+  if(oc && RX.test(oc)) return true;
+  var tag = el.tagName;
+  var btnLike = tag === 'BUTTON' || tag === 'A' || (tag === 'LABEL' && (el.classList.contains('btn-sm') || el.querySelector('input[type=file]')));
+  if(btnLike){ var t = (el.textContent || '').trim(); if(t.length < 40 && RX.test(t)) return true; }
+  return false;
+}
+function sweep(){
+  if(!viewer()) return;
+  document.querySelectorAll('button,label,a,[onclick]').forEach(function(el){ if(looksLikeExport(el)) el.classList.add('vl-hide'); });
+  ['nav-rentaldb','nav-rentwatch','fu-btn-forecast','fu-btn-publish'].forEach(function(id){ var e = document.getElementById(id); if(e) e.classList.add('vl-hide'); });
+  document.querySelectorAll('.nav-divider').forEach(function(d){ if(/Rental Rates/i.test(d.textContent || '')) d.classList.add('vl-hide'); });
+}
+var pending = null;
+function schedule(){ if(pending) return; pending = setTimeout(function(){ pending = null; wrapAll(); sweep(); }, 120); }
+new MutationObserver(schedule).observe(document.documentElement, {childList:true, subtree:true});
+new MutationObserver(schedule).observe(document.body, {attributes:true, attributeFilter:['class']});
+window.addEventListener('load', function(){ wrapAll(); sweep(); setTimeout(function(){ wrapAll(); sweep(); }, 1500); });
+try{ firebase.auth().onAuthStateChanged(function(){ setTimeout(function(){ wrapAll(); sweep(); }, 300); }); }catch(e){}
+wrapAll();
 })();
 </script>
 <script>
