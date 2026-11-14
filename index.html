@@ -805,6 +805,10 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
             🗑️ Clear & Import
             <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="clearAndImport(this)">
                     </label>
+          <label id="btn-update-tdate" title="Reads the 'Transfer Date' column (last column of the Equipment List sheet) and updates ONLY that date on the equipment already in the app — nothing else changes" style="display:none; background: rgba(31,106,165,.14); border: 1px solid rgba(31,106,165,.45); color: #58a6ff; padding: 8px 14px; border-radius: var(--radius); cursor: pointer; font-size: 13px; font-weight: 600; white-space: nowrap;">
+            🚚 Update Transfer Date
+            <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="updateTransferDatesFromExcel(this)">
+          </label>
           <label id="btn-update-years" style="display:none; background: rgba(63,185,80,.12); border: 1px solid rgba(63,185,80,.4); color: #3fb950; padding: 8px 14px; border-radius: var(--radius); cursor: pointer; font-size: 13px; font-weight: 600; white-space: nowrap;">
             📅 Update Manuf. Year
             <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="updateYearsFromExcel(this)">
@@ -2071,6 +2075,7 @@ auth.onAuthStateChanged(function(user) {
         document.getElementById('btn-clear-import').style.display = isAdmin ? 'inline-flex' : 'none';
         document.getElementById('btn-clear-fleet').style.display = isAdmin ? 'inline-flex' : 'none';
         document.getElementById('btn-update-years').style.display = isAdmin ? 'inline-flex' : 'none';
+        document.getElementById('btn-update-tdate').style.display = isAdmin ? 'inline-flex' : 'none';
         if(typeof hmAdminUI==='function') hmAdminUI();
 
     document.getElementById('actions-col').style.display = isAdmin ? '' : 'none';
@@ -8437,6 +8442,7 @@ window.confirmFleetImport = function(fleetValue) {
 
       const records = dataRows.map(function(row, i) {
         const eq       = get(row, ['Equipment']);
+        const trDate   = hacIsoDate(get(row, ['Transfer Date','Transfer date','TransferDate']));
         const cat      = get(row, ['Eq Category','Category']);
         const code     = get(row, ['Code / Board No.','Code/Board No.']);
         const brand    = get(row, ['Brand / Model','Brand','Model']);
@@ -8478,6 +8484,7 @@ window.confirmFleetImport = function(fleetValue) {
           sapCode:     sapCode,
           chassis:     chassis,
           owner:       owner || 'HAC',
+          transferDate: trDate,
           fleet:       fleet,
           tab:         sheetName,
           importedAt:  new Date().toISOString()
@@ -8589,6 +8596,84 @@ window.confirmFleetImport = function(fleetValue) {
   }
 };
 
+/* any Excel date (serial number, Date, dd/mm/yyyy, dd-mm-yyyy, yyyy-mm-dd) -> 'YYYY-MM-DD', '' when empty / not a date */
+function hacIsoDate(v){
+  if(v===null||v===undefined) return '';
+  if(v instanceof Date){ return isNaN(+v)?'':v.toISOString().slice(0,10); }
+  var t=String(v).trim(); if(!t||/^[-\u2013\u2014]+$/.test(t)) return '';
+  var n=Number(t);
+  if(!isNaN(n)&&n>20000&&n<70000) return new Date(Math.round((n-25569)*86400*1000)).toISOString().slice(0,10);
+  var m=t.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/);
+  if(m) return m[1]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[3]).slice(-2);
+  m=t.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})/);
+  if(m){ var y=m[3].length===2?'20'+m[3]:m[3]; return y+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[1]).slice(-2); }
+  var d=new Date(t); return isNaN(+d)?'':d.toISOString().slice(0,10);
+}
+/* Update ONLY the Transfer Date of equipment already in the app (matched by SAP / chassis / code, same as Update Manuf. Year) */
+function updateTransferDatesFromExcel(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'binary'});
+      const normHeader = function(s){ return String(s).replace(/\s+/g,' ').trim(); };
+      const normKey = function(s){ return String(s||'').trim().toUpperCase().replace(/\s+/g,''); };
+      const rowsFound = []; let sheetsWithCol = 0;
+      wb.SheetNames.forEach(function(sheetName){
+        if(/sold|scrap/i.test(sheetName)) return;
+        const raw = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {header:1, defval:''});
+        let headerIdx = -1;
+        for (let i = 0; i < Math.min(raw.length, 12); i++) {
+          if (raw[i].some(function(v){ return String(v).trim() === 'S.n' || String(v).trim() === 'Equipment'; })) { headerIdx = i; break; }
+        }
+        if (headerIdx < 0) return;
+        const colIdx = {};
+        raw[headerIdx].forEach(function(h, i){ if(h) colIdx[normHeader(h).toLowerCase()] = i; });
+        const key = ['transfer date','transferdate'].find(function(k){ return colIdx[k] !== undefined; });
+        if (!key) return;
+        sheetsWithCol++;
+        raw.slice(headerIdx + 1).forEach(function(r){
+          const sn = r[0];
+          if (sn === '' || sn === null || isNaN(Number(sn)) || Number(sn) <= 0) return;
+          const g = function(keys){ for(const k of keys){ const ix = colIdx[k]; if(ix !== undefined && r[ix] !== '' && r[ix] !== null) return String(r[ix]).trim(); } return ''; };
+          rowsFound.push({date: hacIsoDate(r[colIdx[key]]), sap: normKey(g(['code sap'])), chassis: normKey(g(['chassis no.'])), code: normKey(g(['code / board no.','code/board no.']))});
+        });
+      });
+      if (!rowsFound.length) {
+        alert(sheetsWithCol ? 'لقيت عمود Transfer Date بس مفيش صفوف بيانات جواه.' : 'مفيش أي شيت فيه عمود اسمه Transfer Date مع S.n/Equipment. اتأكد من اسم العمود.');
+        input.value=''; return;
+      }
+      const bySap = {}, byChassis = {}, byCode = {};
+      const add = function(map, k, doc){ if(!k) return; if(map[k] === undefined) map[k] = doc; else map[k] = null; };
+      allEquipment.forEach(function(d){ add(bySap, normKey(d.sapCode), d); add(byChassis, normKey(d.chassis), d); add(byCode, normKey(d.code), d); });
+      let matched = 0, unmatched = 0, ambiguous = 0, noDate = 0; const updates = [];
+      rowsFound.forEach(function(it){
+        if (!it.date) { noDate++; return; }
+        let doc = null;
+        if (it.sap && bySap[it.sap]) doc = bySap[it.sap];
+        else if (it.chassis && byChassis[it.chassis]) doc = byChassis[it.chassis];
+        else if (it.code && byCode[it.code]) doc = byCode[it.code];
+        if (doc === null) { ambiguous++; return; }
+        if (!doc) { unmatched++; return; }
+        matched++;
+        if (String(doc.transferDate||'') !== it.date) updates.push({id: doc.id, date: it.date});
+      });
+      if (!updates.length) {
+        alert('مفيش Transfer Date جديد يحتاج تحديث.\nصفوف اتقرت: '+rowsFound.length+' · مطابق: '+matched+' · بدون تاريخ: '+noDate+' · مش لاقيلها مطابقة: '+unmatched+(ambiguous?(' · متكررة (اتجاهلت): '+ambiguous):''));
+        input.value=''; return;
+      }
+      if (!confirm('هيتحدث تاريخ التحويل (Transfer Date) بس لـ '+updates.length+' معدة (من أصل '+matched+' متطابقة، '+unmatched+' مش لاقيلها مطابقة، '+noDate+' بدون تاريخ).\nمفيش أي حاجة تانية هتتغير. نكمل؟')) { input.value=''; return; }
+      toast('⏳ Updating Transfer Date for ' + updates.length + ' equipment…');
+      const batches = []; for (let i = 0; i < updates.length; i += 400) batches.push(updates.slice(i, i+400));
+      let chain = Promise.resolve();
+      batches.forEach(function(chunk){ chain = chain.then(function(){ const b = db.batch(); chunk.forEach(function(u){ b.update(db.collection('equipment').doc(u.id), {transferDate: u.date}); }); return b.commit(); }); });
+      chain.then(function(){ toast('✓ ' + updates.length + ' Transfer Dates updated'); loadData(); input.value = ''; })
+           .catch(function(err){ toast('Update error: ' + err.message, 'error'); });
+    } catch (err) { toast('Parse error: ' + err.message, 'error'); input.value = ''; }
+  };
+  reader.readAsBinaryString(file);
+}
 function updateYearsFromExcel(input) {
   const file = input.files[0];
   if (!file) return;
@@ -16083,6 +16168,7 @@ try{console.log('%cHAC \u00b7 PMV','color:#f0a500;font-size:18px;font-weight:700
 <!-- ===== VIEWER LOCK: viewer accounts cannot export / print, and cannot open or read Rental Database prices ===== -->
 <style>
 body.is-viewer .vl-hide{display:none !important}
+body.is-viewer .hd-tab[data-id="comparison"]{display:none !important}
 @media print{ body.is-viewer *{display:none !important} body.is-viewer::before{display:block !important;content:"Printing is disabled for viewer accounts";padding:40px;font:16px Arial} }
 </style>
 <script>
@@ -16122,6 +16208,13 @@ var PRICE_FNS = {
   rdAllRows:function(){ return Promise.resolve([]); },
   rdLastPrice:function(a, b, cb){ if(typeof cb === 'function') cb({error:'restricted'}); }
 };
+/* Features viewers must not see or open: Low H/M usage, Bulk owned search, Fleet Comparison
+   (internal redraw helpers become silent no-ops so nothing pops up when other code calls them) */
+var BLOCKED_FNS = {
+  hmLowOpen:function(){ deny('Low H/M usage'); }, hmLowMsgOpen:function(){ deny('Low H/M usage'); }, hmLowExport:function(){ deny('Low H/M usage'); }, hmLowRedraw:function(){},
+  fuOpenBulk:function(){ deny('Bulk owned search'); }, fuRenderBulk:function(){}, fuBulkToggle:function(){}, fuBulkAll:function(){},
+  cmpRender:function(){}, cmpOpenUnit:function(){ deny('Fleet Comparison'); }, cmpGoPage:function(){ deny('Fleet Comparison'); }
+};
 function wrap(name, onDeny){
   var f = window[name];
   if(typeof f !== 'function' || f.__vl) return;
@@ -16131,9 +16224,10 @@ function wrap(name, onDeny){
 function wrapAll(){
   EXPORTS.forEach(function(n){ wrap(n); });
   Object.keys(PRICE_FNS).forEach(function(n){ wrap(n, PRICE_FNS[n]); });
+  Object.keys(BLOCKED_FNS).forEach(function(n){ wrap(n, BLOCKED_FNS[n]); });
   /* page switch: the Rental Database page cannot be opened */
   var sp = window.showPage;
-  if(typeof sp === 'function' && !sp.__vl){ var w = function(page){ if(viewer() && page === 'rentaldb'){ deny('The Rental Database'); return; } return sp.apply(this, arguments); }; w.__vl = 1; try{ window.showPage = w; }catch(e){} }
+  if(typeof sp === 'function' && !sp.__vl){ var w = function(page){ if(viewer() && page === 'rentaldb'){ deny('The Rental Database'); return; } if(viewer() && page === 'comparison'){ deny('Fleet Comparison'); return; } return sp.apply(this, arguments); }; w.__vl = 1; try{ window.showPage = w; }catch(e){} }
 }
 
 /* 4 — hide the buttons (and keep hiding them when tables / modals re-render) */
@@ -16150,7 +16244,7 @@ function looksLikeExport(el){
 function sweep(){
   if(!viewer()) return;
   document.querySelectorAll('button,label,a,[onclick]').forEach(function(el){ if(looksLikeExport(el)) el.classList.add('vl-hide'); });
-  ['nav-rentaldb','nav-rentwatch','fu-btn-forecast','fu-btn-publish'].forEach(function(id){ var e = document.getElementById(id); if(e) e.classList.add('vl-hide'); });
+  ['nav-rentaldb','nav-rentwatch','fu-btn-forecast','fu-btn-publish','nav-comparison','btn-hm-low','fu-btn-bulk'].forEach(function(id){ var e = document.getElementById(id); if(e) e.classList.add('vl-hide'); });
   document.querySelectorAll('.nav-divider').forEach(function(d){ if(/Rental Rates/i.test(d.textContent || '')) d.classList.add('vl-hide'); });
 }
 var pending = null;
@@ -17048,6 +17142,7 @@ function ensureDash(){
   return o;
 }
 function openDashboard(pageId,btn){
+  if(pageId==='comparison'&&document.body.classList.contains('is-viewer')){ toast_('\ud83d\udd12 Fleet Comparison is disabled for viewer accounts','error'); return; }
   var fn=BUILD[pageId]; if(!fn){ toast_('Dashboard is not available for this page','error'); return; }
   var old=btn?btn.innerHTML:''; if(btn){ btn.disabled=true; btn.innerHTML='⏳ Building…'; }
   var done=function(){ if(btn){ btn.disabled=false; btn.innerHTML=old; } };
@@ -17118,7 +17213,7 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
 <script>
 /* ═════ Low H/M usage — units whose monthly hour-meter difference (End − Start) is below a limit ═════ */
 (function(){
-  var LS='hm_low_thr_v1', thr={eq:80,gen:125,inc:false,mode:'either',tol:0}, ST={ym:'',fleet:'all',q:'',ur:''}, LAST=[];
+  var LS='hm_low_thr_v1', thr={eq:80,gen:125,inc:false,mode:'either',tol:0}, ST={ym:'',fleet:'all',q:'',ur:'',arr:'hide'}, LAST=[];
   try{ var o=JSON.parse(localStorage.getItem(LS)||'null'); if(o){ thr.eq=isFinite(+o.eq)?+o.eq:80; thr.gen=isFinite(+o.gen)?+o.gen:125; thr.inc=!!o.inc; thr.mode=(o.mode==='hm'||o.mode==='bm')?o.mode:'either'; thr.tol=(isFinite(+o.tol)&&+o.tol>0)?+o.tol:0; } }catch(e){}
   function HMS(){ return window.HM_STATE||{byCode:{},months:[],latest:'',loaded:false,rows:[]}; }
   function esc(v){ return (typeof _hacEsc==='function')?_hacEsc(v):String(v==null?'':v); }
@@ -17207,6 +17302,15 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
     var info=repairInfo(code,ym);
     return ' <span title="below the '+lim+' h limit" style="font-size:10px;font-weight:700;color:#e3a008;">LOW</span> '+(info?urBadge(info):'');
   };
+  /* ---- Arrival date at the CURRENT project = 'Transfer Date' column of the Equipment List sheet (falls back to the latest transfer record when it is empty) ---- */
+  function arrivalOf(e){ var d=String(e.transferDate||'').slice(0,10); if(/^\d{4}-\d{2}-\d{2}$/.test(d)) return d; try{ if(typeof fuOwnedEntry==='function') return fuOwnedEntry(e)||''; }catch(x){} return ''; }
+  function arrTag(x){
+    if(!x.arr) return '<span style="color:var(--text-muted);font-size:11px;" title="No transfer into the current project on file">\u2014</span>';
+    var d=(typeof rwFmtDate==='function')?rwFmtDate(x.arr):x.arr, st=x.arrSt;
+    var note=st==='before'?'Arrived after this month \u2014 not at this project yet':(st==='in'?'Arrived during this month \u2014 zero / low reading may be only because of the late arrival':'At the project the whole month \u2014 a low reading here is real idle time');
+    var col=st==='before'?'#ff7b72':(st==='in'?'#f0a500':'#3fb950'), lbl=st==='before'?'\u23f3 Not arrived yet':(st==='in'?'\ud83d\udea7 Arrived in month':'\u2714 On site');
+    return '<b style="white-space:nowrap;">'+esc(d)+'</b><div title="'+esc(note)+'" style="font-size:10px;font-weight:700;color:'+col+';">'+lbl+'</div>';
+  }
   function compute(){
     var out=[], withRead=0, total=0, q=ST.q.trim().toLowerCase();
     (typeof allEquipment!=='undefined'?allEquipment:[]).forEach(function(e){
@@ -17215,7 +17319,7 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
       total++;
       var g=isGen(e), lim=g?thr.gen:thr.eq;
       if(q){ var hay=(String(e.code||'')+' '+(e.equipment||'')+' '+(e.project||'')+' '+(e.od||'')+' '+(e.brand||'')+' '+engStr(e)).toLowerCase(); if(hay.indexOf(q)<0) return; }
-      var ALL=(ST.ym==='all'), months=ALL?HMS().months:[ST.ym];
+      var ALL=(ST.ym==='all'), months=ALL?HMS().months:[ST.ym], arr=arrivalOf(e);
       months.forEach(function(ym){
         var r=reading(e.code,ym), item=null, mode=thr.mode||'either', bx=bmOf(e.code,ym), dd=(r&&r.s!=null)?(r.e-r.s):null;
         if(dd!=null) withRead++;
@@ -17226,6 +17330,9 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
         if(!item) return;
         item.bmx=bx; item.hLow=(mode==='bm')?false:hLow; item.bLow=(mode==='hm')?false:bLow;
         item.ym=ym; item.ur=repairInfo(e.code,ym);
+        item.arr=arr; item.arrSt='';
+        if(arr){ var am=String(arr).slice(0,7); item.arrSt=(am>ym)?'before':(am===ym?'in':'ok'); }
+        if(ST.arr==='hide'&&(item.arrSt==='before'||item.arrSt==='in')) return;   /* arrived after / during the month: not idle, it just was not there */
         if(ST.ur==='only'&&!item.ur) return; if(ST.ur==='hide'&&item.ur) return;
         out.push(item);
       });
@@ -17313,6 +17420,7 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
       +'<label><input id="hml-inc" type="checkbox"'+(thr.inc?' checked':'')+'> include units with no reading this month</label>'
       +'<input id="hml-q" placeholder="Search code / equipment / project / O.D / engineer" value="'+esc(ST.q)+'" style="'+inp+'min-width:230px;">'
       +'<label>Repair <select id="hml-ur" style="'+inp+'"><option value="">All units</option><option value="only"'+(ST.ur==='only'?' selected':'')+'>Under repair only</option><option value="hide"'+(ST.ur==='hide'?' selected':'')+'>Hide under repair</option></select></label>'
+      +'<label title="Uses the date the unit entered its current project (latest transfer in). Units that arrived during or after the month are not counted as idle.">Arrival <select id="hml-arr" style="'+inp+'"><option value="hide"'+(ST.arr==='hide'?' selected':'')+'>Hide late arrivals</option><option value="show"'+(ST.arr==='show'?' selected':'')+'>Show with arrival flag</option></select></label>'
       +'<label title="Which units are listed: low by H/M hours, below the Master Owned benchmark (B.M), or either">Low by <select id="hml-mode" style="'+inp+'"><option value="either"'+((thr.mode||'either')==='either'?' selected':'')+'>Hours or B.M</option><option value="hm"'+(thr.mode==='hm'?' selected':'')+'>H/M hours only</option><option value="bm"'+(thr.mode==='bm'?' selected':'')+'>Below B.M only</option></select></label>'
       +'<label title="A unit counts as below B.M when its utilization is lower than the B.M by more than this many points">B.M tolerance <input id="hml-tol" type="number" min="0" step="1" value="'+(thr.tol||0)+'" style="'+inp+'width:56px;"> pts</label>'
       +'<button class="btn-sm accent" onclick="hmLowExport()">📊 Excel</button><button class="btn-sm" onclick="hmLowMsgOpen()" title="One WhatsApp-ready message per engineer with his low-usage units">💬 Message engineers</button></div>';
@@ -17326,13 +17434,13 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
       +(thr.inc?'<span class="mr-chip" style="cursor:default;">No reading: <b>'+fmt(nN)+'</b></span>':'')
       +'<span style="font-size:11px;color:var(--text-muted);align-self:center;">'+(ST.ym==='all'?fmt(R.withRead)+' monthly readings checked across all months':fmt(R.withRead)+' of '+fmt(R.total)+' units have a '+lab(ST.ym)+' reading')+'</span></div>';
     var th='style="text-align:left;padding:8px 10px;font-size:10px;letter-spacing:.8px;color:var(--text-muted);position:sticky;top:0;background:var(--surface,#161b22);"';
-    h+='<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr><th '+th+'>#</th><th '+th+'>Code</th><th '+th+'>Month</th><th '+th+'>Equipment</th><th '+th+'>Category</th><th '+th+'>Brand / Model</th><th '+th+'>Capacity</th><th '+th+'>Project</th><th '+th+'>O.D</th><th '+th+'>Engineer</th><th '+th+'>Mobile</th><th '+th+'>Start</th><th '+th+'>End</th><th '+th+'>Diff (h)</th><th '+th+'>Limit</th><th '+th+'>Util vs B.M</th><th '+th+'>Repair status</th><th '+th+'>Low by</th></tr></thead><tbody>';
+    h+='<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr><th '+th+'>#</th><th '+th+'>Code</th><th '+th+'>Month</th><th '+th+'>Equipment</th><th '+th+'>Category</th><th '+th+'>Brand / Model</th><th '+th+'>Capacity</th><th '+th+'>Project</th><th '+th+'>Arrived at project</th><th '+th+'>O.D</th><th '+th+'>Engineer</th><th '+th+'>Mobile</th><th '+th+'>Start</th><th '+th+'>End</th><th '+th+'>Diff (h)</th><th '+th+'>Limit</th><th '+th+'>Util vs B.M</th><th '+th+'>Repair status</th><th '+th+'>Low by</th></tr></thead><tbody>';
     var lim=Math.min(R.rows.length,800);
     for(var i=0;i<lim;i++){ var x=R.rows[i], e=x.e, td='style="padding:7px 10px;border-top:1px solid var(--border);"', mono='style="padding:7px 10px;border-top:1px solid var(--border);font-family:monospace;"';
-      h+='<tr class="hml-r" data-eid="'+esc(e.id||'')+'" title="Click to open equipment details"><td '+td+'>'+(i+1)+'</td><td '+mono+'><span style="color:#e3a008;">'+esc(e.code||'—')+'</span></td><td '+mono+'>'+lab(x.ym||ST.ym)+'</td><td '+td+'><b>'+esc(e.equipment||'—')+'</b>'+(x.g?' <span style="font-size:10px;color:var(--text-muted);">gen</span>':'')+'</td><td '+td+'>'+esc(catOf(e)||'—')+'</td><td '+td+'>'+esc(e.brand||'—')+'</td><td '+mono+'>'+esc(capOf(e)||'—')+'</td><td '+td+'>'+esc(e.project||'—')+'</td><td '+td+'>'+esc(e.od||'—')+'</td><td '+td+'>'+engCell(e)+'</td><td '+td+'>'+mobCell(e)+'</td>'
+      h+='<tr class="hml-r" data-eid="'+esc(e.id||'')+'" title="Click to open equipment details"><td '+td+'>'+(i+1)+'</td><td '+mono+'><span style="color:#e3a008;">'+esc(e.code||'—')+'</span></td><td '+mono+'>'+lab(x.ym||ST.ym)+'</td><td '+td+'><b>'+esc(e.equipment||'—')+'</b>'+(x.g?' <span style="font-size:10px;color:var(--text-muted);">gen</span>':'')+'</td><td '+td+'>'+esc(catOf(e)||'—')+'</td><td '+td+'>'+esc(e.brand||'—')+'</td><td '+mono+'>'+esc(capOf(e)||'—')+'</td><td '+td+'>'+esc(e.project||'—')+'</td><td '+td+'>'+arrTag(x)+'</td><td '+td+'>'+esc(e.od||'—')+'</td><td '+td+'>'+engCell(e)+'</td><td '+td+'>'+mobCell(e)+'</td>'
         +(x.r?('<td '+mono+'>'+fmt(x.r.s)+'</td><td '+mono+'>'+fmt(x.r.e)+'</td><td '+mono+'><b style="color:'+(x.d<0?'#e3a008':'var(--red,#f85149)')+';">'+fmt(x.d)+(x.d<0?' ⚠':'')+'</b></td>'):('<td '+mono+'>—</td><td '+mono+'>—</td><td '+mono+'><span style="color:var(--text-muted);">no reading</span></td>'))
         +'<td '+mono+'>&lt; '+x.lim+'</td><td '+td+'>'+bmCell(x)+'</td><td '+td+'>'+(x.ur?urBadge(x.ur):'<span style="color:var(--text-muted);">\u2014</span>')+'</td><td '+td+'>'+byCell(x)+'</td></tr>'; }
-    if(!R.rows.length) h+='<tr><td colspan="18" style="padding:30px;text-align:center;color:var(--text-muted);">No units below the limit in '+lab(ST.ym)+' 🎉</td></tr>';
+    if(!R.rows.length) h+='<tr><td colspan="19" style="padding:30px;text-align:center;color:var(--text-muted);">No units below the limit in '+lab(ST.ym)+' 🎉</td></tr>';
     h+='</tbody></table>'+(R.rows.length>lim?'<div style="font-size:11px;color:var(--text-muted);margin-top:6px;">Showing the first '+lim+' — use Excel for the full list.</div>':'');
     var keepQ=(document.activeElement&&document.activeElement.id==='hml-q'), pos=keepQ?document.activeElement.selectionStart:0;
     body.innerHTML=h; wire();
@@ -17354,6 +17462,7 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
       var hm=document.getElementById('history-modal'); if(hm) hm.style.zIndex='10001';   /* keep the details window above the Low H/M list */
     }); }
     on('hml-ur','change',function(){ ST.ur=this.value; draw(); });
+    on('hml-arr','change',function(){ ST.arr=this.value; draw(); });
     on('hml-mode','change',function(){ thr.mode=this.value; save(); draw(); });
     on('hml-tol','change',function(){ thr.tol=Math.max(0,+this.value||0); save(); draw(); });
     on('hml-q','input',function(){ ST.q=this.value; draw(); });
