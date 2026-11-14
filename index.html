@@ -1132,7 +1132,7 @@ body:not(.is-viewer) .rd-admin{display:inline-flex !important;}
 
           <div class="dash-section-label">Rate records</div>
           <div class="toolbar">
-            <input type="text" class="search-box" id="rd-q" placeholder="Search contract, equipment, model, vendor, project, contact, note…">
+            <input type="text" class="search-box" id="rd-q" placeholder="Search contract, equipment, capacity, attachment, model, vendor, project, contact, note…">
             <select id="rd-sel-plant"></select>
             <select id="rd-sel-cat"></select>
             <select id="rd-sel-rate"></select>
@@ -14777,9 +14777,14 @@ function parseMaster(matrix,headerAt,catPairs){
   head.forEach(function(h,i){ if(h&&ix[h]==null) ix[h]=i; });
   function col(){ for(var i=0;i<arguments.length;i++){ if(ix[arguments[i]]!=null) return ix[arguments[i]]; } return -1; }
   var C={contract:col('contract','contract no','contract number'),plant:col('plant'),project:col('project'),vendor:col('vendors','vendor'),contact:col('contacts','contact'),
-         cat:col('eq category','category'),item:col('equipment / item','equipment'),model:col('model / capacity','model'),
+         cat:col('eq category','category'),item:col('equipment / item','equipment'),model:col('model / capacity'),cap:col('capacity'),att:col('attachment'),brand:col('model'),
          qty:col('qty'),cost:col('unit cost'),rate:col('rate'),date:col('date'),sb:col('s.b rate','s.b'),
          fuel:col('fuel cost','fuel'),trans:col('transportation'),note:col('note')};
+  /* New sheet layout has separate Model / Attachment / Capacity columns: the row is identified by Capacity + Attachment
+     (Model is only a brand / free text and made filtering unreliable, so it is kept apart in r.brand for searching).
+     Old layout (a single 'Model / Capacity' column, or only 'Model') keeps working as before. */
+  var NEWLAY=(C.model<0&&(C.cap>=0||C.att>=0));
+  if(C.model<0&&!NEWLAY) C.model=C.brand;
   ['item','cost','rate'].forEach(function(k){ if(C[k]<0) throw new Error('Column not found: '+k); });
   function g(r,k){ return C[k]<0?null:r[C[k]]; }
 
@@ -14790,7 +14795,7 @@ function parseMaster(matrix,headerAt,catPairs){
     if(!item&&cost==null){ skipped++; continue; }
     out.push({
       contract:clean(g(r,'contract')), plant:clean(g(r,'plant')), project:clean(g(r,'project')), vendor:clean(g(r,'vendor')), contact:clean(g(r,'contact')),
-      cat:clean(g(r,'cat')), item:item, model:clean(g(r,'model')), qty:toNum(g(r,'qty')), cost:cost,
+      cat:clean(g(r,'cat')), item:item, model:(NEWLAY?[clean(g(r,'cap')),clean(g(r,'att'))].filter(Boolean).join(' \u00b7 '):clean(g(r,'model'))), brand:(NEWLAY?clean(g(r,'brand')):''), qty:toNum(g(r,'qty')), cost:cost,
       rate:rateOf(g(r,'rate')), date:toISO(g(r,'date')), sb:toSB(g(r,'sb')),
       fuel:party(g(r,'fuel')), trans:party(g(r,'trans')), note:clean(g(r,'note'))
     });
@@ -14951,7 +14956,7 @@ function decorate(){
     var dk=[r.plant,r.project,r.vendor,r.item,r.model,r.rate,r.cost,r.date,r.sb,r.fuel,r.trans,r.note].join('|');
     if(seen[dk]) f.push('dup'); else seen[dk]=1;
     r.flags=f;
-    r._h=(r.item+' '+r.model+' '+r.vendor+' '+r.project+' '+r.contact+' '+r.plant+' '+r.note+' '+r.contract).toLowerCase();
+    r._h=(r.item+' '+r.model+' '+(r.brand||'')+' '+r.vendor+' '+r.project+' '+r.contact+' '+r.plant+' '+r.note+' '+r.contract).toLowerCase();
   });
   computeDif();
 }
@@ -15146,11 +15151,11 @@ function renderPanels(){
     LM.forEach(function(r){ var key=r.model||'—'; var o=gm[key]||(gm[key]={n:0,d:[]}); o.n++; if(r.rate==='daily'&&r.cost!=null) o.d.push(r.cost); });
     var caps=Object.keys(gm).map(function(k){ var d=gm[k].d.sort(function(a,b){return a-b;}); return {v:k,n:gm[k].n,min:d.length?d[0]:null,med:pctl(d,.5),max:d.length?d[d.length-1]:null}; })
       .sort(function(a,b){ return b.n-a.n||a.v.localeCompare(b.v); });
-    var ctb='<div class="table-wrap" style="border:none;background:transparent;"><table class="rd-bt"><thead><tr><th>Model / Capacity</th><th class="n">Records</th><th class="n">Min</th><th class="n">Median</th><th class="n">Max</th></tr></thead><tbody>'
+    var ctb='<div class="table-wrap" style="border:none;background:transparent;"><table class="rd-bt"><thead><tr><th>Capacity / Attachment</th><th class="n">Records</th><th class="n">Min</th><th class="n">Median</th><th class="n">Max</th></tr></thead><tbody>'
       +caps.map(function(c){
         return '<tr class="rd-btr" data-rd="model" data-v="'+enc(c.v)+'"><td>'+E(c.v)+'</td><td class="n">'+fmt(c.n)+'</td><td class="n">'+fmt(c.min)+'</td><td class="n">'+fmt(c.med)+'</td><td class="n">'+fmt(c.max)+'</td></tr>';
       }).join('')+'</tbody></table></div>';
-    h+=panel('Capacities — '+E(F.item),'Pick a model/capacity to see its latest price in every plant it appears in',ctb,true);
+    h+=panel('Capacities — '+E(F.item),'Pick a capacity / attachment to see its latest price in every plant it appears in',ctb,true);
   }
   if(F.item&&F.model){
     var byPlant={};
@@ -15175,7 +15180,7 @@ function renderPanels(){
 }
 
 var COLF={item:'item',modelL:'model',catL:'cat',rateL:'rate',cost:'dif',sb:'sb',vendor:'vendor',project:'project',plant:'plant',date:'month',fuelL:'fuel',transL:'trans'};
-var COLS=[['contract','Contract'],['item','Equipment'],['modelL','Model / Capacity'],['catL','Category'],['rateL','Rate'],['cost','Unit cost'],['sb','S.B'],['vendor','Vendor'],
+var COLS=[['contract','Contract'],['item','Equipment'],['modelL','Capacity / Attachment'],['catL','Category'],['rateL','Rate'],['cost','Unit cost'],['sb','S.B'],['vendor','Vendor'],
           ['project','Project'],['plant','Plant'],['date','Date'],['fuelL','Fuel'],['transL','Transport'],['contact','Contact'],['note','Note']];
 /* export of the filtered Rental Database table (all matching rows, not just the ones currently shown) */
 window.rdExport=function(kind){
@@ -15227,7 +15232,7 @@ function renderTable(){
     return '<tr><td class="rd-muted">'+(i+1)+'</td>'
       +'<td class="code-cell">'+cLink(r.contract)+'</td>'
       +'<td style="font-weight:600;">'+E(r.item)+'</td>'
-      +'<td>'+E(r.model||'—')+'</td>'
+      +'<td'+(r.brand?' title="Model: '+E(r.brand)+'"':'')+'>'+E(r.model||'—')+'</td>'
       +'<td><span class="cat-badge"'+(cc[r.catL]?' style="border-left:3px solid '+cc[r.catL]+'"':'')+'>'+(r.cat?E(r.cat):'<span class="rd-muted">Uncategorized</span>')+'</span></td>'
       +'<td>'+E(r.rateL)+'</td>'
       +'<td class="code-cell'+(flagged?' rd-warn':'')+'" title="'+(flagged?'Daily rate ≥ '+fmt(HIGH_DAILY)+' — verify basis':'')+'">'+fmt(r.cost,2)+difBadge(r)+'</td>'
