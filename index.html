@@ -17868,5 +17868,700 @@ window.HACBI={hub:function(btn){ ensureDash(); openDashboard(DASH_LAST||'executi
   document.addEventListener('DOMContentLoaded', sched); sched();
 })();
 </script>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     🤖 HAC AI AGENT v1.0 — Brain + Tools + Workflow Engine
+     Placed before </body>. Works with existing globals:
+     db, wsDb, auth, allEquipment, FU_DATA, window.MO/MR/__rdData,
+     HACBI, hmLookup, OD_MAP, getOd, isAdmin, currentUser
+════════════════════════════════════════════════════════════════ -->
+<script>
+(function(){
+'use strict';
+if(window.__HAC_BLOCKED || window.HAC_AGENT) return;
+
+/* ══════════ 1) KNOWLEDGE BASE — كل حاجة جوه الأداة ══════════ */
+var KB = {
+  app:'HAC · PMV Integrated System — Hassan Allam Construction',
+  firebase:{ main:'equipment-list-hac', workshop:'hac-pmv-workshop' },
+  collections:{
+    equipment:'Fleet assets: fleet,category,equipment,brand,code,sap,chassis,engine,enginesn,year,power,project,od,costcenter,value,sn,tab',
+    transfers:'equipmentId,equipmentName,code,from,to,date,notes,requestedBy,attachment,timestamp,by',
+    followup:'sn,equipment,capacity,qty,sap,project,submission_date,provision(Rental|Transfer|Hold|Pending|Cancel),date_from,date_to,days(max30/mo),notes,stage,stageAt',
+    master_owned:'Monthly owned utilization: hiring,od,project,cat,code,equipment,model,worked,standby,repair,unitPrice,totalCost,qty,utl,fuel,bm,status',
+    master_rental:'Monthly rental invoices: sap,plant,od,project,equipment,qty,days,unitPrice,totalPrice,otCost,fuel,totalDeduct,util,hiringDate,month',
+    rental_database:'Market rate reference: item,model,vendor,project,plant,cost,rate,rateL,date,fuel,note (EGP)',
+    workshop:'wsDb.equipment: name,code,report,project,dept(Mechanics|Denting|Blacksmith|Welding|Painting|Electric|Testing),status(Ready|In Progress|Waiting|Delay|External|Dispatched),dates'
+  },
+  fleets:{egypt:'🇪🇬 Egypt',ksa:'🇸🇦 Saudi Arabia',algeria:'🇩🇿 Algeria',uae:'🇦🇪 UAE',foundation:'🏗 Foundation',tunnelling:'⛏ Tunnelling',tbmsupport:'🧰 TBM Support',others:'📦 Others',welding:'🔥 Welding Machines',all:'🌍 All Countries'},
+  pages:{executive:'Executive Summary',dashboard:'Dashboard',equipment:'Equipment List',transfers:'Transfer Log',workshop:'Central Workshop',followup:'Follow-Up 2026',rentaldb:'Rental Database',masterowned:'Master Owned',masterrental:'Master Rental',comparison:'Owned vs Rental'},
+  erms:[{k:'receive',l:'Receive & Register',sla:1},{k:'review',l:'Technical Review',sla:2},{k:'search',l:'Search Owned',sla:3},{k:'allocation',l:'Allocation Decision',sla:2},{k:'mobilization',l:'Mobilization',sla:7},{k:'acceptance',l:'Project Acceptance',sla:3},{k:'closure',l:'Closure',sla:2}],
+  rules:['Days auto-capped at 30/month','Central Workshop equipment has empty O.D','jv fleet is hidden everywhere','Writes require Admin ('+'magdygaperarqam@gmail.com'+')','Quota exceeded → local cache fallback']
+};
+
+/* ══════════ 2) SAFE ACCESSORS (no eval — الـ CSP بتاع الصفحة مانع eval) ══════════ */
+/* let/const globals مش على window، فبنقراهم بالاسم من الـ global lexical scope */
+var LEX={
+  allEquipment:function(){return allEquipment;}, allTransfers:function(){return allTransfers;},
+  FU_DATA:function(){return FU_DATA;}, wsEquipment:function(){return wsEquipment;},
+  isAdmin:function(){return isAdmin;}, currentUser:function(){return currentUser;},
+  currentFleet:function(){return currentFleet;}, db:function(){return db;},
+  wsDb:function(){return wsDb;}, OD_MAP:function(){return OD_MAP;}
+};
+function G(name){ try{ if(LEX[name])return LEX[name](); return window[name]; }catch(e){ return undefined; } }
+function eqAll(){ return G('allEquipment')||[]; }
+function fuAll(){ return G('FU_DATA')||[]; }
+function wsAll(){ return G('wsEquipment')||[]; }
+function moAll(){ try{ return window.MO&&MO.data?MO.data():[]; }catch(e){ return []; } }
+function mrAll(){ try{ return window.MR&&MR.data?MR.data():[]; }catch(e){ return []; } }
+function rdAll(){ try{ return window.__rdData?__rdData().all||[]:[]; }catch(e){ return []; } }
+function admin(){ return !!G('isAdmin'); }
+function esc(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function nfmt(n){ return (Math.round((+n||0)*100)/100).toLocaleString('en-US'); }
+function norm(s){ return String(s||'').toLowerCase().replace(/[٠-٩]/g,function(d){return '٠١٢٣٤٥٦٧٨٩'.indexOf(d);}).replace(/[\s\-_.]+/g,' ').trim(); }
+function todayISO(){ var d=new Date(); return d.toISOString().slice(0,10); }
+function refreshAll(){ ['renderTable','renderDashboard','renderExecutiveSummary','updateFleetCounts','populateFilters','renderTransfers','renderCatBreakdown','setupFollowUpUI'].forEach(function(f){ try{ if(typeof G(f)==='function') G(f)(); }catch(e){} }); }
+
+/* ══════════ 3) TOOL REGISTRY — أدوات تنفيذ حقيقية ══════════ */
+var UNDO=[]; // safety stack
+var TOOLS={};
+function tool(name,desc,risk,fn){ TOOLS[name]={desc:desc,risk:risk,fn:fn}; } // risk: read | write | danger
+
+/* ---- READ tools ---- */
+tool('fleet_stats','إحصائيات الأسطول (عدد/دول/فئات/مشاريع)','read',function(a){
+  var list=eqAll(), fl=list;
+  if(a.fleet&&a.fleet!=='all'){ var f=a.fleet; fl=list.filter(function(e){ var ef=e.fleet||'egypt'; if(f==='foundation')return (e.category||'').toLowerCase().indexOf('foundation')>-1; if(f==='tunnelling')return ef==='tunnelling'||/tunnel/i.test(e.category||'')||/tunnel/i.test(e.tab||''); return ef===f; }); }
+  var cats={},projs={},ods={};
+  fl.forEach(function(e){ var c=e.category||'Uncategorized'; cats[c]=(cats[c]||0)+1; projs[e.project||'—']=1; if(e.od)ods[e.od]=1; });
+  var top=Object.keys(cats).sort(function(x,y){return cats[y]-cats[x];}).slice(0,8).map(function(c){return c+': '+cats[c];});
+  return {text:'📊 **'+(KB.fleets[a.fleet||'all']||'All')+'**\n• Total: **'+fl.length+'** معدة\n• Projects: **'+Object.keys(projs).length+'**\n• O.D Engineers: **'+Object.keys(ods).length+'**\n\n**Top Categories:**\n'+top.join('\n'),data:{total:fl.length,cats:cats}};
+});
+
+tool('find_equipment','بحث عن معدة بالكود/الاسم/المشروع','read',function(a){
+  var q=norm(a.query||a.code||''); if(!q)return{text:'اكتب كود أو اسم المعدة'};
+  var hits=eqAll().filter(function(e){ return [e.code,e.sap,e.equipment,e.brand,e.project].some(function(v){return norm(v).indexOf(q)>-1;}); }).slice(0,15);
+  if(!hits.length)return{text:'❌ مفيش نتيجة لـ "'+a.query+'" في الـ Fleet'};
+  var rows=hits.map(function(e){ var hm=''; try{ if(window.hmLast){var p=hmLast(e.code); if(p)hm=' | H/M: '+nfmt(p.e)+' ('+p.label+')';} }catch(x){}
+    return '• **'+esc(e.equipment)+'** `'+esc(e.code||'—')+'`\n  📍 '+esc(e.project||'—')+' | 👷 '+esc(e.od||'—')+' | '+esc(e.brand||'')+' '+esc(e.year||'')+hm; });
+  return {text:'🔎 **'+hits.length+'** نتيجة:\n\n'+rows.join('\n\n'),data:hits};
+});
+
+tool('project_equipment','معدات مشروع معين','read',function(a){
+  var q=norm(a.project||''); var hits=eqAll().filter(function(e){return norm(e.project).indexOf(q)>-1;});
+  if(!hits.length)return{text:'مفيش معدات لمشروع "'+a.project+'"'};
+  var od=G('getOd')?G('getOd')(hits[0].project):'';
+  var cats={}; hits.forEach(function(e){var c=e.category||'—';cats[c]=(cats[c]||0)+1;});
+  return {text:'🏗 **'+esc(hits[0].project)+'** — '+hits.length+' معدة'+(od?'\n👷 O.D: '+od:'')+'\n'+Object.keys(cats).map(function(c){return '• '+c+': '+cats[c];}).join('\n'),data:hits};
+});
+
+tool('od_projects','مشاريع ومعدات مهندس O.D','read',function(a){
+  var q=norm(a.od||a.engineer||''); var map=G('OD_MAP')||{};
+  var projs=Object.keys(map).filter(function(p){return norm(map[p]).indexOf(q)>-1;});
+  if(!projs.length){ var ods={}; eqAll().forEach(function(e){if(e.od&&norm(e.od).indexOf(q)>-1)ods[e.od]=1;}); return {text:Object.keys(ods).length?'المهندس موجود بس مش في OD_MAP':'ملقتش مهندس بالاسم ده'}; }
+  var counts={}; eqAll().forEach(function(e){ if(projs.indexOf(e.project)>-1)counts[e.project]=(counts[e.project]||0)+1; });
+  return {text:'👷 **'+map[projs[0]]+'**\n'+projs.map(function(p){return '• '+p+': '+(counts[p]||0)+' معدة';}).join('\n')};
+});
+
+tool('workshop_status','حالة الورشة المركزية لايف','read',function(a){
+  var list=wsAll(); if(!list.length){ try{G('initWorkshopLive')();}catch(e){} return {text:'⏳ بجيب بيانات الورشة اللايف... اسأل تاني بعد ثانيتين'}; }
+  var act=list.filter(function(i){return i.status!=='Dispatched';});
+  var st={}; act.forEach(function(i){st[i.status||'—']=(st[i.status||'—']||0)+1;});
+  var lng=act.filter(function(i){ try{return G('_mgmtDays')(i)>15;}catch(e){return false;} });
+  var txt='🔧 **Central Workshop**\n• Active: **'+act.length+'** | Dispatched: '+(list.length-act.length)+'\n'+Object.keys(st).map(function(s){return '• '+s+': '+st[s];}).join('\n');
+  if(lng.length)txt+='\n\n⚠️ **'+lng.length+'** معدة أكتر من 15 يوم:\n'+lng.slice(0,8).map(function(i){return '• '+esc(i.name)+' `'+esc(i.code)+'` — '+esc(i.dept);}).join('\n');
+  if(a.status){ var f=act.filter(function(i){return i.status===a.status;}); txt+='\n\n**'+a.status+':**\n'+f.slice(0,10).map(function(i){return '• '+esc(i.name)+' — '+esc(i.project);}).join('\n'); }
+  return {text:txt,data:act};
+});
+
+tool('followup_summary','ملخص طلبات Follow-Up والخصومات','read',function(a){
+  var list=fuAll(); if(!list.length)return{text:'مفيش طلبات Follow-Up محملة'};
+  var pv={Rental:0,Transfer:0,Hold:0,Pending:0,Cancel:0},days=0,ded=0;
+  list.forEach(function(r){ if(pv[r.provision]!=null)pv[r.provision]++; days+=+r.days||0; try{if(G('fuIsDeduction')(r))ded+=+r.days||0;}catch(e){} });
+  var late=[]; try{ list.forEach(function(r){ var inf=G('fuStageInfo')(r); if(inf&&inf.over)late.push(r); }); }catch(e){}
+  var txt='📋 **Follow-Up 2026** — '+list.length+' طلب\n'+Object.keys(pv).map(function(k){return '• '+k+': '+pv[k];}).join('\n')+'\n• إجمالي الأيام: '+nfmt(days)+(ded?'\n• 💸 أيام خصم ع المقاول: '+nfmt(ded):'');
+  if(late.length)txt+='\n\n🚨 **'+late.length+'** طلب متأخر عن SLA';
+  if(a.project){ var f=list.filter(function(r){return norm(r.project).indexOf(norm(a.project))>-1;}); txt+='\n\n**'+a.project+':** '+f.length+' طلب\n'+f.slice(0,8).map(function(r){return '• '+esc(r.equipment)+' ×'+(r.qty||1)+' — '+r.provision+' ('+(r.days||0)+' يوم)';}).join('\n'); }
+  return {text:txt,data:list};
+});
+
+tool('overdue_requests','الطلبات المتأخرة عن SLA (ERMS)','read',function(){
+  var out=[]; try{ fuAll().forEach(function(r){ var i=G('fuStageInfo')(r); if(i&&i.over)out.push({eq:r.equipment,proj:r.project,stage:G('fuStageLabel')(r.stage)||r.provision,days:i.age,sla:i.sla,owner:G('fuOwnerOf')(r)}); }); }catch(e){ return {text:'ERMS لسه بيتحمل'}; }
+  if(!out.length)return{text:'✅ مفيش طلبات متأخرة عن الـ SLA'};
+  out.sort(function(a,b){return b.days-a.days;});
+  return {text:'🚨 **'+out.length+' طلب متأخر:**\n\n'+out.slice(0,12).map(function(r){return '• **'+esc(r.eq)+'** — '+esc(r.proj)+'\n  ⏱ '+r.days+' يوم (SLA: '+r.sla+') | '+esc(r.stage)+' | 👤 '+esc(r.owner||'—');}).join('\n'),data:out};
+});
+
+tool('rental_analysis','تحليل تكاليف الإيجار (Master Rental)','read',function(a){
+  var list=mrAll(); if(!list.length){ try{if(window.MR)MR.load();}catch(e){} return {text:'⏳ بحمّل بيانات Master Rental... اسأل تاني بعد شوية'}; }
+  if(a.month)list=list.filter(function(r){return r.month===a.month;});
+  if(a.project)list=list.filter(function(r){return norm(r.project).indexOf(norm(a.project))>-1;});
+  var cost=0,fuel=0,ot=0,ded=0,units=0,byProj={};
+  list.forEach(function(r){ cost+=+r.totalPrice||0; fuel+=+r.fuel||0; ot+=+r.otCost||0; ded+=+r.totalDeduct||0; if((+r.qty||0)>0)units+=+r.qty; var p=r.project||'—'; byProj[p]=(byProj[p]||0)+(+r.totalPrice||0); });
+  var top=Object.keys(byProj).sort(function(x,y){return byProj[y]-byProj[x];}).slice(0,7);
+  return {text:'💰 **Master Rental** ('+list.length+' سجل)\n• التكلفة: **'+nfmt(cost)+' EGP**\n• الوقود: '+nfmt(fuel)+' | OT: '+nfmt(ot)+'\n• الخصومات: '+nfmt(ded)+'\n• Units: '+nfmt(units)+'\n\n**Top Projects:**\n'+top.map(function(p,i){return (i+1)+'. '+esc(p)+' — '+nfmt(byProj[p]);}).join('\n')};
+});
+
+tool('owned_analysis','تحليل استغلال المعدات المملوكة','read',function(a){
+  var list=moAll(); if(!list.length){ try{if(window.MO)MO.reload(false);}catch(e){} return {text:'⏳ بحمّل Master Owned...'}; }
+  if(a.month)list=list.filter(function(r){return (r.hiring||'').slice(0,7)===a.month;});
+  var worked=0,idle=0,repair=0,cost=0,utls=[];
+  list.forEach(function(r){ worked+=+r.worked||0; idle+=+r.standby||0; repair+=+r.repair||0; cost+=+r.totalCost||0; if(r.utl!=null)utls.push(+r.utl); });
+  var avg=utls.length?utls.reduce(function(s,v){return s+v;},0)/utls.length:0;
+  return {text:'🚜 **Master Owned** ('+list.length+' صف)\n• ساعات شغل: '+nfmt(worked)+'\n• Standby: '+nfmt(idle)+' | Repair: '+nfmt(repair)+'\n• متوسط الاستغلال: **'+nfmt(avg*100<=100?avg:avg)+'%**\n• التكلفة: '+nfmt(cost)+' EGP'};
+});
+
+tool('low_hm','المعدات قليلة التشغيل (Low H/M)','read',function(){
+  try{ if(window.hmLowOpen){ hmLowOpen(); return {text:'📉 فتحتلك شاشة Low H/M — المعدات تحت الحد (80h معدات / 125h مولدات)'}; } }catch(e){}
+  return {text:'ميزة Low H/M مش محملة دلوقتي'};
+});
+
+tool('rate_lookup','سعر سوق معدة من Rental Database','read',function(a){
+  var list=rdAll(); if(!list.length)return{text:'⏳ افتح صفحة Rental Database الأول عشان تتحمل الأسعار'};
+  var q=norm(a.query||a.equipment||'');
+  var hits=list.filter(function(r){return norm(r.item).indexOf(q)>-1||norm(r.model).indexOf(q)>-1;}).slice(0,10);
+  if(!hits.length)return{text:'مفيش سعر مسجل لـ "'+a.query+'"'};
+  return {text:'💲 **أسعار السوق — '+a.query+':**\n'+hits.map(function(r){return '• '+esc(r.item)+' '+esc(r.model||'')+' — **'+nfmt(r.rate)+' EGP/'+esc(r.rateL||'day')+'**\n  '+esc(r.vendor||'')+' | '+esc(r.project||'')+' | '+esc(r.dateLabel||r.date||'');}).join('\n')};
+});
+
+tool('transfer_history','تاريخ تحويلات معدة','read',function(a){
+  var q=norm(a.query||a.code||''); var ts=G('allTransfers')||[];
+  var hits=ts.filter(function(t){return norm(t.code).indexOf(q)>-1||norm(t.equipmentName).indexOf(q)>-1;}).slice(0,12);
+  if(!hits.length)return{text:'مفيش تحويلات لـ "'+a.query+'"'};
+  return {text:'🚚 **تحويلات '+a.query+':**\n'+hits.map(function(t){return '• '+esc(t.date||'—')+': '+esc(t.from||'—')+' ← → **'+esc(t.to||'—')+'**'+(t.requestedBy?' ('+esc(t.requestedBy)+')':'');}).join('\n')};
+});
+
+tool('explain','شرح أي جزء في السيستم','read',function(a){
+  var q=norm(a.topic||a.query||'');
+  if(/erms|stage|sla|مرحل/.test(q))return{text:'⚙️ **ERMS — 7 مراحل بمواعيد SLA:**\n'+KB.erms.map(function(s){return s.l+' → '+s.sla+' يوم';}).join('\n')+'\n\nأي طلب يعدّي الـ SLA بيتعلّم أحمر في Attention Panel. الـ Owner بيتحدد أوتوماتيك بالكلمات المفتاحية (مولدات→Eng. Emad Galal، ونش→Eng. Bassem، حفارات→Mr. Arafa Ghoneim).'};
+  if(/fleet|دول|أسطول/.test(q))return{text:'🌍 **Fleets:**\n'+Object.keys(KB.fleets).map(function(k){return '• '+KB.fleets[k];}).join('\n')+'\n\nFoundation/Tunnelling بيتفلتروا بالكاتيجوري والتاب، والـ JV مخفي دايمًا.'};
+  if(/quota|firebase| firestore/.test(q))return{text:'🔥 السيستم على Firebase اتنين: رئيسي + ورشة. لو الـ Quota اليومي خلص بيقرأ من الكاش المحلي ويكمل شغل، والكتابات بتتزامن بعدين.'};
+  var keys=Object.keys(KB.collections);
+  return {text:'🧠 **أنا عارف كل حاجة في الأداة:**\n\n**الصفحات:** '+Object.keys(KB.pages).map(function(p){return KB.pages[p];}).join(' · ')+'\n\n**الداتا:** '+keys.join(', ')+'\n\nاسألني عن أي حاجة: أسعار، تحويلات، ورشة، SLA، خصومات، استغلال...'};
+});
+
+/* ---- NAVIGATION tools ---- */
+tool('goto','فتح أي صفحة','read',function(a){
+  var p=a.page; var alias={'ورشة':'workshop','workshop':'workshop','متابعة':'followup','followup':'followup','follow-up':'followup','معدات':'equipment','equipment':'equipment','تحويلات':'transfers','transfers':'transfers','داشبورد':'dashboard','dashboard':'dashboard','ملخص':'executive','executive':'executive','اسعار':'rentaldb','أسعار':'rentaldb','rental':'rentaldb','rentaldb':'rentaldb','owned':'masterowned','masterowned':'masterowned','masterrental':'masterrental','comparison':'comparison','مقارنة':'comparison'};
+  p=alias[norm(p)]||norm(p);
+  if(!KB.pages[p])return{text:'الصفحات المتاحة: '+Object.keys(KB.pages).join(', ')};
+  try{ G('goPage')(p); return {text:'📂 فتحت **'+KB.pages[p]+'**'}; }catch(e){ return {text:'مش قادر أفتح الصفحة: '+e.message}; }
+});
+
+tool('switch_fleet','تغيير الدولة/الأسطول','read',function(a){
+  var f=norm(a.fleet||''); var map={'مصر':'egypt','egypt':'egypt','السعودية':'ksa','ksa':'ksa','saudi':'ksa','الجزائر':'algeria','algeria':'algeria','امارات':'uae','الإمارات':'uae','uae':'uae','foundation':'foundation','الأساسات':'foundation','tunnelling':'tunnelling','tbm':'tunnelling','الأنفاق':'tunnelling','all':'all','الكل':'all'};
+  f=map[f]||f; if(!KB.fleets[f])return{text:'fleets: '+Object.keys(KB.fleets).join(', ')};
+  try{ G('switchFleet')(f,null); return {text:'🌍 اتحولت لـ **'+KB.fleets[f]+'**'}; }catch(e){return{text:e.message};}
+});
+
+tool('open_dashboard','فتح داشبورد تفاعلي لأي صفحة','read',function(a){
+  try{ if(window.HACBI){ HACBI.dashboard(a.page||'executive'); return {text:'📈 فتحت الداشبورد التفاعلي'}; } }catch(e){}
+  return {text:'محرك الداشبورد مش جاهز'};
+});
+
+/* ---- EXPORT tools ---- */
+tool('export_excel','تصدير Excel (Power BI style) لأي صفحة','read',function(a){
+  try{ if(window.HACBI){ HACBI.exportPage(a.page||'equipment'); return {text:'📊 بيتصدّر Excel لـ '+KB.pages[a.page||'equipment']+'...'}; } }catch(e){}
+  return {text:'محرك التصدير مش جاهز — افتح الصفحة الأول'};
+});
+
+/* ---- WRITE tools (Admin only + confirmation) ---- */
+tool('add_equipment','إضافة معدة جديدة للأسطول','write',function(a){
+  if(!a.equipment||!a.project)return{text:'محتاج: اسم المعدة + المشروع (والكود لو موجود)'};
+  var od=''; try{od=G('getOd')(a.project)||'';}catch(e){}
+  var data={fleet:a.fleet||G('currentFleet')||'egypt',category:a.category||'Earthmoving Equipment',equipment:a.equipment,brand:a.brand||'',code:a.code||'',sap:a.sap||'',chassis:'',engine:'',enginesn:'',year:a.year||'',power:a.power||'',project:a.project,od:od,costcenter:'',value:'',sn:eqAll().length+1,createdAt:firebase.firestore.FieldValue.serverTimestamp()};
+  return G('db').collection('equipment').add(data).then(function(ref){
+    data.id=ref.id; eqAll().push(data); UNDO.push({type:'del_eq',id:ref.id}); refreshAll();
+    return {text:'✅ ضفت **'+esc(a.equipment)+'** `'+esc(a.code||'—')+'`\n📍 '+esc(a.project)+(od?'\n👷 O.D تلقائي: '+od:'')+'\n\n_اكتب "تراجع" لو عايز تلغي_'};
+  });
+});
+
+tool('transfer_equipment','تحويل معدة لمشروع تاني (بيسجل في Transfer Log)','write',function(a){
+  var q=norm(a.code||a.query||''); var eq=eqAll().find(function(e){return norm(e.code)===q||norm(e.sap)===q;})||eqAll().find(function(e){return norm(e.code).indexOf(q)>-1;});
+  if(!eq)return{text:'ملقتش معدة بكود "'+a.code+'"'};
+  if(!a.to)return{text:'محتاج المشروع الوجهة (to)'};
+  var newOd=''; try{newOd=G('getOd')(a.to)||'';}catch(e){}
+  var from=eq.project, date=a.date||todayISO();
+  return G('db').collection('transfers').add({equipmentId:eq.id,equipmentName:eq.equipment,code:eq.code,from:from,to:a.to,date:date,notes:a.notes||'via AI Agent',requestedBy:(G('currentUser')||{}).email||'AI Agent',attachment:'',timestamp:firebase.firestore.FieldValue.serverTimestamp(),by:(G('currentUser')||{}).email||''}).then(function(tref){
+    var upd={project:a.to}; if(newOd)upd.od=newOd;
+    return G('db').collection('equipment').doc(eq.id).update(upd).then(function(){
+      UNDO.push({type:'undo_transfer',eqId:eq.id,from:from,oldOd:eq.od,tId:tref.id});
+      eq.project=a.to; if(newOd)eq.od=newOd; refreshAll();
+      return {text:'🚚 **تم التحويل:**\n'+esc(eq.equipment)+' `'+esc(eq.code)+'`\n'+esc(from)+' ➜ **'+esc(a.to)+'**'+(newOd?'\n👷 O.D الجديد: '+newOd:'')+'\n📅 '+date+'\n\n_اكتب "تراجع" للإلغاء_'};
+    });
+  });
+});
+
+tool('add_request','إضافة طلب Follow-Up جديد','write',function(a){
+  if(!a.equipment)return{text:'محتاج اسم المعدة على الأقل'};
+  var days=+a.days||0;
+  if(!days&&a.from&&a.to){ var ms=new Date(a.to)-new Date(a.from); if(ms>=0){days=Math.round(ms/86400000); if(days===31)days=30; if(days===0)days=1;} }
+  if(days>30)days=30;
+  var rec={sn:fuAll().length+1,equipment:a.equipment,capacity:a.capacity||'',qty:+a.qty||1,sap:a.sap||'',project:a.project||'',submission_date:a.submission||todayISO(),provision:a.provision||'Pending',date_from:a.from||'',date_to:a.to||'',days:days,notes:a.notes||'via AI Agent',createdAt:firebase.firestore.FieldValue.serverTimestamp()};
+  return G('db').collection('followup').add(rec).then(function(ref){
+    rec.id=ref.id; fuAll().push(rec); UNDO.push({type:'del_fu',id:ref.id});
+    try{G('fuLogOne')('add',rec,'','','','AI Agent');}catch(e){}
+    try{G('setupFollowUpUI')();}catch(e){}
+    return {text:'✅ ضفت طلب **'+esc(a.equipment)+'** ×'+rec.qty+'\n📍 '+esc(rec.project||'—')+' | '+rec.provision+' | '+days+' يوم'+(days===30?'\n_(اتظبطت على 30 — الحد الأقصى للشهر)_':'')};
+  });
+});
+
+tool('set_request_status','تغيير حالة طلب (Rental/Transfer/Hold/Pending/Cancel)','write',function(a){
+  var q=norm(a.equipment||a.query||''); var prov=a.provision;
+  if(['Rental','Transfer','Hold','Pending','Cancel'].indexOf(prov)<0)return{text:'الحالات: Rental, Transfer, Hold, Pending, Cancel'};
+  var rec=fuAll().find(function(r){return norm(r.equipment).indexOf(q)>-1&&(!a.project||norm(r.project).indexOf(norm(a.project))>-1);});
+  if(!rec)return{text:'ملقتش طلب لـ "'+a.equipment+'"'};
+  var old=rec.provision;
+  return G('db').collection('followup').doc(rec.id).update({provision:prov}).then(function(){
+    UNDO.push({type:'fu_prov',id:rec.id,old:old}); rec.provision=prov;
+    try{G('fuLogOne')('status',rec,'provision',old,prov,'AI Agent');G('setupFollowUpUI')();}catch(e){}
+    return {text:'✅ **'+esc(rec.equipment)+'**: '+old+' ➜ **'+prov+'**'};
+  });
+});
+
+tool('advance_stage','تقديم طلب لمرحلة ERMS التالية','write',function(a){
+  var q=norm(a.equipment||''); var rec=fuAll().find(function(r){return norm(r.equipment).indexOf(q)>-1;});
+  if(!rec)return{text:'ملقتش الطلب'};
+  var keys=KB.erms.map(function(s){return s.k;});
+  var idx=keys.indexOf(rec.stage); var next=a.stage&&keys.indexOf(a.stage)>-1?a.stage:keys[Math.min(idx+1,keys.length-1)];
+  var lbl=KB.erms[keys.indexOf(next)].l;
+  return G('db').collection('followup').doc(rec.id).update({stage:next,stageAt:todayISO()}).then(function(){
+    UNDO.push({type:'fu_stage',id:rec.id,old:rec.stage||'',oldAt:rec.stageAt||''});
+    rec.stage=next; rec.stageAt=todayISO();
+    try{G('fuLogOne')('stage',rec,'stage',idx>=0?KB.erms[idx].l:'—',lbl,'AI Agent');G('setupFollowUpUI')();}catch(e){}
+    return {text:'⚙️ **'+esc(rec.equipment)+'** ➜ مرحلة **'+lbl+'**\n⏱ SLA: '+KB.erms[keys.indexOf(next)].sla+' يوم'};
+  });
+});
+
+tool('undo','التراجع عن آخر عملية كتابة','write',function(){
+  var u=UNDO.pop(); if(!u)return{text:'مفيش عمليات للتراجع عنها'};
+  var db=G('db');
+  if(u.type==='del_eq')return db.collection('equipment').doc(u.id).delete().then(function(){ var l=eqAll(); var i=l.findIndex(function(e){return e.id===u.id;}); if(i>-1)l.splice(i,1); refreshAll(); return {text:'↩️ اتلغت الإضافة'}; });
+  if(u.type==='del_fu')return db.collection('followup').doc(u.id).delete().then(function(){ var l=fuAll(); var i=l.findIndex(function(r){return r.id===u.id;}); if(i>-1)l.splice(i,1); try{G('setupFollowUpUI')();}catch(e){} return {text:'↩️ اتلغى الطلب'}; });
+  if(u.type==='fu_prov')return db.collection('followup').doc(u.id).update({provision:u.old}).then(function(){ var r=fuAll().find(function(x){return x.id===u.id;}); if(r)r.provision=u.old; try{G('setupFollowUpUI')();}catch(e){} return {text:'↩️ رجعت الحالة لـ '+u.old}; });
+  if(u.type==='fu_stage')return db.collection('followup').doc(u.id).update({stage:u.old,stageAt:u.oldAt}).then(function(){ var r=fuAll().find(function(x){return x.id===u.id;}); if(r){r.stage=u.old;r.stageAt=u.oldAt;} try{G('setupFollowUpUI')();}catch(e){} return {text:'↩️ رجعت المرحلة'}; });
+  if(u.type==='undo_transfer')return db.collection('equipment').doc(u.eqId).update({project:u.from,od:u.oldOd||''}).then(function(){ return db.collection('transfers').doc(u.tId).delete(); }).then(function(){ var e=eqAll().find(function(x){return x.id===u.eqId;}); if(e){e.project=u.from;e.od=u.oldOd;} refreshAll(); return {text:'↩️ اتلغى التحويل ورجعت المعدة لـ '+u.from}; });
+  return {text:'نوع تراجع غير معروف'};
+});
+
+/* ══════════ 4) WORKFLOW ENGINE — سلاسل مهام متعددة الخطوات ══════════ */
+var WORKFLOWS=[
+ {name:'daily_brief',trig:/بريف|brief|تقرير اليوم|ملخص اليوم|صباح|morning|daily/i,steps:[
+   {tool:'fleet_stats',args:{fleet:'all'},label:'الأسطول'},
+   {tool:'workshop_status',args:{},label:'الورشة'},
+   {tool:'followup_summary',args:{},label:'الطلبات'},
+   {tool:'overdue_requests',args:{},label:'المتأخرات'}],
+  title:'📋 التقرير اليومي الشامل'},
+ {name:'project_deep',trig:/تحليل مشروع|project deep|كل حاجة عن مشروع/i,extract:function(t){var m=t.match(/مشروع\s+(.+)$/);return{project:m?m[1].trim():''};},steps:[
+   {tool:'project_equipment',dyn:'project',label:'المعدات'},
+   {tool:'rental_analysis',dyn:'project',label:'الإيجارات'},
+   {tool:'followup_summary',dyn:'project',label:'الطلبات'}],
+  title:'🔬 تحليل شامل للمشروع'},
+ {name:'cost_review',trig:/مراجعة تكاليف|cost review|تكلف|صرف|فلوس/i,steps:[
+   {tool:'rental_analysis',args:{},label:'Master Rental'},
+   {tool:'owned_analysis',args:{},label:'Master Owned'}],
+  title:'💰 مراجعة التكاليف'},
+ {name:'maintenance_watch',trig:/صيانة|maintenance|قليلة التشغيل|idle|واقفة/i,steps:[
+   {tool:'workshop_status',args:{},label:'الورشة'},
+   {tool:'low_hm',args:{},label:'Low H/M'}],
+  title:'🔧 مراقبة الصيانة والتشغيل'}
+];
+
+/* ══════════ 5) NLU — يفهم عربي / إنجليزي / Franco ══════════ */
+function parseIntent(text){
+  var t=norm(text), raw=text;
+  function grab(re){ var m=raw.match(re); return m?m[1].trim():null; }
+  // workflows first
+  for(var i=0;i<WORKFLOWS.length;i++)if(WORKFLOWS[i].trig.test(t))return{wf:WORKFLOWS[i],args:WORKFLOWS[i].extract?WORKFLOWS[i].extract(raw):{}};
+  // undo
+  if(/^(تراجع|رجع|undo|الغ|cancel that)/.test(t))return{tool:'undo',args:{}};
+  // transfer (write)
+  if(/(حول|نقل|transfer|move)/.test(t)&&!/سجل|history|تاريخ|log/.test(t)){
+    var code=grab(/(?:كود|code|رقم)\s*([A-Za-z0-9\-]+)/i)||grab(/\b([A-Z]{1,4}[\-\s]?\d{2,6})\b/);
+    var to=grab(/(?:ل|الى|إلى|to|لمشروع)\s+(?:مشروع\s+)?(.+?)(?:\s+بتاريخ|\s+date|$)/i);
+    if(code&&to)return{tool:'transfer_equipment',args:{code:code,to:to}};
+  }
+  // add request
+  if(/(ضيف طلب|طلب جديد|add request|new request)/.test(t)){
+    var eq=grab(/(?:طلب|معدة|request)\s+(.+?)(?:\s+لمشروع|\s+project|\s+×|\s+x\d|$)/i);
+    var pr=grab(/(?:لمشروع|project)\s+(.+?)(?:\s|$)/i);
+    var qty=grab(/[×x]\s*(\d+)/i);
+    return{tool:'add_request',args:{equipment:eq||'',project:pr||'',qty:qty||1}};
+  }
+  // status change
+  if(/(خلي|غير|change|set|حط).*(rental|transfer|hold|pending|cancel|ايجار|إيجار|تحويل|انتظار|الغاء|إلغاء)/i.test(t)){
+    var pm=t.match(/(rental|transfer|hold|pending|cancel)/i); var em=grab(/(?:خلي|غير|change|set|حط)\s+(?:طلب\s+)?(.+?)\s+(?:على|ل|to|->|➜)/i);
+    if(pm)return{tool:'set_request_status',args:{equipment:em||'',provision:pm[1].charAt(0).toUpperCase()+pm[1].slice(1).toLowerCase()}};
+  }
+  // stage advance
+  if(/(مرحلة|stage|قدم الطلب|advance)/.test(t))return{tool:'advance_stage',args:{equipment:grab(/(?:طلب|معدة)\s+(.+)$/i)||''}};
+  // history
+  if(/(تاريخ|سجل|history).*(تحويل|transfer)|transfer.*(history|log)/.test(t))return{tool:'transfer_history',args:{query:grab(/(?:معدة|كود|code)\s+(\S+)/i)||grab(/تحويلات?\s+(.+)$/i)||''}};
+  // rates
+  if(/(سعر|اسعار|أسعار|rate|price|كام|بكام)/.test(t))return{tool:'rate_lookup',args:{query:grab(/(?:سعر|سعر إيجار|rate of|price of|بكام)\s+(.+)$/i)||t.replace(/سعر|بكام|كام|rate|price/g,'').trim()}};
+  // overdue
+  if(/(متأخر|متاخر|late|overdue|sla|تأخير)/.test(t))return{tool:'overdue_requests',args:{}};
+  // workshop
+  if(/(ورشة|workshop)/.test(t)){ var sm=raw.match(/(Ready|In Progress|Waiting|Delay|External)/i); return{tool:'workshop_status',args:sm?{status:sm[1]}:{}}; }
+  // followup
+  if(/(طلبات|follow.?up|متابعة|خصم|deduct)/.test(t))return{tool:'followup_summary',args:{project:grab(/مشروع\s+(.+)$/i)||''}};
+  // rental / owned analysis
+  if(/(ايجار|إيجار|rental|مستأجر)/.test(t))return{tool:'rental_analysis',args:{project:grab(/مشروع\s+(.+)$/i)||'',month:grab(/(\d{4}-\d{2})/)||''}};
+  if(/(owned|مملوك|استغلال|utiliz|تشغيل)/.test(t))return{tool:'owned_analysis',args:{month:grab(/(\d{4}-\d{2})/)||''}};
+  // export
+  if(/(صدر|صدّر|export|excel|اكسل|إكسل)/.test(t)){ var pg=null; Object.keys(KB.pages).forEach(function(k){if(t.indexOf(k)>-1)pg=k;}); if(/ورشة/.test(t))pg='workshop'; if(/متابعة|طلبات/.test(t))pg='followup'; if(/معدات/.test(t))pg='equipment'; return{tool:'export_excel',args:{page:pg||'equipment'}}; }
+  // dashboard
+  if(/(داشبورد|dashboard|شارت|charts)/.test(t)){ var pg2=null; Object.keys(KB.pages).forEach(function(k){if(t.indexOf(k)>-1)pg2=k;}); return{tool:'open_dashboard',args:{page:pg2||'executive'}}; }
+  // fleet switch
+  if(/(روح ل|حولني|switch|افتح اسطول|fleet)/.test(t)&&/(مصر|egypt|سعودي|ksa|جزائر|algeria|امارات|uae|foundation|tunnel|كل|all)/.test(t))return{tool:'switch_fleet',args:{fleet:grab(/(مصر|egypt|ksa|السعودية|الجزائر|algeria|الامارات|uae|foundation|tunnelling|all|الكل)/i)||'all'}};
+  // navigation
+  if(/(افتح|روح|open|go to|show)/.test(t)){ var target=null; var aliases={'ورشة':'workshop','متابعة':'followup','طلبات':'followup','معدات':'equipment','تحويلات':'transfers','داشبورد':'dashboard','ملخص':'executive','اسعار':'rentaldb','أسعار':'rentaldb'}; Object.keys(aliases).forEach(function(k){if(t.indexOf(k)>-1)target=aliases[k];}); Object.keys(KB.pages).forEach(function(k){if(t.indexOf(k)>-1)target=k;}); if(target)return{tool:'goto',args:{page:target}}; }
+  // explain
+  if(/(اشرح|يعني ايه|explain|what is|ازاي|كيف|how does)/.test(t))return{tool:'explain',args:{topic:t}};
+  // OD engineer
+  if(/(مهندس|eng\.?|od\b|مشاريع)/.test(t)&&/(مشاريع|projects|معدات)/.test(t))return{tool:'od_projects',args:{od:grab(/(?:مهندس|Eng\.?)\s+(.+?)(?:\s+مشاريع|\s+projects|$)/i)||''}};
+  // project equipment
+  if(/مشروع|project/.test(t))return{tool:'project_equipment',args:{project:grab(/مشروع\s+(.+)$/i)||grab(/project\s+(.+)$/i)||''}};
+  // equipment search (codes like EQ-123, EX-05...)
+  var codeM=raw.match(/\b([A-Za-z]{1,5}[\-–]?\d{2,6})\b/);
+  if(codeM)return{tool:'find_equipment',args:{query:codeM[1]}};
+  if(/(كام معدة|عدد|كم|count|stats|احصائ|إحصائ|ملخص الاسطول|fleet)/.test(t))return{tool:'fleet_stats',args:{fleet:'all'}};
+  // fallback: search everything
+  if(t.length>2)return{tool:'find_equipment',args:{query:raw.trim()}};
+  return{tool:'explain',args:{topic:''}};
+}
+
+/* ══════════ 6) EXECUTOR — تنفيذ + تأكيد للعمليات الخطرة ══════════ */
+var PENDING=null;
+function runTool(name,args){
+  var T=TOOLS[name]; if(!T)return Promise.resolve({text:'أداة غير معروفة: '+name});
+  if(T.risk!=='read'&&!admin())return Promise.resolve({text:'🔒 العملية دي محتاجة صلاحية **Admin**. أنت Viewer — القراءة والتحليل والتصدير متاحين ليك.'});
+  try{ return Promise.resolve(T.fn(args||{})).catch(function(e){return{text:'❌ خطأ: '+(e.code==='resource-exhausted'?'Quota Firebase اليومي خلص — الكتابة هتتزامن لما يتجدد':e.message)};}); }
+  catch(e){ return Promise.resolve({text:'❌ '+e.message}); }
+}
+function execute(intent){
+  if(intent.wf)return runWorkflow(intent.wf,intent.args);
+  var T=TOOLS[intent.tool];
+  if(T&&T.risk!=='read'&&intent.tool!=='undo'){
+    PENDING=intent;
+    return Promise.resolve({text:'⚠️ **تأكيد مطلوب** — هنفذ:\n`'+intent.tool+'` '+esc(JSON.stringify(intent.args))+'\n\nاكتب **"نفذ"** أو **"yes"** للتأكيد، أو **"لأ"** للإلغاء.',confirm:true});
+  }
+  return runTool(intent.tool,intent.args);
+}
+function runWorkflow(wf,args){
+  var parts=['## '+wf.title+'\n']; var chain=Promise.resolve();
+  wf.steps.forEach(function(st,i){
+    chain=chain.then(function(){
+      var a=st.dyn?Object.assign({},args):st.args||{};
+      return runTool(st.tool,a).then(function(r){ parts.push('### '+(i+1)+'. '+st.label+'\n'+(r.text||'')); });
+    });
+  });
+  return chain.then(function(){ return {text:parts.join('\n\n---\n\n')}; });
+}
+
+/* ══════════ 7) UI — شات عائم أنيق بنفس ثيم الأداة ══════════ */
+var css=document.createElement('style');
+css.textContent='#hac-agent-fab{position:fixed;bottom:22px;left:22px;z-index:99990;width:58px;height:58px;border-radius:50%;background:linear-gradient(135deg,#f0a500,#e3b341);border:none;cursor:pointer;font-size:26px;box-shadow:0 6px 24px rgba(240,165,0,.45);transition:transform .2s;display:flex;align-items:center;justify-content:center}#hac-agent-fab:hover{transform:scale(1.1)}'
++'#hac-agent-panel{position:fixed;bottom:92px;left:22px;z-index:99991;width:min(430px,calc(100vw - 32px));height:min(620px,calc(100vh - 130px));background:#161b22;border:1px solid #30363d;border-radius:16px;display:none;flex-direction:column;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.6);font-family:Inter,sans-serif}'
++'#hac-agent-panel.open{display:flex}'
++'.ha-head{padding:14px 16px;background:linear-gradient(135deg,#1c2128,#21262d);border-bottom:1px solid #30363d;display:flex;align-items:center;gap:10px}'
++'.ha-head .dot{width:9px;height:9px;border-radius:50%;background:#3fb950;box-shadow:0 0 8px #3fb950;animation:haPulse 2s infinite}@keyframes haPulse{50%{opacity:.4}}'
++'.ha-body{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}'
++'.ha-msg{max-width:92%;padding:10px 13px;border-radius:12px;font-size:13px;line-height:1.65;white-space:pre-wrap;word-break:break-word}'
++'.ha-msg.user{align-self:flex-end;background:#f0a500;color:#0d1117;border-bottom-right-radius:3px;font-weight:500}'
++'.ha-msg.bot{align-self:flex-start;background:#21262d;color:#e6edf3;border:1px solid #30363d;border-bottom-left-radius:3px}'
++'.ha-msg.bot strong{color:#f0a500}.ha-msg.bot code{background:#0d1117;padding:1px 6px;border-radius:4px;font-family:JetBrains Mono,monospace;font-size:11.5px;color:#58a6ff}'
++'.ha-chips{display:flex;flex-wrap:wrap;gap:6px;padding:8px 14px;border-top:1px solid #30363d}'
++'.ha-chip{background:#21262d;border:1px solid #30363d;color:#7d8590;font-size:11px;padding:5px 10px;border-radius:20px;cursor:pointer;transition:.15s}.ha-chip:hover{border-color:#f0a500;color:#f0a500}'
++'.ha-input{display:flex;gap:8px;padding:12px 14px;border-top:1px solid #30363d;background:#1c2128}'
++'.ha-input input{flex:1;background:#0d1117;border:1px solid #30363d;border-radius:10px;padding:10px 13px;color:#e6edf3;font-size:13px;outline:none;font-family:inherit}.ha-input input:focus{border-color:#f0a500}'
++'.ha-input button{background:#f0a500;border:none;border-radius:10px;padding:0 16px;cursor:pointer;font-size:16px;color:#0d1117;font-weight:700}'
++'.ha-typing{display:inline-flex;gap:4px;padding:4px 0}.ha-typing span{width:6px;height:6px;border-radius:50%;background:#7d8590;animation:haBounce 1.2s infinite}.ha-typing span:nth-child(2){animation-delay:.2s}.ha-typing span:nth-child(3){animation-delay:.4s}@keyframes haBounce{30%{transform:translateY(-5px);background:#f0a500}}';
+document.head.appendChild(css);
+
+var fab=document.createElement('button'); fab.id='hac-agent-fab'; fab.title='HAC AI Agent'; fab.innerHTML='🤖'; document.body.appendChild(fab);
+var panel=document.createElement('div'); panel.id='hac-agent-panel';
+/* الـ CSP مفيهوش inline handlers مشكلة (unsafe-inline مسموح) بس بنستخدم addEventListener للأمان */
+panel.innerHTML='<div class="ha-head"><span class="dot"></span><div style="flex:1"><div style="font-weight:700;font-size:14px;color:#e6edf3">HAC AI Agent</div><div style="font-size:10.5px;color:#7d8590">عارف كل حاجة في السيستم · عربي / English</div></div><button id="ha-close" style="background:none;border:none;color:#7d8590;font-size:18px;cursor:pointer">✕</button></div>'
++'<div class="ha-body" id="ha-body"></div>'
++'<div class="ha-chips" id="ha-chips"></div>'
++'<div class="ha-input"><input id="ha-in" placeholder="اسأل أو اطلب أي حاجة... مثال: حول EQ-105 لمشروع Kayan" autocomplete="off"><button id="ha-send">➤</button></div>';
+document.body.appendChild(panel);
+panel.querySelector('#ha-close').addEventListener('click',function(){ panel.classList.remove('open'); });
+
+var body=panel.querySelector('#ha-body'), input=panel.querySelector('#ha-in');
+var CHIPS=['📋 تقرير اليوم','🔧 حالة الورشة','🚨 المتأخرات','💰 مراجعة التكاليف','📊 إحصائيات الأسطول','📉 قليلة التشغيل','اشرح ERMS'];
+var chipsEl=panel.querySelector('#ha-chips');
+CHIPS.forEach(function(c){ var b=document.createElement('button'); b.className='ha-chip'; b.textContent=c; b.onclick=function(){ input.value=c.replace(/^[^\s]+\s/,''); send(); }; chipsEl.appendChild(b); });
+
+function md(t){ return esc(t).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/`([^`]+)`/g,'<code>$1</code>').replace(/^## (.+)$/gm,'<div style="font-size:15px;font-weight:700;color:#f0a500;margin-bottom:4px">$1</div>').replace(/^### (.+)$/gm,'<div style="font-weight:600;color:#58a6ff;margin:4px 0">$1</div>').replace(/^---$/gm,'<hr style="border:none;border-top:1px solid #30363d;margin:8px 0">').replace(/_(.+?)_/g,'<em style="color:#7d8590">$1</em>'); }
+function addMsg(text,who){ var d=document.createElement('div'); d.className='ha-msg '+who; d.innerHTML=who==='bot'?md(text):esc(text); body.appendChild(d); body.scrollTop=body.scrollHeight; return d; }
+function typing(){ var d=document.createElement('div'); d.className='ha-msg bot'; d.innerHTML='<span class="ha-typing"><span></span><span></span><span></span></span>'; body.appendChild(d); body.scrollTop=body.scrollHeight; return d; }
+
+function send(){
+  var text=input.value.trim(); if(!text)return; input.value='';
+  addMsg(text,'user');
+  var tp=typing();
+  setTimeout(function(){
+    var intent;
+    var tn=norm(text);
+    if(PENDING&&/^(نفذ|yes|y|تمام|اوك|ok|أكد|اكيد|confirm)/.test(tn)){ intent=PENDING; PENDING=null; tp.remove(); var t2=typing(); runTool(intent.tool,intent.args).then(function(r){t2.remove();addMsg(r.text,'bot');}); return; }
+    if(PENDING&&/^(لأ|لا|no|cancel|الغ)/.test(tn)){ PENDING=null; tp.remove(); addMsg('👍 اتلغى الأمر.','bot'); return; }
+    PENDING=null;
+    try{ intent=parseIntent(text); }catch(e){ tp.remove(); addMsg('حصل خطأ في الفهم: '+e.message,'bot'); return; }
+    execute(intent).then(function(r){ tp.remove(); addMsg(r.text||'…','bot'); }).catch(function(e){ tp.remove(); addMsg('❌ '+e.message,'bot'); });
+  },250);
+}
+fab.onclick=function(){ panel.classList.toggle('open'); if(panel.classList.contains('open')){ input.focus(); if(!body.children.length)addMsg('أهلاً 👋 أنا **HAC AI Agent** — فاهم كل ركن في السيستم:\n\n• 📊 أسئلة وتحليلات على المعدات والورشة والطلبات والتكاليف\n• 🚚 تنفيذ فعلي: تحويلات، إضافة طلبات، تغيير حالات ومراحل ERMS\n• 🔄 Workflows جاهزة: "تقرير اليوم"، "مراجعة التكاليف"\n• ↩️ أي كتابة بتتأكد الأول وتقدر تقول "تراجع"\n\nجرب: **"كام معدة في مصر؟"** أو **"بكام إيجار حفار 20 طن؟"**','bot'); } };
+input.addEventListener('keydown',function(e){ if(e.key==='Enter')send(); });
+panel.querySelector('#ha-send').onclick=send;
+document.addEventListener('keydown',function(e){ if((e.ctrlKey||e.metaKey)&&e.key==='k'){ e.preventDefault(); fab.click(); } });
+
+/* public API for console / future integrations */
+window.HAC_AGENT={kb:KB,tools:TOOLS,ask:function(q){ return execute(parseIntent(q)); },run:runTool,workflows:WORKFLOWS,version:'1.0',
+  hasPending:function(){ return !!PENDING; },
+  confirm:function(ok){ var p=PENDING; PENDING=null; if(!p)return Promise.resolve({text:'مفيش أمر مستني تأكيد'}); if(!ok)return Promise.resolve({text:'👍 اتلغى الأمر.'}); return runTool(p.tool,p.args); }};
+console.log('%c🤖 HAC AI Agent v1.0 loaded — '+Object.keys(TOOLS).length+' tools, '+WORKFLOWS.length+' workflows. Try: HAC_AGENT.ask("تقرير اليوم")','color:#f0a500;font-weight:bold');
+})();
+</script>
+
+<!-- ═══════════════════════════════════════════════════════
+     🚀 HAC AI AGENT v2.0 UPGRADE — placed AFTER v1 block
+     Adds: Voice AR · Memory · Scheduler · WhatsApp ·
+     Forecast · Pull-Back · Engineers · WS Requests ·
+     Rent-vs-Own Calculator · Context Chains
+════════════════════════════════════════════════════════ -->
+<script>
+(function(){
+'use strict';
+if(window.__HAC_BLOCKED) return;
+if(!window.HAC_AGENT){ console.warn('HAC Agent v1 not found — v1 must load first'); return; }
+if(window.HAC_AGENT.version==='2.0') return;
+var A=window.HAC_AGENT, T=A.tools;
+/* no eval — الـ CSP مانع eval، فبنقرا let/const من الـ global lexical scope بالاسم */
+var LEX={
+  allEquipment:function(){return allEquipment;}, FU_DATA:function(){return FU_DATA;},
+  isAdmin:function(){return isAdmin;}, currentUser:function(){return currentUser;},
+  wsDb:function(){return wsDb;}, db:function(){return db;}
+};
+function G(n){ try{ if(LEX[n])return LEX[n](); return window[n]; }catch(e){ return undefined; } }
+function eqAll(){ return G('allEquipment')||[]; }
+function fuAll(){ return G('FU_DATA')||[]; }
+function esc(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function nfmt(n){ return (Math.round((+n||0)*100)/100).toLocaleString('en-US'); }
+function norm(s){ return String(s||'').toLowerCase().replace(/[\s\-_.]+/g,' ').trim(); }
+function admin(){ return !!G('isAdmin'); }
+function tool(n,d,r,f){ T[n]={desc:d,risk:r,fn:f}; }
+
+/* ═══ 1) MEMORY — ذاكرة دائمة ═══ */
+var MEM={prefs:{},freq:{},last:null,ctx:{}};
+try{ var m=localStorage.getItem('hac_agent_mem'); if(m)MEM=Object.assign(MEM,JSON.parse(m)); }catch(e){}
+function memSave(){ try{ localStorage.setItem('hac_agent_mem',JSON.stringify(MEM)); }catch(e){} }
+
+tool('remember','حفظ تفضيل أو معلومة في ذاكرة الوكيل','read',function(a){
+  if(!a.key||!a.value)return{text:'قول: "افتكر إن [الحاجة] = [القيمة]"'};
+  MEM.prefs[a.key]=a.value; memSave();
+  return {text:'🧠 حفظت: **'+esc(a.key)+'** = '+esc(a.value)};
+});
+tool('recall','عرض ذاكرة الوكيل','read',function(){
+  var ks=Object.keys(MEM.prefs);
+  var top=Object.keys(MEM.freq).sort(function(x,y){return MEM.freq[y]-MEM.freq[x];}).slice(0,5);
+  return {text:'🧠 **ذاكرتي:**\n'+(ks.length?ks.map(function(k){return '• '+k+': '+MEM.prefs[k];}).join('\n'):'فاضية لسه')+(top.length?'\n\n**أكتر أوامر بتطلبها:**\n'+top.map(function(t){return '• '+t+' ('+MEM.freq[t]+'×)';}).join('\n'):'')};
+});
+
+/* ═══ 2) ENGINEERS DIRECTORY — من FU_ENG الحقيقي ═══ */
+tool('find_engineer','بحث في دايركتوري المهندسين (اسم/مشروع/موبايل)','read',function(a){
+  var ENG=G('FU_ENG')||[]; if(!ENG.length)return{text:'الدايركتوري لسه بيتحمل — افتح Follow-Up الأول'};
+  var q=norm(a.query||a.name||a.project||'');
+  var hits=ENG.filter(function(g){ return norm(g.n).indexOf(q)>-1||norm(g.p).indexOf(q)>-1||norm(g.t).indexOf(q)>-1; }).slice(0,8);
+  if(!hits.length&&a.project){ try{ hits=G('fuEngFor')(a.project)||[]; }catch(e){} }
+  if(!hits.length)return{text:'ملقتش مهندس بـ "'+q+'"'};
+  return {text:'📇 **'+hits.length+' مهندس:**\n\n'+hits.map(function(g){
+    var wa=''; try{wa=G('fuWaLink')(g.m);}catch(e){}
+    return '• **'+esc(g.n)+'** — '+esc(g.t||'')+'\n  🏗 '+esc(g.p||'—')+'\n  📱 '+esc(g.m||'—')+(wa?' ([WhatsApp]('+wa+'))':'')+(g.e?'\n  ✉️ '+esc(g.e):'');
+  }).join('\n\n'),data:hits};
+});
+
+/* ═══ 3) WHATSAPP COMPOSER — رسائل من الداتا الحقيقية ═══ */
+tool('wa_message','تجهيز رسالة واتساب لمهندس مشروع (بتتفتح جاهزة)','write',function(a){
+  var proj=a.project||''; var eng=[];
+  try{ eng=G('fuEngFor')(proj)||[]; }catch(e){}
+  if(!eng.length)return{text:'ملقتش مهندس لمشروع "'+proj+'" في الدايركتوري'};
+  var g=eng[0], wa=''; try{wa=G('fuWaLink')(g.m);}catch(e){}
+  if(!wa)return{text:'المهندس '+g.n+' ملوش رقم واتساب صالح'};
+  var msg=a.message||'';
+  if(!msg||/تأخير|متأخر|late|overdue/i.test(a.kind||'')){
+    var late=[]; try{ fuAll().forEach(function(r){ if(norm(r.project).indexOf(norm(proj))>-1){ var i=G('fuStageInfo')(r); if(i&&i.over)late.push('• '+r.equipment+' — '+i.age+' يوم (SLA '+i.sla+')'); } }); }catch(e){}
+    msg='م. '+g.n+'، تحية طيبة 🌹\nبخصوص مشروع '+proj+'، الطلبات دي متأخرة عن الموعد:\n'+(late.length?late.join('\n'):'(مفيش متأخرات حالياً ✅)')+'\nبرجاء المتابعة والإفادة.\nشكراً — PMV System';
+  }
+  window.open(wa+'?text='+encodeURIComponent(msg),'_blank');
+  return {text:'💬 فتحت واتساب لـ **'+esc(g.n)+'** ('+esc(g.m)+') بالرسالة جاهزة:\n\n_'+esc(msg.slice(0,200))+'..._\n\n**اضغط Send في واتساب بنفسك** — أنا ماببعتش تلقائي.'};
+});
+
+/* ═══ 4) COST FORECAST — بيقرا نتيجة محرك التوقعات الموجود ═══ */
+tool('cost_forecast','توقع تكاليف الإيجار للطلبات القادمة','read',function(){
+  try{
+    var fc=window.__fuFc;
+    if(!fc||!fc.rows||!fc.rows.length)return{text:'⏳ محتاج أسعار مرجعية — افتح Follow-Up واضغط زرار **Forecast** مرة عشان تتحمل الأسعار، وبعدين اسألني تاني'};
+    var rows=fc.rows, tot=0,cnt=0,byProj={};
+    rows.forEach(function(x){ if(x.est!=null){tot+=x.est;cnt++; var p=x.r.project||'—'; byProj[p]=(byProj[p]||0)+x.est;} });
+    if(!cnt)return{text:'مفيش أسعار مرجعية للطلبات دي لسه'};
+    var top=Object.keys(byProj).sort(function(x,y){return byProj[y]-byProj[x];}).slice(0,6);
+    var flags=rows.filter(function(x){return x.flag;}).length;
+    return {text:'🔮 **Cost Forecast**\n• طلبات متسعّرة: '+cnt+'/'+rows.length+'\n• إجمالي متوقع: **'+nfmt(tot)+' EGP**'+(flags?'\n• ⚠️ '+flags+' طلب سعره أعلى من المرجع (+10%)':'')+'\n\n**حسب المشروع:**\n'+top.map(function(p,i){return (i+1)+'. '+esc(p)+' — '+nfmt(byProj[p]);}).join('\n')};
+  }catch(e){ return {text:'محرك التوقعات محتاج صفحة Follow-Up مفتوحة: '+e.message}; }
+});
+
+/* ═══ 5) PULL-BACK WATCH — كشف الإيجارات الضايعة ═══ */
+tool('pullback_watch','المعدات المستأجرة قليلة التشغيل (فلوس ضايعة)','read',function(){
+  try{ if(typeof G('rwOpen')==='function'){ G('rwOpen')(); return {text:'🔻 فتحت **Rental Pull-Back Watch** — دي المعدات المستأجرة اللي شغالة أيام قليلة من غير بند "شغل متقطع" في العقد.\n\n💡 اللي يظهر هنا مرشح للـ Pull-Back وتوفير إيجار.'}; } }catch(e){}
+  return {text:'ميزة Pull-Back مش محملة — افتح Follow-Up الأول'};
+});
+
+/* ═══ 6) WORKSHOP REQUEST — طلب صيانة فعلي ═══ */
+tool('ws_request','إرسال طلب تحويل/صيانة للورشة المركزية','write',function(a){
+  if(!a.code&&!a.equipment)return{text:'محتاج كود أو اسم المعدة + المشروع الوجهة'};
+  var eq=eqAll().find(function(e){return norm(e.code)===norm(a.code||'')||norm(e.equipment).indexOf(norm(a.equipment||a.code||''))>-1;});
+  var user=(G('currentUser')||{}).email||'AI Agent';
+  return G('wsDb').collection('transfer_requests').add({
+    userName:a.userName||user, destProject:a.to||a.dest||'', eqCode:(eq&&eq.code)||a.code||'', eqName:(eq&&eq.equipment)||a.equipment||'', timestamp:new Date().toISOString()
+  }).then(function(){ return {text:'🛠 اتبعت الطلب لـ **Eng. Mahmoud Osama**\n• المعدة: '+esc((eq&&eq.equipment)||a.equipment)+' `'+esc((eq&&eq.code)||a.code)+'`\n• الوجهة: '+esc(a.to||a.dest||'—')}; });
+});
+
+/* ═══ 7) RENT vs OWN — حاسبة القرار ═══ */
+tool('rent_vs_own','مقارنة: أستأجر ولا أشغّل المملوك؟','read',function(a){
+  var q=norm(a.equipment||a.query||''); if(!q)return{text:'قول: "أستأجر ولا مملوك حفار 20 طن؟"'};
+  var owned=eqAll().filter(function(e){return norm(e.equipment).indexOf(q)>-1;});
+  var rd=[]; try{ rd=(window.__rdData?__rdData().all:[])||[]; }catch(e){}
+  var rates=rd.filter(function(r){return norm(r.item).indexOf(q)>-1;}).map(function(r){return +r.rate||0;}).filter(Boolean);
+  var avgRate=rates.length?rates.reduce(function(s,v){return s+v;},0)/rates.length:0;
+  var mo=[]; try{ mo=(window.MO&&MO.data?MO.data():[]).filter(function(r){return norm(r.equipment).indexOf(q)>-1;}); }catch(e){}
+  var ownDaily=0; if(mo.length){ var tc=0,wd=0; mo.forEach(function(r){tc+=+r.totalCost||0;wd+=+r.worked||0;}); if(wd>0)ownDaily=tc/(wd/8); }
+  var idle=owned.filter(function(e){ try{ var p=window.hmLast&&hmLast(e.code); return !p||p.e<80; }catch(x){return false;} });
+  var txt='⚖️ **Rent vs Own — '+esc(a.equipment)+'**\n\n🚜 المملوك: **'+owned.length+'** وحدة'+(idle.length?' (منهم **'+idle.length+'** قليلة التشغيل 👈 متاحين!)':'')+(ownDaily?'\n💵 تكلفة تشغيل تقديرية: ~'+nfmt(ownDaily)+' EGP/يوم (من Master Owned)':'')+'\n\n💲 سعر السوق: '+(avgRate?'**'+nfmt(avgRate)+' EGP/يوم** ('+rates.length+' سجل)':'مش مسجل في Rental Database');
+  if(idle.length&&avgRate)txt+='\n\n✅ **توصيتي:** شغّل المملوك — عندك '+idle.length+' وحدة شبه فاضية، وهتوفر ~'+nfmt(avgRate)+' EGP/يوم لكل وحدة.';
+  else if(!owned.length&&avgRate)txt+='\n\n📋 مفيش مملوك متاح → الاستئجار هو الحل، والسعر العادل حوالي '+nfmt(avgRate)+' EGP/يوم.';
+  return {text:txt};
+});
+
+/* ═══ 8) SCHEDULER — جدولة تقارير مع إشعارات ═══ */
+var SCHED=[]; try{ SCHED=JSON.parse(localStorage.getItem('hac_agent_sched')||'[]'); }catch(e){}
+function schedSave(){ try{ localStorage.setItem('hac_agent_sched',JSON.stringify(SCHED)); }catch(e){} }
+function fireJob(j){
+  A.ask(j.cmd).then(function(r){
+    try{ if(Notification.permission==='granted')new Notification('🤖 HAC Agent — '+j.cmd,{body:(r.text||'').replace(/[*#`_]/g,'').slice(0,180)}); }catch(e){}
+    var b=document.getElementById('ha-body'); if(b){ var d=document.createElement('div'); d.className='ha-msg bot'; d.innerHTML='<strong>⏰ تقرير مجدول:</strong> '+esc(j.cmd)+'<br>'+esc(r.text||'').replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>'); b.appendChild(d); b.scrollTop=b.scrollHeight; }
+    j.lastRun=Date.now(); schedSave();
+  });
+}
+setInterval(function(){
+  var now=new Date(), hm=('0'+now.getHours()).slice(-2)+':'+('0'+now.getMinutes()).slice(-2);
+  SCHED.forEach(function(j){ if(j.time===hm&&(!j.lastRun||Date.now()-j.lastRun>12*3600*1000))fireJob(j); });
+},60000);
+tool('schedule','جدولة أمر يومي في وقت معين','read',function(a){
+  if(!a.time||!a.cmd)return{text:'قول: "كل يوم الساعة 09:00 اعمل تقرير اليوم"'};
+  try{ if(Notification.permission==='default')Notification.requestPermission(); }catch(e){}
+  SCHED.push({time:a.time,cmd:a.cmd,lastRun:0}); schedSave();
+  return {text:'⏰ اتجدول: **"'+esc(a.cmd)+'"** كل يوم الساعة **'+a.time+'**\nهيشتغل والصفحة مفتوحة، وهييجيلك إشعار 🔔'};
+});
+tool('schedules','عرض/حذف الجدولات','read',function(a){
+  if(a.clear){ SCHED=[]; schedSave(); return {text:'🗑 مسحت كل الجدولات'}; }
+  if(!SCHED.length)return{text:'مفيش أوامر مجدولة'};
+  return {text:'⏰ **الجدولات:**\n'+SCHED.map(function(j,i){return (i+1)+'. '+j.time+' → '+esc(j.cmd);}).join('\n')+'\n\n_قول "امسح الجدولات" للحذف_'};
+});
+
+/* ═══ 9) NLU v2 — بياخد الأولوية على v1 ═══ */
+var oldAsk=A.ask;
+var YES=/^(نفذ|yes|y|تمام|اوك|ok|أكد|اكيد|confirm)/, NO=/^(لأ|لا|no|cancel|الغ)/;
+var PEND2=null; /* تأكيد أدوات v2 الـ write */
+function grab(raw,re){ var m=raw.match(re); return m?m[1].trim():null; }
+function parseV2(raw){
+  var t=norm(raw);
+  if(/^(افتكر|remember)/.test(t)){ var m=raw.match(/(?:افتكر ان|افتكر إن|remember)\s+(.+?)\s*[=:]\s*(.+)/i); if(m)return{tool:'remember',args:{key:m[1],value:m[2]}}; }
+  if(/(ذاكرتك|memory|فاكر ايه)/.test(t))return{tool:'recall',args:{}};
+  var sm=raw.match(/(?:كل يوم|daily).*(?:الساعة|at)\s*(\d{1,2})(?::(\d{2}))?\s*(?: الصبح| صباحا|am| مساء|pm)?\s*(?:اعمل|شغل|run)?\s*(.+)/i);
+  if(sm){ var h=+sm[1]; if(/مساء|pm/i.test(raw)&&h<12)h+=12; return{tool:'schedule',args:{time:('0'+h).slice(-2)+':'+(sm[2]||'00'),cmd:sm[3].trim()}}; }
+  if(/(الجدولات|schedules)/.test(t))return{tool:'schedules',args:{clear:/امسح|clear|delete/.test(t)}};
+  if(/(ابعت|بعت|send).*(واتساب|whatsapp|رسالة|message)/.test(t))return{tool:'wa_message',args:{project:grab(raw,/(?:مشروع|project)\s+(.+?)(?:\s+عن|\s*$)/i)||'',kind:/تأخير|متأخر|late/.test(t)?'late':''}};
+  if(/(توقع|forecast|التكاليف الجاية|كام ه نصرف)/.test(t))return{tool:'cost_forecast',args:{}};
+  if(/(pull.?back|سحب الايجار|إيجارات ضايعة|فلوس ضايعة|قليلة الشغل.*مستأجر)/.test(t))return{tool:'pullback_watch',args:{}};
+  if(/(أستأجر|استاجر|rent or own|ايجار ولا|إيجار ولا)/.test(t))return{tool:'rent_vs_own',args:{equipment:grab(raw,/(?:ولا|own)\s+(.+)$/i)||t.replace(/أستأجر|استاجر|ولا|ايجار|إيجار/g,'').trim()}};
+  if(/(طلب صيانة|طلب ورشة|maintenance request|ودّي الورشة|ودي الورشة)/.test(t))return{tool:'ws_request',args:{code:grab(raw,/(?:كود|code)\s*([A-Za-z0-9\-]+)/i)||'',equipment:grab(raw,/(?:معدة|صيانة)\s+(.+?)(?:\s+ل|$)/i)||'',to:grab(raw,/(?:لمشروع|ل|to)\s+(.+)$/i)||''}};
+  if(/(مهندس|engineer|رقم|موبايل|contact)/.test(t)&&!/(مشاريع|projects)/.test(t))return{tool:'find_engineer',args:{query:grab(raw,/(?:مهندس|engineer|رقم|موبايل)\s+(.+)$/i)||'',project:grab(raw,/(?:مشروع|project)\s+(.+)$/i)||''}};
+  // context chain: "وهي فين؟" / "ودا تاريخها؟" after an equipment answer
+  if(MEM.ctx.lastEq&&/^(و)?(هي|هو|ودا|دي|ده)?\s*(فين|where|تاريخها|history|تحويلاتها|سعرها|rate)/.test(t)){
+    if(/تاريخ|history|تحويل/.test(t))return{tool:'transfer_history',args:{query:MEM.ctx.lastEq}};
+    if(/سعر|rate/.test(t))return{tool:'rate_lookup',args:{query:MEM.ctx.lastEq}};
+    return{tool:'find_equipment',args:{query:MEM.ctx.lastEq}};
+  }
+  return null;
+}
+A.ask=function(q){
+  var tn=norm(q);
+  /* 1) ردود التأكيد (نفذ / لأ) — لأدوات v2 ولأدوات v1 */
+  if(PEND2){ var p2=PEND2; PEND2=null; if(YES.test(tn))return A.run(p2.tool,p2.args); if(NO.test(tn))return Promise.resolve({text:'👍 اتلغى الأمر.'}); }
+  if(A.hasPending&&A.hasPending()){ if(YES.test(tn))return A.confirm(true); if(NO.test(tn))return A.confirm(false); A.confirm(false); }
+  MEM.freq[q]=(MEM.freq[q]||0)+1; memSave();
+  var v2=parseV2(q);
+  var p;
+  if(v2){
+    var TT=T[v2.tool];
+    if(TT&&TT.risk!=='read'&&admin()){
+      PEND2=v2;
+      p=Promise.resolve({text:'⚠️ **تأكيد مطلوب** — هنفذ:\n`'+v2.tool+'` '+esc(JSON.stringify(v2.args))+'\n\nاكتب **"نفذ"** أو **"yes"** للتأكيد، أو **"لأ"** للإلغاء.'});
+    } else p=A.run(v2.tool,v2.args);
+  }
+  else { p=oldAsk(q); }
+  return p.then(function(r){
+    if(r&&r.data&&Array.isArray(r.data)&&r.data[0]&&(r.data[0].code||r.data[0].equipment)){ MEM.ctx.lastEq=r.data[0].code||r.data[0].equipment; memSave(); }
+    return r;
+  });
+};
+// rewire the chat send box to use upgraded ask (v1 closure calls execute directly, so we hook the input)
+var inp=document.getElementById('ha-in');
+if(inp){
+  var newInp=inp.cloneNode(true); inp.parentNode.replaceChild(newInp,inp);
+  var btn=document.getElementById('ha-send'), newBtn=btn.cloneNode(true); btn.parentNode.replaceChild(newBtn,btn);
+  var fabEl=document.getElementById('hac-agent-fab');
+  if(fabEl)fabEl.addEventListener('click',function(){ setTimeout(function(){ var pn=document.getElementById('hac-agent-panel'); if(pn&&pn.classList.contains('open'))newInp.focus(); },0); });
+  function fmt(t){
+    return esc(t||'…').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\[([^\]]+)\]\((https:[^)\s]+)\)/g,'<a href="$2" target="_blank" rel="noopener" style="color:#3fb950">$1</a>').replace(/^## (.+)$/gm,'<div style="font-size:15px;font-weight:700;color:#f0a500">$1</div>').replace(/^### (.+)$/gm,'<div style="font-weight:600;color:#58a6ff;margin:4px 0">$1</div>').replace(/^---$/gm,'<hr style="border:none;border-top:1px solid #30363d;margin:8px 0">').replace(/_(.+?)_/g,'<em style="color:#7d8590">$1</em>').replace(/\n/g,'<br>');
+  }
+  function send2(){
+    var text=newInp.value.trim(); if(!text)return; newInp.value='';
+    var body=document.getElementById('ha-body');
+    var u=document.createElement('div'); u.className='ha-msg user'; u.textContent=text; body.appendChild(u);
+    var tp=document.createElement('div'); tp.className='ha-msg bot'; tp.innerHTML='<span class="ha-typing"><span></span><span></span><span></span></span>'; body.appendChild(tp); body.scrollTop=body.scrollHeight;
+    A.ask(text).then(function(r){
+      tp.remove(); var d=document.createElement('div'); d.className='ha-msg bot';
+      d.innerHTML=fmt(r.text);
+      body.appendChild(d); body.scrollTop=body.scrollHeight;
+    }).catch(function(e){ tp.remove(); var d=document.createElement('div'); d.className='ha-msg bot'; d.textContent='❌ '+e.message; body.appendChild(d); });
+  }
+  newBtn.onclick=send2;
+  newInp.addEventListener('keydown',function(e){ if(e.key==='Enter')send2(); });
+  /* ═══ 10) VOICE — مايك عربي ═══ */
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(SR){
+    var mic=document.createElement('button'); mic.textContent='🎙'; mic.title='اتكلم بالعربي'; mic.style.cssText='background:#21262d;border:1px solid #30363d;border-radius:10px;padding:0 12px;cursor:pointer;font-size:16px;color:#e6edf3';
+    newBtn.parentNode.insertBefore(mic,newBtn);
+    var rec=new SR(); rec.lang='ar-EG'; rec.interimResults=false;
+    rec.onresult=function(e){ newInp.value=e.results[0][0].transcript; send2(); };
+    rec.onstart=function(){ mic.style.background='#f85149'; mic.textContent='⏺'; };
+    rec.onend=function(){ mic.style.background='#21262d'; mic.textContent='🎙'; };
+    mic.onclick=function(){ try{rec.start();}catch(e){} };
+  }
+  /* chips: وصّل القديمة على send2 + ضيف الجديدة */
+  var chips=document.getElementById('ha-chips');
+  [].slice.call(chips.children).forEach(function(b){ var c=b.textContent; b.onclick=function(){ newInp.value=c.replace(/^[^\s]+\s/,''); send2(); }; });
+  ['🔮 توقع التكاليف','🔻 فلوس ضايعة','📇 المهندسين','⏰ جدولاتي','🧠 ذاكرتك'].forEach(function(c){
+    var b=document.createElement('button'); b.className='ha-chip'; b.textContent=c;
+    b.onclick=function(){ newInp.value=c.replace(/^[^\s]+\s/,''); send2(); }; chips.appendChild(b);
+  });
+}
+A.version='2.0';
+console.log('%c🚀 HAC AI Agent upgraded to v2.0 — '+Object.keys(T).length+' tools · Voice AR · Scheduler · WhatsApp · Memory','color:#3fb950;font-weight:bold;font-size:13px');
+})();
+</script>
+
 </body>
 </html>
